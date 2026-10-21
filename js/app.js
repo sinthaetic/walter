@@ -1,4 +1,4 @@
-// WALTER V1.10 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.11 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -108,11 +108,18 @@
   renderTicker();
 
   // ---------- Portfolio ----------
-  // Graf: historiken i state.json + dagens värde om det är nyare
+  // Faser: capitalChange i state.json delar historiken. Före = fas 1 (paper-test), från och med = fas 2.
+  // Insättningen är ingen vinst, så faserna ritas aldrig som en sammanhängande linje.
+  const cc = pf.capitalChange || null;
+  const allHist = (pf.history || []).slice();
+  if (allHist.length && allHist[allHist.length - 1].date < S.updatedAt) allHist.push({ date: S.updatedAt, value: pf.value, cash: pf.holdings.CASH });
+  const phase1 = cc ? allHist.filter((h) => h.date < cc.date) : [];
+  const phase2 = cc ? [{ date: cc.date, value: cc.value, note: "insättning" }, ...allHist.filter((h) => h.date >= cc.date)] : allHist;
+
+  // Graf: fas 2 (eller hela historiken utan kapitalbyte) + dagens värde om det är nyare.
   // Tom historik = platt linje på startkapitalet, så grafen alltid ritas.
-  const hist = (pf.history || []).slice();
+  const hist = phase2.slice();
   if (!hist.length) hist.push({ date: S.startDate, value: start }, { date: S.updatedAt, value: start });
-  if (hist[hist.length - 1].date < S.updatedAt) hist.push({ date: S.updatedAt, value: pf.value, cash: pf.holdings.CASH });
   if (hist.length < 2) hist.unshift({ date: S.startDate, value: start });
   const chart = (() => {
     const W = 320, H = 110, P = 8;
@@ -132,6 +139,54 @@
       </svg>
       <div class="pf-axis sub"><span>${day(hist[0].date)}</span><span>streckat = startkapital</span><span>${day(last.date)}</span></div>`;
   })();
+
+  // ---------- Resan: fas 1 och fas 2 som två grafer med ett brott emellan ----------
+  const phaseChart = (pts, label) => {
+    const W = 300, H = 130, P = 14, TOP = 24, BOT = 22;
+    const vals = pts.map((h) => h.value);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo) * 0.15 || Math.max(1, hi * 0.02);
+    lo -= pad; hi += pad;
+    const x = (i) => P + 18 + (i * (W - 2 * P - 36)) / Math.max(1, pts.length - 1);
+    const y = (v) => H - BOT - ((v - lo) * (H - TOP - BOT)) / (hi - lo);
+    const line = pts.map((h, i) => `${x(i).toFixed(1)},${y(h.value).toFixed(1)}`).join(" ");
+    return `<svg class="pf-chart journey-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}: ${pts.map((h) => `${day(h.date)} ${nf(0).format(h.value)} kr`).join(", ")}">
+      <polyline points="${x(0).toFixed(1)},${H - BOT} ${line} ${x(pts.length - 1).toFixed(1)},${H - BOT}" class="pf-area"/>
+      <polyline points="${line}" class="pf-line"/>
+      ${pts.map((h, i) => `<circle cx="${x(i)}" cy="${y(h.value)}" r="${i === pts.length - 1 ? 4.5 : 3}" class="pf-dot"/>
+        <text x="${x(i)}" y="${y(h.value) - 9}" text-anchor="middle" class="journey-val">${amount(h.value)}</text>
+        <text x="${i === 0 ? P : i === pts.length - 1 ? W - P : x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle"}" class="journey-date">${[i && pts[i - 1].date === h.date ? "" : day(h.date), i === pts.length - 1 && !h.note ? "nu" : h.note || ""].filter(Boolean).map(esc).join(" · ")}</text>`).join("")}
+    </svg>`;
+  };
+  // Små belopp med ören (624,77), stora i hela kronor
+  const amount = (v) => new Intl.NumberFormat("sv-SE", { maximumFractionDigits: Math.abs(v) < 10000 ? 2 : 0 }).format(v);
+  // Fas 1 innehåller en DCA-insättning, så skillnaden där är ingen vinst – visa bara från/till.
+  // Fas 2 börjar på startkapitalet, så där är skillnaden mot start = vinsten.
+  const phaseSpan = (pts, withGain) => {
+    const d = pts[pts.length - 1].value - pts[0].value;
+    return `${amount(pts[0].value)} kr → ${amount(pts[pts.length - 1].value)} kr` + (withGain ? ` (${d < 0 ? "−" : "+"}${kr(Math.abs(d))})` : "");
+  };
+  if (cc && phase1.length && phase2.length > 1) {
+    // Hur stor "vinsten" hade sett ut om linjen dragits rakt igenom, avrundat nedåt (40 650 % -> 40 000 %)
+    const raw = (phase2[phase2.length - 1].value / phase1[phase1.length - 1].value - 1) * 100;
+    const mag = 10 ** Math.floor(Math.log10(Math.max(1, raw)));
+    const jump = Math.floor(raw / mag) * mag;
+    $("journey").hidden = false;
+    $("journey").innerHTML = `
+      <h2>Resan</h2>
+      <div class="journey-grid">
+        <div class="journey-phase">
+          <div class="journey-head"><b>Fas 1 · paper-test</b><span class="sub num">${esc(phaseSpan(phase1, false))}</span></div>
+          ${phaseChart(phase1, "Fas 1, paper-test")}
+        </div>
+        <div class="journey-break" role="separator"><span>${day(cc.date)}</span>${esc(cc.text)}</div>
+        <div class="journey-phase">
+          <div class="journey-head"><b>Fas 2 · nu</b><span class="sub num">${esc(phaseSpan(phase2, true))}</span></div>
+          ${phaseChart(phase2, "Fas 2, nytt startkapital")}
+        </div>
+      </div>
+      <p class="sub journey-foot">Fas 1 = paper-test ${kr(phase1[0].value)}. Fas 2 = nytt kapital ${kr(cc.value)}. Ingen ${nf(0).format(jump)} % vinst – hoppet är en insättning.</p>`;
+  }
 
   // ---------- K4-rader (portfolio-tabellen + K4-kortet) ----------
   // Avgifter: trading_fee (taker + slippage vid försäljningen) + withdrawal_fee. Bankens FX-avgift hör inte till K4.

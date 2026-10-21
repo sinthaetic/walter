@@ -232,9 +232,15 @@ def fees_pdf(state, cache, rows, year, path):
         story.append(Paragraph("EURSEK eller avgifter saknas – exemplet räknas när kursen har hämtats.", BODY))
 
     story.append(Paragraph("Portföljens väg", H2))
-    data = [["Datum", "Värde", "Varav kontant"]] + \
-           [[h["date"], kr(h["value"], 0), kr(h["cash"], 0)] for h in pf.get("history", [])]
-    story.append(table(data, [40, 50, 50], right_cols=(1, 2)))
+    cc = pf.get("capitalChange")
+    data = [["Datum", "Värde", "Varav kontant", "Not"]]
+    for h in pf.get("history", []):
+        if cc and h["date"] >= cc["date"] and not any(r[3] == "insättning" for r in data):
+            data.append([cc["date"], kr(cc["value"], 0), "", "insättning"])  # brottet mellan fas 1 och fas 2
+        data.append([h["date"], kr(h["value"], 0), kr(h["cash"], 0) if h.get("cash") is not None else "–", h.get("note", "")])
+    story.append(table(data, [32, 40, 40, 30], right_cols=(1, 2)))
+    if cc:
+        story.append(Paragraph(f"{cc['text']}. Före {cc['date']}: paper-test. Insättningen är ingen vinst.", SMALL))
     gain = pf["value"] - pf["start"]
     story.append(Spacer(1, 6))
     story.append(Paragraph(f"Startkapital {kr(pf['start'], 0)}, nu {kr(pf['value'], 0)} "
