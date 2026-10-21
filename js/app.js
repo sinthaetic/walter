@@ -1,4 +1,4 @@
-// WALTER V1.11 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.11.1 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -161,10 +161,16 @@
   // Små belopp med ören (624,77), stora i hela kronor
   const amount = (v) => new Intl.NumberFormat("sv-SE", { maximumFractionDigits: Math.abs(v) < 10000 ? 2 : 0 }).format(v);
   // Fas 1 innehåller en DCA-insättning, så skillnaden där är ingen vinst – visa bara från/till.
-  // Fas 2 börjar på startkapitalet, så där är skillnaden mot start = vinsten.
-  const phaseSpan = (pts, withGain) => {
-    const d = pts[pts.length - 1].value - pts[0].value;
-    return `${amount(pts[0].value)} kr → ${amount(pts[pts.length - 1].value)} kr` + (withGain ? ` (${d < 0 ? "−" : "+"}${kr(Math.abs(d))})` : "");
+  // Fas 2: capitalChange.manualTopUp = manuella insättningar efter startkapitalet (paper, tills LIVE).
+  // Bara det som blir kvar efter insättningarna kallas marknad.
+  const phaseSpan = (pts, split) => {
+    const from = `${amount(pts[0].value)} kr`, to = `${amount(pts[pts.length - 1].value)} kr`;
+    if (!split) return `${from} → ${to}`;
+    const sign = (v) => (v < 0 ? "−" : "+") + kr(Math.abs(v));
+    const manual = cc.manualTopUp || 0;
+    const market = pts[pts.length - 1].value - pts[0].value - manual;
+    const parts = [manual ? `${sign(manual)} insättning, manuell` : "", Math.abs(market) >= 1 ? `${sign(market)} marknad` : ""].filter(Boolean);
+    return `${from} (insättning) → ${to}${parts.length ? ` (${parts.join(", ")})` : ""}`;
   };
   if (cc && phase1.length && phase2.length > 1) {
     // Hur stor "vinsten" hade sett ut om linjen dragits rakt igenom, avrundat nedåt (40 650 % -> 40 000 %)
@@ -185,7 +191,7 @@
           ${phaseChart(phase2, "Fas 2, nytt startkapital")}
         </div>
       </div>
-      <p class="sub journey-foot">Fas 1 = paper-test ${kr(phase1[0].value)}. Fas 2 = nytt kapital ${kr(cc.value)}. Ingen ${nf(0).format(jump)} % vinst – hoppet är en insättning.</p>`;
+      <p class="sub journey-foot">Fas 1 = paper-test ${kr(phase1[0].value)}. Fas 2 = nytt kapital ${kr(cc.value)}. Ingen ${nf(0).format(jump)} % vinst – hoppet är en insättning.${cc.manualTopUp ? ` Även ${kr(cc.value)} → ${kr(phase2[phase2.length - 1].value)} är manuella insättningar, inte marknadsvinst, tills WALTER går LIVE.` : ""}</p>`;
   }
 
   // ---------- K4-rader (portfolio-tabellen + K4-kortet) ----------
