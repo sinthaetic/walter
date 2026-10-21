@@ -1,5 +1,5 @@
 {
-  "version": "1.9",
+  "version": "1.9.1",
   "startDate": "2026-10-15",
   "updatedAt": "2026-10-16",
 
@@ -20,7 +20,12 @@
     ]
   },
 
-  "k4": [],
+  "k4": [
+    { "id": "dust", "beteckning": "Bitcoin (BTC)", "antal": 0.00106721,
+      "kopdatum": "2026-10-17", "saljdatum": "2026-10-21",
+      "forsaljningspris_sek": 89, "omkostnad_sek": 87.27, "trading_fee_sek": 0.53, "withdrawal_fee_sek": 0,
+      "typ": "Damm (PAPER)", "not": "Avgift 0,53 kr = Kraken taker 0,40 % + slippage 0,2 % av 89 kr. Inget uttag, så ingen SEPA eller FX." }
+  ],
 
   "rules": {
     "parkeraAtRed": 7,

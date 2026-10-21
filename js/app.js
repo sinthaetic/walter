@@ -1,4 +1,4 @@
-// WALTER V1.9 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.9.1 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -133,6 +133,9 @@
       <div class="pf-axis sub"><span>${day(hist[0].date)}</span><span>streckat = startkapital</span><span>${day(last.date)}</span></div>`;
   })();
 
+  // Samma årsregel som fetcher/walter_k4.py: senaste försäljningens år, annars innevarande år
+  const sales = (S.k4 || []).map((r) => r.saljdatum).filter(Boolean).sort();
+  const reportYear = sales.length ? sales[sales.length - 1].slice(0, 4) : String(new Date().getFullYear());
   $("portfolio").innerHTML = `
     <h2>Portfolio</h2>
     <div class="pf-value num">${nf(0).format(pf.value)}<small>kr</small></div>
@@ -144,7 +147,11 @@
       <span class="chip">Kontant <strong class="num">${nf(0).format((1 - invested) * 100)} %</strong></span>
       <span class="chip">Dag <strong class="num">${days}</strong></span>
     </div>
-    <div class="pf-ref num" id="pf-ref"></div>`;
+    <div class="pf-ref num" id="pf-ref"></div>
+    <div class="pf-actions">
+      <a class="btn" href="reports/K4_${reportYear}_WALTER_PAPER.pdf" download>Ladda ner K4 (PAPER)</a>
+      <a class="btn" href="reports/Avgiftsrapport_${reportYear}_WALTER_PAPER.pdf" download>Avgiftsrapport (PAPER)</a>
+    </div>`;
   const renderRef = () => {
     const { usdsek, stale, btcSek } = fx();
     $("pf-ref").textContent = `Referens: ${nf(5).format(pf.refBtc)} BTC · startkapital ${kr(start)} · 1 BTC ` +
@@ -496,7 +503,9 @@
   syncGoal();
 
   // ---------- K4 ----------
-  // Avgifter: bara trading_fee + withdrawal_fee. Slippage ligger redan i försäljningspriset, bankens FX-avgift hör inte till K4.
+  // Avgifter: trading_fee (taker + slippage vid försäljningen) + withdrawal_fee. Bankens FX-avgift hör inte till K4.
+  // Samma regler som fetcher/walter_k4.py: vinst beskattas 30 %, förlust dras av till 70 %.
+  const kr2 = (v) => nf(2).format(v) + " kr";
   const k4 = (S.k4 || []).map((r) => ({
     ...r,
     vinst: r.forsaljningspris_sek - r.omkostnad_sek - (r.trading_fee_sek || 0) - (r.withdrawal_fee_sek || 0)
@@ -506,12 +515,13 @@
   $("k4").innerHTML = `
     <h2>K4 · deklaration</h2>
     ${!k4.length ? '<p class="notice-body">Inga försäljningar ännu, så det finns inget att deklarera.</p>' : `
-    <p class="notice-body">Vinster ${kr(gains)}, förluster ${kr(losses)}. 70 % av förlusten är avdragsgill: ${kr(losses * 0.7)}.</p>
+    <p class="notice-body">${k4.length === 1 ? "En försäljning" : `${k4.length} försäljningar`} i paper-journalen. Vinster ${kr2(gains)}, förluster ${kr2(losses)}. Skatten blir ungefär ${kr2(Math.max(0, (gains - losses * 0.7) * 0.3))} (30 % av vinsten, 70 % av förlusten får dras av).</p>
+    <p class="sub">PAPER – simulering, inte för Skatteverket. <a href="reports/K4_${reportYear}_WALTER_PAPER.csv" download>K4 som CSV</a></p>
     <details><summary>Siffrorna</summary><div class="table-wrap"><table class="k4-table num">
       <thead><tr><th>Köpt</th><th>Såld</th><th>Antal</th><th>Försäljningspris</th><th>Omkostnad</th><th>Trading fee</th><th>Withdrawal fee</th><th>Vinst/förlust</th><th>Typ</th></tr></thead>
-      <tbody>${k4.map((r) => `<tr><td>${esc(r.kopdatum)}</td><td>${esc(r.saljdatum)}</td><td>${esc(r.antal)}</td><td>${kr(r.forsaljningspris_sek)}</td><td>${kr(r.omkostnad_sek)}</td><td>${kr(r.trading_fee_sek || 0)}</td><td>${kr(r.withdrawal_fee_sek || 0)}</td><td class="${r.vinst < 0 ? "down" : "up"}">${kr(r.vinst)}</td><td>${esc(r.typ || "")}</td></tr>`).join("")}</tbody>
+      <tbody>${k4.map((r) => `<tr><td>${esc(r.kopdatum)}</td><td>${esc(r.saljdatum)}</td><td>${esc(r.antal)}</td><td>${kr2(r.forsaljningspris_sek)}</td><td>${kr2(r.omkostnad_sek)}</td><td>${kr2(r.trading_fee_sek || 0)}</td><td>${kr2(r.withdrawal_fee_sek || 0)}</td><td class="${r.vinst < 0 ? "down" : "up"}">${kr2(r.vinst)}</td><td>${esc(r.typ || "")}</td></tr>`).join("")}</tbody>
     </table></div></details>`}
-    <p class="sub">Omkostnad räknas FIFO inklusive köp-courtage. Vinster och förluster står på separata rader.</p>`;
+    <p class="sub">Omkostnad räknas med genomsnittsmetoden (Skatteverkets regel för krypto) inklusive köpavgift. Vinster och förluster står på separata rader.</p>`;
 
   // ---------- Inställningar (sparas bara i den här webbläsaren) ----------
   const SETTING_KEYS = ["startCapital", ...FEE_KEYS];

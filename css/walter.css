@@ -167,6 +167,7 @@ html, body {
 .status     { grid-column: span 12; padding: 14px 20px; }
 .notis      { grid-column: span 12; padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
 .notis p    { margin: 0; font-size: 15px; }
+.notis[hidden] { display: none; }
 
 /* Status + Uppdatera */
 .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 16px; align-items: center; }
@@ -301,6 +302,8 @@ body.is-live .topbar { border-color: rgba(255, 92, 122, 0.55); }
   border-radius: 12px; padding: 8px 12px; min-width: 0;
 }
 select.input option { background: var(--bg); }
+.pf-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pf-actions .btn { font-size: 13px; }
 .goal-plain { margin-top: 4px; }
 .goal-alts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
 .goal-alt { padding: 14px; border-radius: var(--radius-sm); background: var(--glass-2); border: 1px solid var(--glass-border); }

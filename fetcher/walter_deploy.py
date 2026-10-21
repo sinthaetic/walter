@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "deploy"
-ALLOW = ["index.html", "css", "js", "assets", "data/state.js", "data/cache.json"]
+ALLOW = ["index.html", "css", "js", "assets", "data/state.js", "data/cache.json", "reports"]
 BLOCK = {".env", "etf_raw.json"}  # extra spärr om någon lägger något fel i en tillåten mapp
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -31,6 +31,9 @@ def build_state():
     r = subprocess.run([sys.executable, str(ROOT / "fetcher" / "walter_fetch.py"), "--offline"])
     if r.returncode:
         sys.exit("Kunde inte bygga state.js – deploy avbruten.")
+    r = subprocess.run([sys.executable, str(ROOT / "fetcher" / "walter_k4.py")])
+    if r.returncode:
+        sys.exit("Kunde inte bygga K4/avgiftsrapport – deploy avbruten.")
 
 
 def copy_site():
