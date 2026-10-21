@@ -162,6 +162,8 @@
     return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
   const diff = pf.value - start;
+  // Samma takt som .github/workflows/walter-auto.yml: PARKERA ca var 3:e timme, annars var 15:e minut.
+  const autoMsg = `Uppdateras automatiskt ${parked ? "ungefär var 3:e timme (WALTER är parkerad)" : "var 15e min"} via GitHub Actions – både kurser och WALTER-lampor.`;
   $("status").innerHTML = `
     <div class="status-grid">
       <div class="status-item"><span class="sub">Senast uppdaterad</span><strong class="num" id="status-time">${stamp(S.fetchedAt)}</strong></div>
@@ -169,7 +171,7 @@
       <div class="status-item"><span class="sub">Portfölj</span><strong class="num">${kr(pf.value)}</strong><span class="num ${diff < 0 ? "down" : "up"}">${diff < 0 ? "−" : "+"}${kr(Math.abs(diff))} sedan start (${pct(start > 0 ? (diff / start) * 100 : 0)})</span></div>
       <button type="button" class="btn btn-primary status-btn" id="btn-refresh">Uppdatera</button>
     </div>
-    <p class="sub status-msg" id="status-msg" aria-live="polite">Knappen hämtar färska kurser för BTC, USDSEK och EURSEK. Full uppdatering kräver: <b>walter hamta</b> + <b>walter deploy</b> hemma.</p>`;
+    <p class="sub status-msg" id="status-msg" aria-live="polite">Knappen hämtar färska kurser för BTC, USDSEK och EURSEK. ${autoMsg}</p>`;
 
   const getJson = async (url) => {
     const r = await fetch(url, { cache: "no-store" });
@@ -212,7 +214,7 @@
     $("status-msg").innerHTML =
       (got.length ? `Färskt ${stamp(now.toISOString())}: ${esc(got.join(" · "))}. ` : "") +
       (failedSrc.length ? `<span class="warn">Kunde inte hämta: ${esc(failedSrc.join(", "))}. Senast sparade värden visas.</span> ` : "") +
-      "Lamporna ändras inte här – full uppdatering kräver: <b>walter hamta</b> + <b>walter deploy</b> hemma.";
+      autoMsg;
     btn.disabled = false;
     btn.textContent = "Uppdatera";
   });

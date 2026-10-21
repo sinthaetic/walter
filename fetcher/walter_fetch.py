@@ -295,16 +295,19 @@ def main():
     if not args.offline:
         load_env()
         print("WALTER hämtar data …")
-        fresh = {}
+        fresh, status = {}, {}
         for name, fn in SOURCES:
             try:
                 fresh.update(fn())
                 ok += 1
+                status[name] = "ok"
                 print(f"  OK   {name}")
             except Exception as e:
+                status[name] = "fel"
                 print(f"  FEL  {name}: {safe(e)}")
         if ok:
             cache["market"] = {**cache.get("market", {}), **fresh}
+            cache["sources"] = status  # vilka källor som svarade vid senaste hämtningen
             cache["fetchedAt"] = datetime.now().isoformat(timespec="seconds")
             CACHE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
 
