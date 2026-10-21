@@ -1,5 +1,5 @@
 {
-  "version": "1.11.1",
+  "version": "1.11.2",
   "startDate": "2026-10-15",
   "updatedAt": "2026-10-16",
 
@@ -89,10 +89,10 @@
       "date": "2026-10-21",
       "mode": "PARKERA",
       "red": 4,
-      "plain": "WALTER sålde de sista 89 kronorna i bitcoin. Nu ligger hela portföljen, 254 600 kr, som kontanter. Det är 54 600 kr mer än när vi började.",
+      "plain": "WALTER sålde de sista 89 kronorna i bitcoin. Nu ligger hela portföljen, 254 600 kr, som kontanter. Insättning 54 600 kr (manuell), inte trading-vinst.",
       "facts": [
         "Sålt: 89 SEK BTC (damm) → kontant",
-        "254 600 SEK totalt (+54 600 SEK, +27,3 %), allt cash, 0 SEK BTC",
+        "254 600 SEK totalt = 200 000 SEK startkapital + 54 600 SEK manuell insättning. Marknadsvinst 0 SEK. Allt cash, 0 SEK BTC",
         "Referens: 200 000 SEK / (BTC $81 604 × USDSEK 9,9719 den 15 okt) = 0,24578 BTC",
         "4/10 röda lampor enligt hämtad data (10-årig ränta, ETF-flöden, KPI, SOPR)",
         "USDSEK 9,8785 och EURSEK 11,0975 (Riksbanken, 21 okt)",

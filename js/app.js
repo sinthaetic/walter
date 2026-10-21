@@ -1,4 +1,4 @@
-// WALTER V1.11.1 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.11.2 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -55,6 +55,12 @@
   const days = daysSince(S.startDate);
   const parked = S.mode === "PARKERA";
   const start = Number.isFinite(settings.startCapital) && settings.startCapital > 0 ? settings.startCapital : pf.start;
+  // Insättningar = startkapital + manuella påfyllningar (capitalChange.manualTopUp). Bara det som är över
+  // insättningarna är marknadsvinst – den räknas för vinst, upplåsning och OPTIMERAT.
+  const topUp = (pf.capitalChange && pf.capitalChange.manualTopUp) || 0;
+  const deposits = start + topUp;
+  const marketGain = pf.value - deposits;
+  const marketPct = deposits > 0 ? (marketGain / deposits) * 100 : 0;
 
   // USDSEK: senast sparade live-kurs med datum, annars null. Ingen fast reservkurs.
   // Funktion, eftersom Uppdatera-knappen kan byta ut m.usdsek / m.btc mot färskare värden.
@@ -243,14 +249,13 @@
     const d = new Date(iso);
     return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
-  const diff = pf.value - start;
   // Samma takt som .github/workflows/walter-auto.yml: PARKERA ca var 3:e timme, annars var 15:e minut.
   const autoMsg = `Uppdateras automatiskt ${parked ? "ungefär var 3:e timme (WALTER är parkerad)" : "var 15e min"} via GitHub Actions – både kurser och WALTER-lampor.`;
   $("status").innerHTML = `
     <div class="status-grid">
       <div class="status-item"><span class="sub">Senast uppdaterad</span><strong class="num" id="status-time">${stamp(S.fetchedAt)}</strong></div>
       <div class="status-item"><span class="sub">WALTER</span><strong><span class="dot${parked ? "" : " green"}"></span>${esc(S.mode)} – ${esc(MODE_TEXT[S.mode] || "okänt läge")}</strong><span class="sub num">${red}/${total} röda lampor</span></div>
-      <div class="status-item"><span class="sub">Portfölj</span><strong class="num">${kr(pf.value)}</strong><span class="num ${diff < 0 ? "down" : "up"}">${diff < 0 ? "−" : "+"}${kr(Math.abs(diff))} sedan start (${pct(start > 0 ? (diff / start) * 100 : 0)})</span></div>
+      <div class="status-item"><span class="sub">Portfölj</span><strong class="num">${kr(pf.value)}</strong><span class="sub num">Insättningar ${kr(deposits)}${topUp ? ` (${kr(start)} + ${kr(topUp)})` : ""}</span><span class="num ${marketGain < 0 ? "down" : marketGain > 0 ? "up" : ""}">Marknadsvinst ${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))} (${pct(marketPct)})</span></div>
       <button type="button" class="btn btn-primary status-btn" id="btn-refresh">Uppdatera</button>
     </div>
     <p class="sub status-msg" id="status-msg" aria-live="polite">Knappen hämtar färska kurser för BTC, USDSEK och EURSEK. ${autoMsg}</p>`;
@@ -415,7 +420,7 @@
   const paths = [
     { name: "Tidig upplåsning", conds: [
       [`Minst ${u.early.days} dagar (dag ${days})`, days >= u.early.days],
-      [`Upp ${u.early.gainPct} % till ${kr(start * (1 + u.early.gainPct / 100))} (nu ${kr(pf.value)})`, pf.value >= start * (1 + u.early.gainPct / 100)],
+      [`Marknadsvinst ${nf(0).format(Math.max(0, marketPct))} % / ${u.early.gainPct} %${marketPct >= u.early.gainPct ? "" : " – väntar"} (krävs +${kr(deposits * u.early.gainPct / 100)} över insättningarna ${kr(deposits)})`, marketPct >= u.early.gainPct],
       [`Drawdown under ${u.early.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.early.maxDd],
       [`Minst ${u.early.minGreen}/${total} gröna lampor (nu ${green})`, green >= u.early.minGreen]
     ] },
@@ -524,7 +529,8 @@
         (parked ? " Just nu är pengarna parkerade och växer inte." : " Det finns ingen garanti att nå dit – det här visar bara hur stor ökningen skulle behöva vara.");
     }
 
-    // Tre vägar. BALANSERAT = när WALTER inte skulle parkera. OPTIMERAT (TP) = när hela uttaget ryms i vinsten.
+    // Tre vägar. BALANSERAT = när WALTER inte skulle parkera. OPTIMERAT (TP) = när uttaget ryms över startkapitalet –
+    // i marknadsvinst om det finns, annars i de manuella insättningarna (sägs rakt ut).
     const maxRed = S.rules.parkeraAtRed - 1;
     const calm = red <= maxRed;
     const short = kr(Math.max(0, brutto - pf.value));
@@ -537,7 +543,8 @@
           : enough ? `Marknaden är lugn nog (${red} av ${total} lampor). Du kan sälja direkt.` : `Lugnt nu (${red} av ${total} lampor), men det fattas ${short}.` },
       { name: "OPTIMERAT", when: "Vänta på TP", ok: pf.value > 0 && pf.value >= tp,
         text: !(pf.value > 0) ? "Portföljens värde saknas."
-          : pf.value >= tp ? `Uttaget ryms i vinsten (${kr(pf.value - start)}). Startkapitalet på ${kr(start)} lämnas orört.`
+          : marketGain >= brutto ? `Uttaget ryms i marknadsvinsten (${kr(marketGain)}). Insättningarna lämnas orörda.`
+          : pf.value >= tp ? `Uttaget ryms i insättningar (${kr(topUp)})${marketGain > 0 ? ` och marknadsvinst (${kr(marketGain)})` : " – ingen marknadsvinst än"}. Startkapitalet på ${kr(start)} lämnas orört.`
           : (() => { const gr = growth(tp); return `Vänta tills portföljen är värd ${kr(tp)} – då tas hela uttaget ur vinsten. Det är ${pct(gr.need * 100, 0)} till, ungefär ${pct(gr.perMonth * 100, 0)} i månaden på ${label}.`; })() }
     ];
 

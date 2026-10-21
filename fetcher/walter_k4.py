@@ -241,10 +241,13 @@ def fees_pdf(state, cache, rows, year, path):
     story.append(table(data, [32, 40, 40, 30], right_cols=(1, 2)))
     if cc:
         story.append(Paragraph(f"{cc['text']}. Före {cc['date']}: paper-test. Insättningen är ingen vinst.", SMALL))
-    gain = pf["value"] - pf["start"]
+    top_up = (cc or {}).get("manualTopUp", 0)
+    deposits = pf["start"] + top_up
+    gain = pf["value"] - deposits  # marknadsvinst = det som är över insättningarna
     story.append(Spacer(1, 6))
-    story.append(Paragraph(f"Startkapital {kr(pf['start'], 0)}, nu {kr(pf['value'], 0)} "
-                           f"({'+' if gain >= 0 else ''}{kr(gain, 0)}). Paper trading – inga riktiga pengar har rört sig.", BODY))
+    story.append(Paragraph(f"Insättningar {kr(deposits, 0)} (startkapital {kr(pf['start'], 0)}"
+                           f"{f' + manuell insättning {kr(top_up, 0)}' if top_up else ''}), nu {kr(pf['value'], 0)}. "
+                           f"Marknadsvinst {'+' if gain >= 0 else ''}{kr(gain, 0)}. Paper trading – inga riktiga pengar har rört sig.", BODY))
     build_pdf(path, story)
 
 
