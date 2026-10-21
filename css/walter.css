@@ -304,6 +304,14 @@ body.is-live .topbar { border-color: rgba(255, 92, 122, 0.55); }
 select.input option { background: var(--bg); }
 .pf-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .pf-actions .btn { font-size: 13px; }
+/* K4 i portfolio-kortet: kortet är smalt, så varje försäljning blir ett rutnät (etikett ovanför värdet) */
+.pf-k4 { margin-top: 14px; }
+.pf-k4 .k4-table, .pf-k4 tbody { display: block; white-space: normal; }
+.pf-k4 caption { display: block; text-align: left; padding: 0 0 6px; }
+.pf-k4 thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.pf-k4 tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; padding: 12px 0; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
+.pf-k4 .k4-table td { display: block; padding: 0; border: 0; text-align: left; font-size: 13px; overflow-wrap: anywhere; }
+.pf-k4 td::before { content: attr(data-label); display: block; color: var(--text-3); font-size: 11px; font-weight: 600; margin-bottom: 2px; }
 .goal-plain { margin-top: 4px; }
 .goal-alts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
 .goal-alt { padding: 14px; border-radius: var(--radius-sm); background: var(--glass-2); border: 1px solid var(--glass-border); }
@@ -365,6 +373,7 @@ details summary { cursor: pointer; color: var(--text-3); font-size: 13px; }
   .pf-value { font-size: 44px; }
   .goal-form { grid-template-columns: 1fr; }
   .goal-alts { grid-template-columns: 1fr; }
+  .pf-k4 tr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Mobil: portfolio direkt under tickern, status strax efter */
   .portfolio { order: -2; }
   .status { order: -1; padding: 14px 16px; }

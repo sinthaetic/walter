@@ -1,4 +1,4 @@
-// WALTER V1.9.2 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.10 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -133,6 +133,14 @@
       <div class="pf-axis sub"><span>${day(hist[0].date)}</span><span>streckat = startkapital</span><span>${day(last.date)}</span></div>`;
   })();
 
+  // ---------- K4-rader (portfolio-tabellen + K4-kortet) ----------
+  // Avgifter: trading_fee (taker + slippage vid försäljningen) + withdrawal_fee. Bankens FX-avgift hör inte till K4.
+  // Samma regler som fetcher/walter_k4.py: vinst beskattas 30 %, förlust dras av till 70 %.
+  const kr2 = (v) => nf(2).format(v) + " kr";
+  const k4 = (S.k4 || []).map((r) => ({
+    ...r,
+    vinst: r.forsaljningspris_sek - r.omkostnad_sek - (r.trading_fee_sek || 0) - (r.withdrawal_fee_sek || 0)
+  }));
   // Samma årsregel som fetcher/walter_k4.py: senaste försäljningens år, annars innevarande år
   const sales = (S.k4 || []).map((r) => r.saljdatum).filter(Boolean).sort();
   const reportYear = sales.length ? sales[sales.length - 1].slice(0, 4) : String(new Date().getFullYear());
@@ -151,7 +159,12 @@
     <div class="pf-actions">
       <a class="btn" href="reports/K4_${reportYear}_WALTER_PAPER.pdf" download>Ladda ner K4 (PAPER)</a>
       <a class="btn" href="reports/Avgiftsrapport_${reportYear}_WALTER_PAPER.pdf" download>Avgiftsrapport (PAPER)</a>
-    </div>`;
+    </div>
+    ${k4.length ? `<div class="pf-k4"><table class="k4-table num">
+      <caption class="sub">K4 ${reportYear} · PAPER – simulering, belopp i kr</caption>
+      <thead><tr><th>Köpdatum</th><th>Säljdatum</th><th>Antal</th><th>Försäljning</th><th>Omkostnad</th><th>Vinst</th><th>Avgift</th><th>Beteckning</th></tr></thead>
+      <tbody>${k4.map((r) => `<tr><td data-label="Köpdatum">${esc(r.kopdatum)}</td><td data-label="Säljdatum">${esc(r.saljdatum)}</td><td data-label="Antal">${nf(8).format(r.antal)}</td><td data-label="Försäljning">${nf(2).format(r.forsaljningspris_sek)}</td><td data-label="Omkostnad">${nf(2).format(r.omkostnad_sek)}</td><td data-label="${r.vinst < 0 ? "Förlust" : "Vinst"}" class="${r.vinst < 0 ? "down" : "up"}">${r.vinst < 0 ? "−" : ""}${nf(2).format(Math.abs(r.vinst))}</td><td data-label="Avgift">${nf(2).format((r.trading_fee_sek || 0) + (r.withdrawal_fee_sek || 0))}</td><td data-label="Beteckning">${esc(r.beteckning || "")}</td></tr>`).join("")}</tbody>
+    </table></div>` : `<p class="sub">Inga försäljningar ${reportYear} ännu.</p>`}`;
   const renderRef = () => {
     const { usdsek, stale, btcSek } = fx();
     $("pf-ref").textContent = `Referens: ${nf(5).format(pf.refBtc)} BTC · startkapital ${kr(start)} · 1 BTC ` +
@@ -503,13 +516,6 @@
   syncGoal();
 
   // ---------- K4 ----------
-  // Avgifter: trading_fee (taker + slippage vid försäljningen) + withdrawal_fee. Bankens FX-avgift hör inte till K4.
-  // Samma regler som fetcher/walter_k4.py: vinst beskattas 30 %, förlust dras av till 70 %.
-  const kr2 = (v) => nf(2).format(v) + " kr";
-  const k4 = (S.k4 || []).map((r) => ({
-    ...r,
-    vinst: r.forsaljningspris_sek - r.omkostnad_sek - (r.trading_fee_sek || 0) - (r.withdrawal_fee_sek || 0)
-  }));
   const gains = k4.filter((r) => r.vinst >= 0).reduce((a, r) => a + r.vinst, 0);
   const losses = Math.abs(k4.filter((r) => r.vinst < 0).reduce((a, r) => a + r.vinst, 0));
   $("k4").innerHTML = `
