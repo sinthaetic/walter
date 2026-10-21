@@ -1,10 +1,15 @@
 {
-  "version": "1.11.4",
+  "version": "1.12",
   "startDate": "2026-10-21",
   "updatedAt": "2026-10-16",
 
   "mode": "PARKERA",
   "level": 1,
+  "levels": {
+    "1": { "asset": "BTC", "name": "Bitcoin", "unlocked": true, "since": "2026-10-21" },
+    "2": { "asset": "ETH", "name": "Ethereum", "gainPct": 20, "description": "+20 % riktig marknadsvinst över alla insättningar" },
+    "3": { "asset": "GULD", "name": "Guld", "targetTotal": 500000, "description": "Portfölj 500 000 kr – av marknadsvinst, inte insättningar" }
+  },
 
   "portfolio": {
     "start": 200000,

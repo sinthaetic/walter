@@ -180,6 +180,16 @@ html, body {
 .journey-date { fill: var(--text-3); font-size: 9.5px; }
 .journey-foot { margin: 12px 0 0; }
 
+/* Level-rad: Level 1 ✓ · Level 2 med progress mot marknadsvinst · Level 3 */
+.level-strip { grid-column: span 12; padding: 14px 20px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px 28px; align-items: center; }
+.level-strip[hidden] { display: none; }
+.lv-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 14px; color: var(--text-2); }
+.lv-item b { color: var(--text); }
+.lv-item.open b { color: var(--cyan); }
+.lv-progress { display: grid; grid-template-columns: auto 1fr; }
+.lv-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--glass-2); border: 1px solid var(--glass-border); overflow: hidden; }
+.lv-bar span { display: block; height: 100%; background: var(--cyan); box-shadow: 0 0 8px rgba(0, 255, 209, 0.6); }
+
 /* Status + Uppdatera */
 .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 16px; align-items: center; }
 .status-item { display: grid; gap: 2px; min-width: 0; }
@@ -390,6 +400,7 @@ details summary { cursor: pointer; color: var(--text-3); font-size: 13px; }
   .status { order: -1; padding: 14px 16px; }
   .notis { order: -1; padding: 12px 16px; }
   .journey-grid { grid-template-columns: 1fr; }
+  .level-strip { grid-template-columns: 1fr; padding: 14px 16px; }
   .journey-break { border-left: 0; border-top: 2px dashed var(--amber); padding: 12px 0 4px; }
   .status-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .status-btn { grid-column: 1 / -1; }

@@ -1,4 +1,4 @@
-// WALTER V1.11.4 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.12 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -393,17 +393,30 @@
     <p class="alloc-foot">Investerat ${nf(0).format(invested * 100)} % av max ${S.rules.maxInvested * 100} %. Strecket visar tak (eller golv för kontanter).</p>`;
 
   // ---------- Levels ----------
+  // Upplåsning räknas ALLTID på marknadsvinst över insättningarna – insättningar låser aldrig upp.
+  // Level 2: +gainPct % över insättningarna. Level 3: targetTotal kr, där allt över insättningarna är marknadsvinst.
+  // Beloppen räknas här (inte fasta i state.json), så en ny insättning flyttar kraven med sig.
+  const LV = S.levels || {};
+  const lvReq = {
+    2: LV[2] ? { profit: deposits * LV[2].gainPct / 100, total: deposits * (1 + LV[2].gainPct / 100) } : null,
+    3: LV[3] ? { profit: Math.max(0, LV[3].targetTotal - deposits), total: LV[3].targetTotal } : null
+  };
+  const lvUnlocked = (n) => n === 1 || (lvReq[n] != null && pf.value >= lvReq[n].total && marketGain >= lvReq[n].profit && marketGain > 0);
+  // Låst level: villkoren visas släckta ("tänds" först när leveln är upplåst)
+  const lockedDot = '<span class="dot off" title="Låst tills leveln är upplåst"></span>';
   const levels = [
     { n: 1, name: "Level 1 · Bitcoin", tag: "BTC max 35 % · kontant minst 25 %", conds: [
       ["Aktiv från start", true],
       [`Inte PARKERA (färre än ${S.rules.parkeraAtRed}/${total} röda lampor)`, !parked]
     ] },
     { n: 2, name: "Level 2 · Ethereum", tag: "ETH 20 %", conds: [
+      [`Upplåst: +${LV[2] ? LV[2].gainPct : "?"} % marknadsvinst (${kr(Math.max(0, marketGain))} / ${kr(lvReq[2] ? lvReq[2].profit : 0)})`, lvUnlocked(2), true],
       ["BTC är LONG", m.btcLong],
       ["ETH/BTC över 30-dagars snitt", m.ethBtcAbove30dMa],
       ["SOPR under 1,0", m.sopr.value == null ? null : m.sopr.value < 1]
     ] },
     { n: 3, name: "Level 3 · Guld", tag: "PAXG / XAUT 20 %", conds: [
+      [`Upplåst: portfölj ${kr(lvReq[3] ? lvReq[3].total : 0)} av marknadsvinst (${kr(Math.max(0, marketGain))} / ${kr(lvReq[3] ? lvReq[3].profit : 0)})`, lvUnlocked(3), true],
       [`Dollarindex över 105 (nu ${nf(1).format(m.dxy.value)})`, m.dxy.value > 105],
       [`10-årig ränta över 4,5 % (nu ${nf(2).format(m.us10y.value)} %)`, m.us10y.value > 4.5],
       [`VIX upp mer än 10 % (${day(m.vix.asOf)}: ${pct(m.vix.changePct)})`, m.vix.changePct > 10]
@@ -414,8 +427,22 @@
     ${levels.map((l) => `
       <div class="level${l.n === S.level ? " current" : ""}">
         <div class="level-head"><span>${l.name}${l.n === S.level ? " · nu" : ""}</span><span class="tag">${esc(l.tag)}</span></div>
-        <ul class="conds">${l.conds.map(([t, ok]) => `<li>${check(ok)}${esc(t)}</li>`).join("")}</ul>
+        <ul class="conds">${l.conds.map(([t, ok, gate]) => `<li>${gate || lvUnlocked(l.n) ? check(ok) : lockedDot}${esc(t)}</li>`).join("")}</ul>
       </div>`).join("")}`;
+
+  // ---------- Level-rad under Resan: BTC ✓ · ETH 🔒 med progress · GULD 🔒 ----------
+  if (LV[1]) {
+    const lv2pct = lvReq[2] && lvReq[2].profit > 0 ? Math.min(100, Math.max(0, marketGain) / lvReq[2].profit * 100) : 0;
+    const k = (v) => (v >= 1000 ? new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 1 }).format(v / 1000) + "k" : kr(v));  // 254,6k · 500k
+    $("level-strip").hidden = false;
+    $("level-strip").innerHTML = `
+      <div class="lv-item${lvUnlocked(1) ? " open" : ""}"><b>Level 1 ${esc(LV[1].asset)}</b><span>✓ (${k(pf.value)})</span></div>
+      ${lvReq[2] ? `<div class="lv-item lv-progress${lvUnlocked(2) ? " open" : ""}">
+        <b>Level 2 ${esc(LV[2].asset)}</b><span>${lvUnlocked(2) ? "✓" : "🔒"} ${kr(Math.max(0, marketGain))} / ${kr(lvReq[2].profit)} (${nf(0).format(lv2pct)} %) → ${kr(lvReq[2].total)}</span>
+        <div class="lv-bar" role="progressbar" aria-label="Marknadsvinst mot Level 2" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(lv2pct)}"><span style="width:${lv2pct}%"></span></div>
+      </div>` : ""}
+      ${lvReq[3] ? `<div class="lv-item${lvUnlocked(3) ? " open" : ""}"><b>Level 3 ${esc(LV[3].asset)}</b><span>${lvUnlocked(3) ? "✓" : "🔒"} vid ${k(lvReq[3].total)}</span></div>` : ""}`;
+  }
 
   // ---------- Upplåsning ----------
   const u = S.rules.unlock;
