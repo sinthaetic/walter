@@ -88,9 +88,14 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
             echo "Inga Netlify-secrets – hoppar över Netlify."
             exit 0
           fi
+          # Varje Netlify-deploy kostar krediter. "[skip netlify]" i commit-meddelandet = bara GitHub Pages.
+          case "$COMMIT_MSG" in
+            *"[skip netlify]"*) echo "[skip netlify] i commit-meddelandet – hoppar över Netlify."; exit 0 ;;
+          esac
           npx --yes netlify-cli deploy --prod --dir=deploy --site "$NETLIFY_SITE_ID"
