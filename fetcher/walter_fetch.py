@@ -11,6 +11,7 @@ Mode ändras aldrig automatiskt – journalen är facit. Hämtaren räknar bara 
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -46,6 +47,11 @@ def day(iso):
 def warn(msg):
     """Gul varning i terminalen. Avbryter aldrig hämtningen."""
     print(f"[33m  VARNING  {msg}[0m")
+
+
+def safe(e):
+    """Felmeddelande utan nycklar – requests lägger hela URL:en (med api_key=…) i texten."""
+    return re.sub(r"(api_key|apikey|key|token)=[^&\s]+", r"=***", str(e), flags=re.I)
 
 
 def get_json(url, **kw):
@@ -296,7 +302,7 @@ def main():
                 ok += 1
                 print(f"  OK   {name}")
             except Exception as e:
-                print(f"  FEL  {name}: {e}")
+                print(f"  FEL  {name}: {safe(e)}")
         if ok:
             cache["market"] = {**cache.get("market", {}), **fresh}
             cache["fetchedAt"] = datetime.now().isoformat(timespec="seconds")
