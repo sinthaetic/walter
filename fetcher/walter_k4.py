@@ -74,12 +74,16 @@ def k4_summary(rows):
 def write_csv(rows, path):
     with path.open("w", newline="", encoding="utf-8-sig") as f:  # BOM + semikolon = öppnas rätt i svensk Excel
         w = csv.writer(f, delimiter=";")
-        w.writerow(["Status", "Antal", "Beteckning", "Försäljningspris (kr)", "Omkostnadsbelopp (kr)",
-                    "Vinst (kr)", "Förlust (kr)", "Köpdatum", "Säljdatum", "Avgift (kr)", "Typ"])
+        # Datum och exakta belopp först. Vinst/Förlust = försäljningspris − avgift − omkostnad.
+        # Sist: hela kronor som på blanketten, och PAPER-stämpeln.
+        w.writerow(["Köpdatum", "Säljdatum", "Antal/Belopp", "Försäljningspris (kr)", "Omkostnadsbelopp (kr)",
+                    "Vinst/Förlust (kr)", "Avgift (kr)", "Beteckning", "Typ",
+                    "K4 försäljningspris (hela kr)", "K4 omkostnad (hela kr)", "Status"])
         for r in rows:
-            w.writerow([WATERMARK, num(r["antal"], 8), r["beteckning"], r["sale_k4"], r["cost_k4"],
-                        max(0, r["sale_k4"] - r["cost_k4"]), max(0, r["cost_k4"] - r["sale_k4"]),
-                        r["kopdatum"], r["saljdatum"], num(r["fee"], 2), r.get("typ", "")])
+            w.writerow([r["kopdatum"], r["saljdatum"], f"{num(r['antal'], 8)} {r['beteckning'].split('(')[-1].rstrip(')')}",
+                        num(r["forsaljningspris_sek"], 2), num(r["omkostnad_sek"], 2), num(r["result"], 2),
+                        num(r["fee"], 2), r["beteckning"], r.get("typ", ""),
+                        r["sale_k4"], r["cost_k4"], WATERMARK])
 
 
 # ---------- PDF ----------
@@ -156,11 +160,11 @@ def k4_pdf(rows, summ, year, path):
         story.append(table(data, [24, 26, 20, 20, 26, 20, 19, 19], right_cols=(0, 4, 5, 6, 7)))
         story.append(Paragraph("* Efter avdrag för försäljningsavgifter. Hela kronor, som på blanketten.", SMALL))
         story.append(Paragraph("Exakt uträkning", H2))
-        data = [["Försäljning", "Säljpris", "Avgift", "Netto", "Omkostnad", "Resultat"]]
+        data = [["Köpt", "Såld", "Säljpris", "Avgift", "Netto", "Omkostnad", "Vinst/Förlust"]]
         for r in rows:
-            data.append([f"{r['saljdatum']} {r.get('typ', '')}", kr(r["forsaljningspris_sek"]), kr(-r["fee"]),
+            data.append([r["kopdatum"], r["saljdatum"], kr(r["forsaljningspris_sek"]), kr(-r["fee"]),
                          kr(r["sale_net"]), kr(-r["omkostnad_sek"]), kr(r["result"])])
-        story.append(table(data, [44, 24, 22, 24, 26, 24], right_cols=(1, 2, 3, 4, 5)))
+        story.append(table(data, [22, 22, 23, 21, 24, 25, 27], right_cols=(2, 3, 4, 5, 6)))
         notes = [r["not"] for r in rows if r.get("not")]
         if notes:
             story.append(Spacer(1, 4))
