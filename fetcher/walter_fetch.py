@@ -25,7 +25,7 @@ OUT = ROOT / "data" / "state.js"
 ENV = Path(__file__).resolve().parent / ".env"
 
 HTTP = requests.Session()
-HTTP.headers["User-Agent"] = "WALTER/1.6.3 (paper trading)"
+HTTP.headers["User-Agent"] = "WALTER/1.7 (paper trading)"
 MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"]
 
 

@@ -300,6 +300,11 @@ body.is-live .topbar { border-color: rgba(255, 92, 122, 0.55); }
 }
 select.input option { background: var(--bg); }
 .goal-plain { margin-top: 4px; }
+.goal-alts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+.goal-alt { padding: 14px; border-radius: var(--radius-sm); background: var(--glass-2); border: 1px solid var(--glass-border); }
+.goal-alt-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.goal-alt-head .sub { font-size: 12px; }
+.goal-alt p { margin: 8px 0 0; font-size: 13px; color: var(--text-2); }
 .facts { margin: 8px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
 details summary { cursor: pointer; color: var(--text-3); font-size: 13px; }
 .warn { margin: 8px 0; font-size: 13px; color: var(--amber); }
@@ -354,6 +359,7 @@ details summary { cursor: pointer; color: var(--text-3); font-size: 13px; }
 
   .pf-value { font-size: 44px; }
   .goal-form { grid-template-columns: 1fr; }
+  .goal-alts { grid-template-columns: 1fr; }
   /* Mobil: portfolio direkt under tickern, status strax efter */
   .portfolio { order: -2; }
   .status { order: -1; padding: 14px 16px; }

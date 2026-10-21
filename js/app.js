@@ -1,4 +1,4 @@
-// WALTER V1.6.3 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.7 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -11,11 +11,12 @@
     set(k, v, area = localStorage) { try { area.setItem(k, JSON.stringify(v)); } catch { /* lagring blockerad */ } }
   };
   const settings = store.get("walter.settings", {});
-  // Avgifter är inställningar, aldrig hårdkodade. null = inte angivet.
-  const fees = {
-    tradingPct: Number.isFinite(settings.tradingFeePct) ? settings.tradingFeePct : null,
-    withdrawalSek: Number.isFinite(settings.withdrawalFeeSek) ? settings.withdrawalFeeSek : null
-  };
+  // Uttagsavgifter: standard i state.json (rules.withdrawalFees), kan skrivas över under Inställningar.
+  // Aldrig hårdkodade här. null = inte angivet.
+  const FEE_KEYS = ["takerPct", "slippagePct", "sepaEur", "fxPct"];
+  const feeDefaults = S.rules.withdrawalFees || {};
+  const fees = Object.fromEntries(FEE_KEYS.map((k) => [k,
+    Number.isFinite(settings[k]) ? settings[k] : Number.isFinite(feeDefaults[k]) ? feeDefaults[k] : null]));
 
   // ---------- Format ----------
   const nf = (d = 0) => new Intl.NumberFormat("sv-SE", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -362,14 +363,35 @@
     </div>`;
 
   // ---------- Footer ----------
-  // ---------- Sparmål (slider 5 000–500 000 kr + eget belopp) ----------
-  const PURPOSES = { bil: ["Bil", "en bil"], husinsats: ["Husinsats", "en husinsats"], resa: ["Resa", "en resa"], rakningar: ["Räkningar", "räkningar"], buffert: ["Buffert", "en buffert"] };
+  // ---------- Mitt mål: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
+  const PURPOSES = { bil: ["Bil", "en bil"], husinsats: ["Husinsats", "en husinsats"], resa: ["Resa", "en resa"], rakningar: ["Räkningar", "räkningar"], buffert: ["Buffert", "en buffert"], annat: ["Annat", "ditt mål"] };
   const HORIZONS = { "1v": [7, "1 vecka"], "1m": [30, "1 månad"], "3m": [91, "3 månader"], "6m": [182, "6 månader"] };
   const goal = Object.assign({ amount: 50000, purpose: "buffert", horizon: "1m" }, store.get("walter.goal", {}));
   if (!HORIZONS[goal.horizon]) goal.horizon = "1m";
   if (!PURPOSES[goal.purpose]) goal.purpose = "buffert";
   if (!(goal.amount > 0)) goal.amount = 50000;
-  const feesKnown = fees.tradingPct != null && fees.withdrawalSek != null;
+  const feesKnown = FEE_KEYS.every((k) => fees[k] != null);
+
+  // Brutto = det som måste säljas för att netto ska landa på banken i SEK:
+  // sälj på Kraken (taker + slippage) → EUR → SEPA-uttag (fast €) → banken växlar till SEK (FX %).
+  // null när avgifter eller dagens EURSEK saknas – då räknas inget på gissning.
+  const grossFor = (netto) => {
+    const eursek = m.eursek && m.eursek.value;
+    if (!feesKnown || !eursek) return null;
+    const t = fees.takerPct / 100, s = fees.slippagePct / 100, f = fees.fxPct / 100;
+    const sepa = fees.sepaEur * eursek;
+    const beforeFx = netto / (1 - f);
+    const brutto = (beforeFx + sepa) / ((1 - t) * (1 - s));
+    return {
+      brutto,
+      parts: [
+        [`Kraken taker ${nf(2).format(fees.takerPct)} %`, brutto * t],
+        [`Slippage ${nf(1).format(fees.slippagePct)} %`, brutto * (1 - t) * s],
+        [`SEPA-uttag €${nf(0).format(fees.sepaEur)} (EURSEK ${nf(4).format(eursek)}, ${day(m.eursek.asOf)})`, sepa],
+        [`Valutaväxling ${nf(1).format(fees.fxPct)} %`, beforeFx - netto]
+      ]
+    };
+  };
 
   $("goal").innerHTML = `
     <h2>Mitt mål</h2>
@@ -393,25 +415,58 @@
   const renderGoal = () => {
     const [daysH, label] = HORIZONS[goal.horizon];
     const netto = goal.amount;
-    // Netto är alltid ≤ brutto: brutto − säljavgift − uttagsavgift = netto
-    const brutto = feesKnown ? (netto + fees.withdrawalSek) / (1 - fees.tradingPct / 100) : netto;
-    const gain = pf.value > 0 ? brutto / pf.value - 1 : null;
-    const perMonth = gain != null ? Math.pow(1 + gain, 30 / daysH) - 1 : null;
+    const g = grossFor(netto);
+    const brutto = g ? g.brutto : netto;
     const what = PURPOSES[goal.purpose][1];
+    const enough = pf.value > 0 && pf.value >= brutto;
+    const growth = (target) => {
+      const need = target / pf.value - 1;
+      return { need, perMonth: Math.pow(1 + need, 30 / daysH) - 1 };
+    };
 
     let plain;
-    if (gain == null) plain = "Portföljens värde saknas, så målet kan inte räknas ut än.";
-    else if (gain <= 0) plain = `Du har redan nog för ${what}: ${kr(pf.value)} räcker till ${kr(netto)}.`;
-    else plain = `För ${what} om ${label} behöver ${kr(pf.value)} växa till ${kr(brutto)}. Det är ${pct(gain * 100, 0)}, ungefär ${pct(perMonth * 100, 0)} i månaden.` +
-      (parked ? " Just nu är pengarna parkerade och växer inte." : " Det finns ingen garanti att nå dit – det här visar bara hur stor ökningen skulle behöva vara.");
+    if (!(pf.value > 0)) plain = "Portföljens värde saknas, så målet kan inte räknas ut än.";
+    else if (enough) plain = `Du har redan nog för ${what}: ${kr(pf.value)} räcker till ${kr(netto)}.` +
+      (pf.holdings.CASH >= brutto ? " Pengarna ligger redan som kontanter, så du kan ta ut dem när du vill." : "");
+    else {
+      const gr = growth(brutto);
+      plain = `För ${what} om ${label} behöver ${kr(pf.value)} växa till ${kr(brutto)}. Det är ${pct(gr.need * 100, 0)}, ungefär ${pct(gr.perMonth * 100, 0)} i månaden.` +
+        (parked ? " Just nu är pengarna parkerade och växer inte." : " Det finns ingen garanti att nå dit – det här visar bara hur stor ökningen skulle behöva vara.");
+    }
+
+    // Tre vägar. BALANSERAT = när WALTER inte skulle parkera. OPTIMERAT (TP) = när hela uttaget ryms i vinsten.
+    const maxRed = S.rules.parkeraAtRed - 1;
+    const calm = red <= maxRed;
+    const short = kr(Math.max(0, brutto - pf.value));
+    const tp = start + brutto;
+    const alts = [
+      { name: "AKUT", when: "Sälj nu", ok: enough,
+        text: enough ? `Du kan ta ut ${kr(netto)} i dag. Kvar i WALTER: ${kr(pf.value - brutto)}.` : `Räcker inte i dag – det fattas ${short}.` },
+      { name: "BALANSERAT", when: `När högst ${maxRed} lampor lyser`, ok: enough && calm,
+        text: !calm ? `Vänta tills högst ${maxRed} av ${total} lampor lyser (nu ${red}).`
+          : enough ? `Marknaden är lugn nog (${red} av ${total} lampor). Du kan sälja direkt.` : `Lugnt nu (${red} av ${total} lampor), men det fattas ${short}.` },
+      { name: "OPTIMERAT", when: "Vänta på TP", ok: pf.value > 0 && pf.value >= tp,
+        text: !(pf.value > 0) ? "Portföljens värde saknas."
+          : pf.value >= tp ? `Uttaget ryms i vinsten (${kr(pf.value - start)}). Startkapitalet på ${kr(start)} lämnas orört.`
+          : (() => { const gr = growth(tp); return `Vänta tills portföljen är värd ${kr(tp)} – då tas hela uttaget ur vinsten. Det är ${pct(gr.need * 100, 0)} till, ungefär ${pct(gr.perMonth * 100, 0)} i månaden på ${label}.`; })() }
+    ];
 
     $("goal-out").innerHTML = `
       <p class="notice-body goal-plain">${esc(plain)}</p>
       ${feesKnown ? "" : '<p class="warn">Avgifterna är inte angivna, så beloppet räknas utan avgifter. Fyll i dem under <a href="#installningar">Inställningar</a>.</p>'}
+      ${feesKnown && !g ? '<p class="warn">Dagens EURSEK saknas, så beloppet räknas utan avgifter tills kursen har hämtats.</p>' : ""}
+      <div class="goal-alts">${alts.map((a) => `
+        <div class="goal-alt">
+          <div class="goal-alt-head">${check(a.ok)}<b>${a.name}</b><span class="sub">${esc(a.when)}</span></div>
+          <p>${esc(a.text)}</p>
+        </div>`).join("")}
+      </div>
       <details><summary>Siffrorna</summary><ul class="facts">
-        <li>Netto (det du får ut): ${kr(netto)}</li>
+        <li>Netto (det du får på banken): ${kr(netto)}</li>
+        ${g ? g.parts.map(([n, v]) => `<li>${esc(n)}: ${kr(v)}</li>`).join("") : ""}
+        <li>Avgifter totalt: ${g ? kr(brutto - netto) : "inte uträknade"}</li>
         <li>Brutto (det som måste säljas): ${kr(brutto)}</li>
-        <li>Avgifter: ${feesKnown ? `${kr(brutto - netto)} (trading fee ${nf(2).format(fees.tradingPct)} % + withdrawal fee ${kr(fees.withdrawalSek)})` : "inte angivna"}</li>
+        <li>TP (startkapital + brutto): ${kr(tp)}</li>
         <li>Portfölj nu: ${kr(pf.value)} · tid: ${label} (${daysH} dagar)</li>
       </ul></details>`;
   };
@@ -450,7 +505,7 @@
     <p class="sub">Omkostnad räknas FIFO inklusive köp-courtage. Vinster och förluster står på separata rader.</p>`;
 
   // ---------- Inställningar (sparas bara i den här webbläsaren) ----------
-  const SETTING_KEYS = ["startCapital", "tradingFeePct", "withdrawalFeeSek"];
+  const SETTING_KEYS = ["startCapital", ...FEE_KEYS];
   $("settings").innerHTML = `
     <section class="card glass settings-card">
       <h2>Inställningar</h2>
@@ -459,12 +514,10 @@
           <input class="input num" type="number" name="startCapital" min="1" step="1" placeholder="${esc(pf.start)} (från state.json)">
           <small class="sub">Används för upplåsningen och grafens startlinje. Tomt = värdet i state.json.</small>
         </label>
-        <label class="field"><span>Trading fee vid försäljning (%)</span>
-          <input class="input num" type="number" name="tradingFeePct" min="0" max="10" step="0.01" placeholder="från din börs prislista">
-        </label>
-        <label class="field"><span>Withdrawal fee per uttag (kr)</span>
-          <input class="input num" type="number" name="withdrawalFeeSek" min="0" step="1" placeholder="från din börs prislista">
-        </label>
+        ${[["takerPct", "Kraken taker fee (%)"], ["slippagePct", "Slippage (%)"], ["sepaEur", "SEPA-uttag (€)"], ["fxPct", "Valutaväxling på banken (%)"]].map(([k, t]) => `
+        <label class="field"><span>${t}</span>
+          <input class="input num" type="number" name="${k}" min="0" max="100" step="0.01" placeholder="${feeDefaults[k] != null ? esc(feeDefaults[k]) + " (från state.json)" : "från din börs prislista"}">
+        </label>`).join("")}
         <p class="sub">Sparas bara i den här webbläsaren. API-nycklar läggs aldrig in här.</p>
         <div class="dialog-actions">
           <a class="btn" href="#">Tillbaka</a>

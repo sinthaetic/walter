@@ -1,5 +1,5 @@
 {
-  "version": "1.6.3",
+  "version": "1.7",
   "startDate": "2026-10-15",
   "updatedAt": "2026-10-16",
 
@@ -31,6 +31,7 @@
       "early":  { "days": 15, "gainPct": 20, "maxDd": 8, "minGreen": 7 },
       "normal": { "days": 30, "minValue": 550, "maxDd": 12, "minSharpe": 1 }
     },
+    "withdrawalFees": { "takerPct": 0.40, "slippagePct": 0.2, "sepaEur": 1, "fxPct": 1 },
     "lampThresholds": {
       "indexDropPct": -1,
       "vixRisePct": 10,
