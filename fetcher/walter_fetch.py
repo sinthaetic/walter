@@ -51,7 +51,7 @@ def warn(msg):
 
 def safe(e):
     """Felmeddelande utan nycklar – requests lägger hela URL:en (med api_key=…) i texten."""
-    return re.sub(r"(api_key|apikey|key|token)=[^&\s]+", r"=***", str(e), flags=re.I)
+    return re.sub(r"(api_key|apikey|key|token)=[^&\s]+", r"\1=***", str(e), flags=re.I)
 
 
 def get_json(url, **kw):
