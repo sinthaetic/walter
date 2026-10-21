@@ -1,4 +1,4 @@
-# WALTER paper trading tracker V1.11.3
+# WALTER paper trading tracker V1.11.4
 
 Statisk frontend (HTML/CSS/JS, ingen build). Öppna `index.html` direkt i webbläsaren.
 Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redigera den aldrig för hand.

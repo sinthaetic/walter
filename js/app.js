@@ -1,4 +1,4 @@
-// WALTER V1.11.3 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.11.4 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -11,6 +11,8 @@
     set(k, v, area = localStorage) { try { area.setItem(k, JSON.stringify(v)); } catch { /* lagring blockerad */ } }
   };
   const settings = store.get("walter.settings", {});
+  // Startkapital kommer bara från state.json. Ett gammalt eget värde (från 500-kronorstiden) rensas bort.
+  if ("startCapital" in settings) { delete settings.startCapital; store.set("walter.settings", settings); }
   // Uttagsavgifter: standard i state.json (rules.withdrawalFees), kan skrivas över under Inställningar.
   // Aldrig hårdkodade här. null = inte angivet.
   const FEE_KEYS = ["takerPct", "slippagePct", "sepaEur", "fxPct"];
@@ -54,7 +56,7 @@
   const green = total - red;
   const days = daysSince(S.startDate);
   const parked = S.mode === "PARKERA";
-  const start = Number.isFinite(settings.startCapital) && settings.startCapital > 0 ? settings.startCapital : pf.start;
+  const start = pf.start;
   // Insättningar = startkapital + manuella påfyllningar (capitalChange.manualTopUp). Bara det som är över
   // insättningarna är marknadsvinst – den räknas för vinst, upplåsning och OPTIMERAT.
   const topUp = (pf.capitalChange && pf.capitalChange.manualTopUp) || 0;
@@ -234,7 +236,7 @@
     </table></div>` : `<p class="sub">Inga försäljningar ${reportYear} ännu.</p>`}`;
   const renderRef = () => {
     const { usdsek, stale, btcSek } = fx();
-    $("pf-ref").textContent = `Referens: ${nf(5).format(pf.refBtc)} BTC · startkapital ${kr(start)} · 1 BTC ` +
+    $("pf-ref").textContent = `Referens: ${nf(5).format(pf.refBtc)} BTC · insättningar ${kr(deposits)} · 1 BTC ` +
       (btcSek != null ? "≈ " + kr(btcSek) + (stale ? " (kurs per " + day(usdsek.asOf) + ")" : "") : "i kr: väntar på data");
   };
   renderRef();
@@ -546,7 +548,7 @@
         text: !(pf.value > 0) ? "Portföljens värde saknas."
           : marketGain >= brutto ? `Uttaget ryms i marknadsvinsten (${kr(marketGain)}). Insättningarna lämnas orörda.`
           : pf.value >= tp ? `Uttaget ryms i insättningar (${kr(topUp)})${marketGain > 0 ? ` och marknadsvinst (${kr(marketGain)})` : " – ingen marknadsvinst än"}. Startkapitalet på ${kr(start)} lämnas orört.`
-          : (() => { const gr = growth(tp); return `Vänta tills portföljen är värd ${kr(tp)} – då tas hela uttaget ur vinsten. Det är ${pct(gr.need * 100, 0)} till, ungefär ${pct(gr.perMonth * 100, 0)} i månaden på ${label}.`; })() }
+          : (() => { const gr = growth(tp); return `Vänta tills portföljen är värd ${kr(tp)} – då ryms uttaget över startkapitalet. Det är ${pct(gr.need * 100, 0)} till, ungefär ${pct(gr.perMonth * 100, 0)} i månaden på ${label}.`; })() }
     ];
 
     $("goal-out").innerHTML = `
@@ -599,15 +601,11 @@
     <p class="sub">Omkostnad räknas med genomsnittsmetoden (Skatteverkets regel för krypto) inklusive köpavgift. Vinster och förluster står på separata rader.</p>`;
 
   // ---------- Inställningar (sparas bara i den här webbläsaren) ----------
-  const SETTING_KEYS = ["startCapital", ...FEE_KEYS];
+  const SETTING_KEYS = [...FEE_KEYS];
   $("settings").innerHTML = `
     <section class="card glass settings-card">
       <h2>Inställningar</h2>
       <form id="settings-form" class="settings-form">
-        <label class="field"><span>Startkapital (kr)</span>
-          <input class="input num" type="number" name="startCapital" min="1" step="1" placeholder="${esc(pf.start)} (från state.json)">
-          <small class="sub">Används för upplåsningen och grafens startlinje. Tomt = värdet i state.json.</small>
-        </label>
         ${[["takerPct", "Kraken taker fee (%)"], ["slippagePct", "Slippage (%)"], ["sepaEur", "SEPA-uttag (€)"], ["fxPct", "Valutaväxling på banken (%)"]].map(([k, t]) => `
         <label class="field"><span>${t}</span>
           <input class="input num" type="number" name="${k}" min="0" max="100" step="0.01" placeholder="${feeDefaults[k] != null ? esc(feeDefaults[k]) + " (från state.json)" : "från din börs prislista"}">

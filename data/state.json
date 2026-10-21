@@ -1,6 +1,6 @@
 {
-  "version": "1.11.3",
-  "startDate": "2026-10-15",
+  "version": "1.11.4",
+  "startDate": "2026-10-21",
   "updatedAt": "2026-10-16",
 
   "mode": "PARKERA",
@@ -11,7 +11,7 @@
     "value": 254600,
     "peak": 254600,
     "holdings": { "BTC": 0, "ETH": 0, "GOLD": 0, "CASH": 254600 },
-    "refBtc": 0.24578,
+    "refBtc": 0.30447,
     "sharpe": null,
     "history": [
       { "date": "2026-10-15", "value": 500, "cash": 500 },
@@ -93,7 +93,7 @@
       "facts": [
         "Sålt: 89 SEK BTC (damm) → kontant",
         "254 600 SEK totalt = 200 000 SEK startkapital + 54 600 SEK manuell insättning. Marknadsvinst 0 SEK. Allt cash, 0 SEK BTC",
-        "Referens: 200 000 SEK / (BTC $81 604 × USDSEK 9,9719 den 15 okt) = 0,24578 BTC",
+        "Referens: 254 600 SEK insättningar / (BTC $84 650 × USDSEK 9,8785 den 21 okt) = 0,30447 BTC",
         "4/10 röda lampor enligt hämtad data (10-årig ränta, ETF-flöden, KPI, SOPR)",
         "USDSEK 9,8785 och EURSEK 11,0975 (Riksbanken, 21 okt)",
         "BTC $84 650"
