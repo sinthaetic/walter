@@ -1,4 +1,4 @@
-// WALTER V1.12 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.13 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -620,7 +620,7 @@
     <h2>K4 · deklaration</h2>
     ${!k4.length ? '<p class="notice-body">Inga försäljningar ännu, så det finns inget att deklarera.</p>' : `
     <p class="notice-body">${k4.length === 1 ? "En försäljning" : `${k4.length} försäljningar`} i paper-journalen. Vinster ${kr2(gains)}, förluster ${kr2(losses)}. Skatten blir ungefär ${kr2(Math.max(0, (gains - losses * 0.7) * 0.3))} (30 % av vinsten, 70 % av förlusten får dras av).</p>
-    <p class="sub">PAPER – simulering, inte för Skatteverket. <a href="reports/K4_${reportYear}_WALTER_PAPER.csv" download>K4 som CSV</a></p>
+    <p class="sub">PAPER – simulering, inte för Skatteverket. <a href="reports/K4-WALTER-${reportYear}-PAPER.xlsx" download>K4 som Excel</a> · <a href="reports/K4_${reportYear}_WALTER_PAPER.csv" download>CSV</a></p>
     <details><summary>Siffrorna</summary><div class="table-wrap"><table class="k4-table num">
       <thead><tr><th>Köpt</th><th>Såld</th><th>Antal</th><th>Försäljningspris</th><th>Omkostnad</th><th>Trading fee</th><th>Withdrawal fee</th><th>Vinst/förlust</th><th>Typ</th></tr></thead>
       <tbody>${k4.map((r) => `<tr><td>${esc(r.kopdatum)}</td><td>${esc(r.saljdatum)}</td><td>${esc(r.antal)}</td><td>${kr2(r.forsaljningspris_sek)}</td><td>${kr2(r.omkostnad_sek)}</td><td>${kr2(r.trading_fee_sek || 0)}</td><td>${kr2(r.withdrawal_fee_sek || 0)}</td><td class="${r.vinst < 0 ? "down" : "up"}">${kr2(r.vinst)}</td><td>${esc(r.typ || "")}</td></tr>`).join("")}</tbody>

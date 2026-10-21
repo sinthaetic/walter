@@ -4,6 +4,7 @@
 
 Skriver till reports/ (genereras, checkas inte in):
   K4_<år>_WALTER_PAPER.csv              K4 sektion D, en rad per försäljning
+  K4-WALTER-<år>-PAPER.xlsx             samma rader som riktig Excel: datumceller, breda kolumner, summor
   K4_<år>_WALTER_PAPER.pdf              samma sak, snyggt
   Avgiftsrapport_<år>_WALTER_PAPER.pdf  avgiftsmodellen, betalda avgifter, uttagsexempel, portföljens väg
 
@@ -84,6 +85,50 @@ def write_csv(rows, path):
                         num(r["forsaljningspris_sek"], 2), num(r["omkostnad_sek"], 2), num(r["result"], 2),
                         num(r["fee"], 2), r["beteckning"], r.get("typ", ""),
                         r["sale_k4"], r["cost_k4"], WATERMARK])
+
+
+def write_xlsx(rows, summ, year, path):
+    """Riktig Excel: datum som datumceller (ÅÅÅÅ-MM-DD), belopp som tal, kolumner breda nog för att slippa ######."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"K4 {year}"
+    # (rubrik, bredd i tecken, talformat)
+    cols = [("Köpdatum", 12, "yyyy-mm-dd"), ("Säljdatum", 12, "yyyy-mm-dd"), ("Antal", 15, "0.00000000"),
+            ("Försäljningspris (kr)", 12, "#,##0.00"), ("Omkostnadsbelopp (kr)", 12, "#,##0.00"),
+            ("Vinst/Förlust (kr)", 12, "#,##0.00"), ("Avgift (kr)", 12, "#,##0.00"), ("Beteckning", 16, None),
+            ("Typ", 16, None), ("K4 försäljningspris (hela kr)", 12, "#,##0"), ("K4 omkostnad (hela kr)", 12, "#,##0")]
+    ws.append([WATERMARK.upper()])
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(cols))
+    ws["A1"].font = Font(bold=True, color="C8102E")
+    ws.append([c[0] for c in cols])
+    for cell in ws[2]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="5741F8")
+        cell.alignment = Alignment(wrap_text=True, vertical="center")
+    for r in rows:
+        ws.append([date.fromisoformat(r["kopdatum"]), date.fromisoformat(r["saljdatum"]), r["antal"],
+                   r["forsaljningspris_sek"], r["omkostnad_sek"], round(r["result"], 2), round(r["fee"], 2),
+                   r["beteckning"], r.get("typ", ""), r["sale_k4"], r["cost_k4"]])
+    for i, (_, width, fmt) in enumerate(cols, start=1):
+        letter = ws.cell(row=2, column=i).column_letter
+        ws.column_dimensions[letter].width = width + 2  # lite luft, så att datum och belopp aldrig blir ######
+        if fmt:
+            for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=i, max_col=i):
+                row[0].number_format = fmt
+    ws.row_dimensions[2].height = 32
+    ws.freeze_panes = "A3"
+
+    ws.append([])
+    for label, value in [("Summa vinster (kr)", summ["gains"]), ("Summa förluster (kr)", summ["losses"]),
+                         (f"Avdragsgill förlust {int(LOSS_DEDUCT * 100)} % (kr)", summ["deductible"]),
+                         (f"Uppskattad skatt {int(GAIN_TAX * 100)} % (kr)", summ["tax"])]:
+        ws.append([label, None, None, None, None, round(value, 2)])
+        ws.cell(row=ws.max_row, column=1).font = Font(bold=True)
+        ws.cell(row=ws.max_row, column=6).number_format = "#,##0.00"
+    wb.save(path)
 
 
 # ---------- PDF ----------
@@ -265,6 +310,7 @@ def main():
     OUT.mkdir(exist_ok=True)
     base = f"K4_{year}_WALTER_PAPER"
     write_csv(rows, OUT / f"{base}.csv")
+    write_xlsx(rows, summ, year, OUT / f"K4-WALTER-{year}-PAPER.xlsx")
     k4_pdf(rows, summ, year, OUT / f"{base}.pdf")
     fees_pdf(state, cache, rows, year, OUT / f"Avgiftsrapport_{year}_WALTER_PAPER.pdf")
     print(f"K4 {year}: {len(rows)} försäljning(ar), vinst {kr(summ['gains'])}, förlust {kr(summ['losses'])}, "
