@@ -1,4 +1,4 @@
-// WALTER V1.11.2 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.11.3 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -426,7 +426,8 @@
     ] },
     { name: "Normal upplåsning", conds: [
       [`Minst ${u.normal.days} dagar (dag ${days})`, days >= u.normal.days],
-      [`Över ${kr(u.normal.minValue)} (nu ${kr(pf.value)})`, pf.value > u.normal.minValue],
+      // +minGainPct över alla insättningar – samma logik som tidig upplåsning, så insättningar aldrig låser upp
+      [`Över ${kr(deposits * (1 + u.normal.minGainPct / 100))} = +${u.normal.minGainPct} % marknadsvinst (nu ${kr(pf.value)})${marketPct >= u.normal.minGainPct ? "" : " – väntar"}`, marketPct >= u.normal.minGainPct],
       [`Drawdown under ${u.normal.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.normal.maxDd],
       [`Sharpe över ${u.normal.minSharpe}${pf.sharpe != null ? " (nu " + nf(2).format(pf.sharpe) + ")" : ""}`, pf.sharpe == null ? null : pf.sharpe > u.normal.minSharpe]
     ] }

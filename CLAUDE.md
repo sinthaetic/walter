@@ -1,4 +1,4 @@
-# WALTER paper trading tracker V1.9
+# WALTER paper trading tracker V1.11.3
 
 Statisk frontend (HTML/CSS/JS, ingen build). Öppna `index.html` direkt i webbläsaren.
 Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redigera den aldrig för hand.
@@ -17,7 +17,8 @@ Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redig
 - Level 2: ETH 20 %, låst tills BTC LONG + ETH/BTC över 30d MA + SOPR < 1,0.
 - Level 3: Guld 20 % (PAXG/XAUT) när DXY > 105 + 10Y > 4,5 % + VIX > +10 %.
 - Max 75 % investerat.
-- Upplåsning tidig: +20 %, 15 dagar, DD < 8 %, 7/10 gröna. Normal: 30 dagar, > 550 kr, DD < 12 %, Sharpe > 1.
+- Upplåsning tidig: +20 %, 15 dagar, DD < 8 %, 7/10 gröna. Normal: 30 dagar, +10 %, DD < 12 %, Sharpe > 1.
+- Procenten är MARKNADSVINST över alla insättningar (startkapital + `capitalChange.manualTopUp`). Insättningar låser aldrig upp.
 
 ## Data (bara gratis)
 yfinance (^IXIC ^GSPC ^DJI ^VIX), FRED DGS10, BGeometrics (MVRV-Z, SOPR), bykaranteli (ETF-flöden), CoinGecko. Inga dyra API:er.
