@@ -1,0 +1,11 @@
+# Nycklar och rådata – får aldrig till GitHub
+.env
+fetcher/.env
+data/etf_raw.json
+
+# Genereras
+data/state.js
+deploy/
+__pycache__/
+.venv/
+graphify-out/

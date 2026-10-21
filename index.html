@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080A12">
+  <title>WALTER V1.6.3</title>
+  <link rel="stylesheet" href="css/walter.css">
+</head>
+<body>
+  <!-- Bakgrund: tre suddiga blobs bakom glaset -->
+  <div class="blobs" aria-hidden="true">
+    <span class="blob blob-indigo"></span>
+    <span class="blob blob-cyan"></span>
+    <span class="blob blob-violet"></span>
+  </div>
+
+  <div class="app">
+    <header class="topbar glass">
+      <!-- LOGOS: fasta filer i assets/logo/. Byts aldrig ut, genereras aldrig. -->
+      <div class="brand">
+        <img class="logo logo-full" src="assets/logo/walter-full.svg" alt="WALTER" data-logo>
+        <img class="logo logo-symbol" src="assets/logo/walter-symbol.svg" alt="WALTER" data-logo>
+        <!-- Reserv när logofilerna saknas: vanlig text, solid vit. Ingen genererad logo. -->
+        <span class="logo-text" hidden>WALTER</span>
+        <span class="version" id="version"></span>
+      </div>
+      <div class="top-actions">
+        <div class="mode-pill" id="mode-pill"></div>
+        <div class="seg" role="group" aria-label="Handelsläge">
+          <button type="button" id="btn-paper" class="seg-btn">PAPER</button>
+          <button type="button" id="btn-live" class="seg-btn">LIVE</button>
+        </div>
+        <a class="icon-btn" id="nav-settings" href="#installningar">Inställningar</a>
+      </div>
+    </header>
+
+    <!-- Mobil: kompakt 48px ticker direkt ovanför portfolion -->
+    <nav class="ticker glass" id="ticker" aria-label="Marknadsläge"></nav>
+
+    <main class="grid">
+      <section class="card glass status" id="status" aria-label="Status och uppdatering"></section>
+      <section class="card glass portfolio" id="portfolio"></section>
+      <section class="card glass notice" id="notice" aria-live="polite"></section>
+      <section class="card glass goal" id="goal"></section>
+      <section class="card glass lamps" id="lamps"></section>
+      <section class="card glass allocation" id="allocation"></section>
+      <section class="card glass levels" id="levels"></section>
+      <section class="card glass unlock" id="unlock"></section>
+      <section class="card glass journal" id="journal"></section>
+      <section class="card glass k4" id="k4"></section>
+    </main>
+
+    <!-- Inställningar: sparas bara i den här webbläsaren (localStorage), inget skickas någonstans -->
+    <main class="settings-view" id="settings" hidden></main>
+
+    <footer class="footer" id="footer"></footer>
+  </div>
+
+  <dialog class="live-dialog glass" id="live-dialog">
+    <form method="dialog" id="live-form">
+      <h2>Gå över till LIVE?</h2>
+      <p>I LIVE gäller riktiga pengar. Skriv <b>JA GÅ LIVE</b> för att bekräfta.</p>
+      <input id="live-confirm" type="text" autocomplete="off" spellcheck="false" placeholder="JA GÅ LIVE">
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" class="btn">Avbryt</button>
+        <button type="submit" value="live" class="btn btn-danger" id="live-ok" disabled>Gå live</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="data/state.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

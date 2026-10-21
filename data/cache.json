@@ -1,0 +1,65 @@
+{
+  "market": {
+    "nasdaq": {
+      "changePct": 1.05,
+      "asOf": "2026-10-21"
+    },
+    "spx": {
+      "changePct": 0.58,
+      "asOf": "2026-10-21"
+    },
+    "dow": {
+      "changePct": 0.69,
+      "asOf": "2026-10-21"
+    },
+    "vix": {
+      "value": 16.68,
+      "changePct": -3.6,
+      "asOf": "2026-10-21"
+    },
+    "dxy": {
+      "value": 101.694,
+      "asOf": "2026-10-21"
+    },
+    "us10y": {
+      "value": 5.15,
+      "changeBp": 3,
+      "asOf": "2026-10-21",
+      "source": "Yahoo ^TNX"
+    },
+    "btc": {
+      "value": 84650,
+      "unit": "usd",
+      "asOf": "2026-10-21"
+    },
+    "ethBtc": {
+      "value": 0.03004,
+      "ma30": 0.03091
+    },
+    "ethBtcAbove30dMa": false,
+    "mvrvZ": {
+      "value": 0.92,
+      "asOf": "2026-10-14"
+    },
+    "sopr": {
+      "value": 0.9987,
+      "asOf": "2026-10-14"
+    },
+    "etfFlow": {
+      "mtdUsd": -67407249,
+      "lastDayUsd": 23162423,
+      "asOf": "2026-10-20"
+    },
+    "usdsek": {
+      "value": 9.8785,
+      "asOf": "2026-10-21",
+      "source": "Riksbanken"
+    },
+    "eursek": {
+      "value": 11.0975,
+      "asOf": "2026-10-21",
+      "source": "Riksbanken"
+    }
+  },
+  "fetchedAt": "2026-10-21T22:53:35"
+}

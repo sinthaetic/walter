@@ -1,0 +1,73 @@
+name: WALTER auto
+
+on:
+  schedule:
+    - cron: "*/15 4-20 * * *"   # var 15:e minut 04:00–20:45 UTC
+    - cron: "0 23 * * *"        # 00:00 svensk vintertid (01:00 sommartid)
+  workflow_dispatch:            # "Run workflow"-knappen, kör alltid
+  push:
+    branches: [main]
+    paths: ["data/state.json", "index.html", "css/**", "js/**", "assets/**"]
+
+permissions:
+  contents: write               # bara för att pusha gh-pages med GITHUB_TOKEN
+
+concurrency:
+  group: walter-auto
+  cancel-in-progress: false
+
+env:
+  TZ: Europe/Stockholm          # fetchedAt och datum i svensk tid, som lokalt
+
+jobs:
+  walter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hämta senast publicerade cache.json från gh-pages
+        run: |
+          if git fetch -q --depth=1 origin gh-pages 2>/dev/null; then
+            git show FETCH_HEAD:data/cache.json > "$RUNNER_TEMP/pages-cache.json" 2>/dev/null \
+              || rm -f "$RUNNER_TEMP/pages-cache.json"
+          else
+            echo "Ingen gh-pages ännu – första körningen."
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Ska vi hämta nu?
+        id: gate
+        run: python fetcher/walter_auto.py "$RUNNER_TEMP/pages-cache.json"
+
+      - name: Installera
+        if: steps.gate.outputs.run == 'true'
+        run: pip install -r fetcher/requirements.txt
+
+      - name: Hämta (walter hamta)
+        if: steps.gate.outputs.run == 'true'
+        env:
+          BYKARANTELI_API_KEY: ${{ secrets.BYKARANTELI_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python fetcher/walter_fetch.py
+
+      - name: Bygg deploy/ och pusha gh-pages (walter deploy)
+        if: steps.gate.outputs.run == 'true'
+        env:
+          WALTER_PAGES_REPO: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+        run: python fetcher/walter_deploy.py
+
+      - name: Netlify (om nycklarna finns)
+        if: steps.gate.outputs.run == 'true'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "Inga Netlify-secrets – hoppar över Netlify."
+            exit 0
+          fi
+          npx --yes netlify-cli deploy --prod --dir=deploy --site "$NETLIFY_SITE_ID"

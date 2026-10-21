@@ -1,0 +1,119 @@
+{
+  "version": "1.6.3",
+  "startDate": "2026-10-15",
+  "updatedAt": "2026-10-16",
+
+  "mode": "PARKERA",
+  "level": 1,
+
+  "portfolio": {
+    "start": 200000,
+    "value": 254600,
+    "peak": 254600,
+    "holdings": { "BTC": 0, "ETH": 0, "GOLD": 0, "CASH": 254600 },
+    "refBtc": 0.24578,
+    "sharpe": null,
+    "history": [
+      { "date": "2026-10-15", "value": 200000, "cash": 200000 },
+      { "date": "2026-10-16", "value": 200000, "cash": 200000 },
+      { "date": "2026-10-21", "value": 254600, "cash": 254600 }
+    ]
+  },
+
+  "k4": [],
+
+  "rules": {
+    "parkeraAtRed": 7,
+    "maxInvested": 0.75,
+    "minCash": 0.25,
+    "caps": { "BTC": 0.35, "ETH": 0.20, "GOLD": 0.20 },
+    "unlock": {
+      "early":  { "days": 15, "gainPct": 20, "maxDd": 8, "minGreen": 7 },
+      "normal": { "days": 30, "minValue": 550, "maxDd": 12, "minSharpe": 1 }
+    },
+    "lampThresholds": {
+      "indexDropPct": -1,
+      "vixRisePct": 10,
+      "us10y": 4.5,
+      "dxy": 105,
+      "mvrvZ": 7,
+      "sopr": 1
+    }
+  },
+
+  "market": {
+    "asOf": "2026-10-16",
+    "btc":      { "value": 81776, "unit": "usd" },
+    "usdsek":   { "value": null, "asOf": null },
+    "eursek":   { "value": null, "asOf": null },
+    "us10y":    { "value": 5.09, "changeBp": -10, "note": "största dagsfallet på över ett år" },
+    "dxy":      { "value": 102.945, "asOf": "2026-10-15", "note": "dagshögsta" },
+    "vix":      { "value": null, "changePct": 10.5, "asOf": "2026-10-15" },
+    "etfFlow":  { "mtdUsd": -276000000, "note": "trots IBIT +370M och ny ETF i Thailand" },
+    "nasdaq":   { "changePct": -2.1 },
+    "spx":      { "changePct": -1.1 },
+    "dow":      { "changePct": null },
+    "cpi":      { "actual": 3.7, "expected": 3.6, "asOf": "2026-10-15" },
+    "mvrvZ":    { "value": null },
+    "sopr":     { "value": null },
+    "ethBtcAbove30dMa": null,
+    "btcLong": false
+  },
+
+  "lampScore": { "red": 8, "total": 10, "asOf": "2026-10-16", "source": "journal" },
+
+  "lamps": [
+    { "id": "nasdaq", "name": "Nasdaq",          "rule": "Faller mer än 1 % på en dag",    "status": "red",   "value": "−2,1 %" },
+    { "id": "spx",    "name": "S&P 500",         "rule": "Faller mer än 1 % på en dag",    "status": "red",   "value": "−1,1 %" },
+    { "id": "dow",    "name": "Dow Jones",       "rule": "Faller mer än 1 % på en dag",    "status": null,    "value": null },
+    { "id": "vix",    "name": "VIX (oro-index)", "rule": "Stiger mer än 10 % på en dag",   "status": null,    "value": "15 okt: +10,5 %" },
+    { "id": "us10y",  "name": "10-årig ränta",   "rule": "Över 4,5 %",                     "status": "red",   "value": "5,09 %" },
+    { "id": "dxy",    "name": "Dollarindex",     "rule": "Över 105",                       "status": "green", "value": "102,95" },
+    { "id": "etf",    "name": "Bitcoin-fonder",  "rule": "Pengar flödar ut",               "status": "red",   "value": "−$276M i okt" },
+    { "id": "cpi",    "name": "Inflation (KPI)", "rule": "Högre än väntat",                "status": "red",   "value": "3,7 % mot 3,6 %" },
+    { "id": "mvrv",   "name": "MVRV-Z",          "rule": "Överhettad värdering",           "status": null,    "value": null },
+    { "id": "sopr",   "name": "SOPR",            "rule": "Under 1,0 (säljer med förlust)", "status": null,    "value": null }
+  ],
+
+  "journal": [
+    {
+      "date": "2026-10-21",
+      "mode": "PARKERA",
+      "red": 4,
+      "plain": "WALTER sålde de sista 89 kronorna i bitcoin. Nu ligger hela portföljen, 254 600 kr, som kontanter. Det är 54 600 kr mer än när vi började.",
+      "facts": [
+        "Sålt: 89 SEK BTC (damm) → kontant",
+        "254 600 SEK totalt (+54 600 SEK, +27,3 %), allt cash, 0 SEK BTC",
+        "Referens: 200 000 SEK / (BTC $81 604 × USDSEK 9,9719 den 15 okt) = 0,24578 BTC",
+        "4/10 röda lampor enligt hämtad data (10-årig ränta, ETF-flöden, KPI, SOPR)",
+        "USDSEK 9,8785 och EURSEK 11,0975 (Riksbanken, 21 okt)",
+        "BTC $84 650"
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "mode": "PARKERA",
+      "red": 8,
+      "plain": "Tung dag på börsen. Teknikaktierna föll kraftigt och pengar fortsätter lämna bitcoin-fonderna. Räntan sjönk lite men är fortfarande hög. WALTER väntar.",
+      "facts": [
+        "Nasdaq −2,1 % vid stängning, S&P 500 −1,1 %",
+        "Micron −5,6 %, AMD −6 %, CoreWeave −12 %, Tesla −2 %",
+        "10-årig ränta 5,09 % (−10 bp, största fallet på över ett år)",
+        "Bitcoin-ETF hittills i oktober −$276M, trots IBIT +$370M och ny ETF i Thailand",
+        "BTC $81 776"
+      ]
+    },
+    {
+      "date": "2026-10-15",
+      "mode": "PARKERA",
+      "red": 7,
+      "plain": "Inflationen blev lite högre än väntat, och oron på marknaden steg. Pengar drogs ur bitcoin-fonderna. WALTER parkerade pengarna som kontanter.",
+      "facts": [
+        "KPI 3,7 % mot väntat 3,6 %",
+        "VIX +10,5 %",
+        "Dollarindex 102,945 (dagshögsta)",
+        "Bitcoin-ETF −$261M"
+      ]
+    }
+  ]
+}
