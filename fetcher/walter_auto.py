@@ -4,6 +4,7 @@
 
 PARKERA + senaste hämtning < 3 timmar                       -> hoppa över.
 NORMAL/OFFENSIV, öppen position, manuell körning eller push  -> kör.
+Notis-tiderna (08:13 / 22:05)                               -> kör alltid.
 Öppen position = minst ett innehav (utom CASH) över 1 000 kr; mindre är damm.
 Skickas en cache.json från gh-pages med och den är nyare än data/cache.json
 används den, så att hämtaren bygger vidare på senast publicerade värden.
@@ -24,6 +25,7 @@ CACHE = ROOT / "data" / "cache.json"
 TZ = ZoneInfo("Europe/Stockholm")  # hämtaren skriver fetchedAt i svensk tid
 PARK_INTERVAL = timedelta(hours=3)
 DUST_KR = 1000  # innehav upp till detta räknas inte som öppen position
+NOTIS_CRONS = {"13 7 * * *", "13 6 * * *", "5 21 * * *", "5 20 * * *"}  # samma som i walter-auto.yml
 
 
 def read_json(path):
@@ -56,6 +58,8 @@ def decide(state, cache, event):
 
     if event in ("workflow_dispatch", "push"):
         return True, f"startad via {event}"
+    if os.environ.get("WALTER_SCHEDULE", "").strip() in NOTIS_CRONS:
+        return True, "notis-tid – hämtar färskt före morgon/kväll-notisen"
     if mode != "PARKERA":
         return True, f"läge {mode} – vi är i trade, ska vara live"
     if open_pos:

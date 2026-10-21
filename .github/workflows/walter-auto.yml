@@ -4,7 +4,19 @@ on:
   schedule:
     - cron: "*/15 4-20 * * *"   # var 15:e minut 04:00–20:45 UTC
     - cron: "0 23 * * *"        # 00:00 svensk vintertid (01:00 sommartid)
+    # Notiser 08:13 och 22:05 svensk tid. Cron är UTC, så både vinter- och sommartid står med;
+    # walter_notis.py skickar bara från den som just nu motsvarar 08:13 / 22:05.
+    - cron: "13 7 * * *"        # 08:13 vintertid
+    - cron: "13 6 * * *"        # 08:13 sommartid
+    - cron: "5 21 * * *"        # 22:05 vintertid
+    - cron: "5 20 * * *"        # 22:05 sommartid
   workflow_dispatch:            # "Run workflow"-knappen, kör alltid
+    inputs:
+      notis:
+        description: "Skicka notis nu (test)"
+        type: choice
+        options: [ingen, morgon, kvall]
+        default: ingen
   push:
     branches: [main]
     paths: ["data/state.json", "index.html", "css/**", "js/**", "assets/**"]
@@ -41,6 +53,8 @@ jobs:
 
       - name: Ska vi hämta nu?
         id: gate
+        env:
+          WALTER_SCHEDULE: ${{ github.event.schedule }}
         run: python fetcher/walter_auto.py "$RUNNER_TEMP/pages-cache.json"
 
       - name: Installera
@@ -53,6 +67,15 @@ jobs:
           BYKARANTELI_API_KEY: ${{ secrets.BYKARANTELI_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python fetcher/walter_fetch.py
+
+      - name: Notis morgon/kväll
+        if: steps.gate.outputs.run == 'true'
+        env:
+          WALTER_SCHEDULE: ${{ github.event.schedule }}
+          WALTER_NOTIS: ${{ inputs.notis }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python fetcher/walter_notis.py
 
       - name: Bygg deploy/ och pusha gh-pages (walter deploy)
         if: steps.gate.outputs.run == 'true'

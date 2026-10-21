@@ -25,7 +25,7 @@ OUT = ROOT / "data" / "state.js"
 ENV = Path(__file__).resolve().parent / ".env"
 
 HTTP = requests.Session()
-HTTP.headers["User-Agent"] = "WALTER/1.7 (paper trading)"
+HTTP.headers["User-Agent"] = "WALTER/1.9 (paper trading)"
 MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"]
 
 
@@ -108,13 +108,14 @@ def fetch_us10y():
 
 
 def fetch_coingecko():
-    btc = get_json("https://api.coingecko.com/api/v3/simple/price", params={"ids": "bitcoin", "vs_currencies": "usd"})
+    btc = get_json("https://api.coingecko.com/api/v3/simple/price", params={"ids": "bitcoin", "vs_currencies": "usd", "include_24hr_change": "true"})
     chart = get_json("https://api.coingecko.com/api/v3/coins/ethereum/market_chart",
                      params={"vs_currency": "btc", "days": 30, "interval": "daily"})
     prices = [p for _, p in chart["prices"]]
     ma30 = sum(prices) / len(prices)
     return {
-        "btc": {"value": round(btc["bitcoin"]["usd"]), "unit": "usd", "asOf": date.today().isoformat()},
+        "btc": {"value": round(btc["bitcoin"]["usd"]), "unit": "usd", "asOf": date.today().isoformat(),
+                "changePct24h": round(btc["bitcoin"]["usd_24h_change"], 2) if btc["bitcoin"].get("usd_24h_change") is not None else None},
         "ethBtc": {"value": round(prices[-1], 5), "ma30": round(ma30, 5)},
         "ethBtcAbove30dMa": prices[-1] > ma30,
     }
@@ -266,6 +267,8 @@ def build(state, cache, fetched_any):
         m["asOf"] = cache.get("fetchedAt", today)[:10]
         state["updatedAt"] = max(state["updatedAt"], m["asOf"])
         state["fetchedAt"] = cache.get("fetchedAt")
+    if cache.get("notis"):
+        state["notis"] = cache["notis"]  # morgon/kväll-notisen från walter_notis.py
     return state
 
 

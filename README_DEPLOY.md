@@ -59,6 +59,17 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
 7. **Provkör:** repot → **Actions → WALTER auto → Run workflow**. En grön bock betyder att sidan är uppdaterad på
    `https://MITT-NAMN.github.io/walter/` (och på Netlify om du har lagt in nycklarna).
 
+## Notiser morgon och kväll
+
+Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skriver en notis på vanlig svenska, t.ex.
+"Morgon 08:13: Cash 254 600 kr vilar, BTC $84 719 (+0,94 % på ett dygn), totalt 254 600 kr. 4/10 lampor röda. Walter håller PARKERA."
+
+- Notisen visas alltid överst på sidan.
+- **Telegram (valfritt):** skapa en bot hos @BotFather och lägg in token som secret `TELEGRAM_TOKEN`.
+  Skriv sedan något till boten och öppna `https://api.telegram.org/bot<TOKEN>/getUpdates`.
+  Där står `"chat":{"id":…}`, och det talet läggs in som secret `TELEGRAM_CHAT_ID`.
+- **Testa:** Actions → WALTER auto → Run workflow → välj `morgon` eller `kvall` under "Skicka notis nu".
+
 ## Vardag
 
 - **Ny journalpost:** ändra `data/state.json` och kör `walter deploy`. Då publiceras sidan direkt och

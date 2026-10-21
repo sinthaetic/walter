@@ -165,6 +165,8 @@ html, body {
 .unlock     { grid-column: span 6; }
 .goal       { grid-column: span 12; }
 .status     { grid-column: span 12; padding: 14px 20px; }
+.notis      { grid-column: span 12; padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+.notis p    { margin: 0; font-size: 15px; }
 
 /* Status + Uppdatera */
 .status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 16px; align-items: center; }
@@ -363,6 +365,7 @@ details summary { cursor: pointer; color: var(--text-3); font-size: 13px; }
   /* Mobil: portfolio direkt under tickern, status strax efter */
   .portfolio { order: -2; }
   .status { order: -1; padding: 14px 16px; }
+  .notis { order: -1; padding: 12px 16px; }
   .status-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .status-btn { grid-column: 1 / -1; }
   .topbar { flex-wrap: wrap; }

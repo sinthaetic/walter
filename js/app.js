@@ -1,4 +1,4 @@
-// WALTER V1.7 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER V1.9 – renderar data/state.js. Ingen build, inga beroenden.
 (function () {
   "use strict";
 
@@ -219,6 +219,15 @@
     btn.disabled = false;
     btn.textContent = "Uppdatera";
   });
+
+  // ---------- Morgon/kväll-notis (skrivs av fetcher/walter_notis.py i Actionen) ----------
+  if (S.notis && S.notis.text) {
+    const at = new Date(S.notis.at);
+    const old = Date.now() - at > 36 * 3600 * 1000;  // äldre än ett och ett halvt dygn = inte längre aktuell
+    $("notis").hidden = false;
+    $("notis").innerHTML = `<span class="dot ${parked ? "amber" : "green"}"></span>
+      <p>${esc(S.notis.text)}${old ? ` <span class="sub">(från ${day(S.notis.at.slice(0, 10))})</span>` : ""}</p>`;
+  }
 
   // ---------- Notis (vanlig människa, inte siffervägg) ----------
   const notice = (() => {
