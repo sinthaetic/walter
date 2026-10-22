@@ -3,6 +3,7 @@
   python fetcher/walter_vault.py ny-kod    skriv ut en ny åtkomstkod
   python fetcher/walter_vault.py las       state.json -> state.enc (kräver WALTER_OWNER_KEY)
   python fetcher/walter_vault.py las-upp   state.enc -> state.json (vägrar skriva över nyare state.json)
+  python fetcher/walter_vault.py sla-ihop FIL   lägg daily/notis från en owner.enc (gh-pages) i data/owner-cache.json
 
 Kuvert (samma i JS): {"v":1,"kdf":"PBKDF2-SHA256","iter":600000,"salt","iv","ct"} i vanlig base64.
 AES-256-GCM, 16 byte salt, 12 byte iv, ct = chiffertext + 16 byte tag.
@@ -24,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 ROOT = Path(__file__).resolve().parent.parent
 STATE = ROOT / "data" / "state.json"
 ENC = ROOT / "data" / "state.enc"
+OWNER_CACHE = ROOT / "data" / "owner-cache.json"
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ITER = 600000
 
@@ -110,6 +112,22 @@ def unlock_state(code=None, dst=STATE, src=ENC):
     _write_atomic(dst, json.dumps(obj, ensure_ascii=False, indent=2))
 
 
+def merge_owner_cache(enc_path, code, dst=OWNER_CACHE):
+    """daily/notis från en publicerad owner.enc in i owner-cache.json. Lokala värden vinner.
+    Returnerar False (och rör inget) om filen inte går att läsa, t.ex. efter byte av kod."""
+    dst = Path(dst)
+    try:
+        remote = decrypt(json.loads(Path(enc_path).read_text(encoding="utf-8")), code)
+    except (OSError, ValueError, VaultError):
+        return False
+    local = json.loads(dst.read_text(encoding="utf-8")) if dst.exists() else {}
+    local["daily"] = merge_daily(remote.get("daily") or {}, local.get("daily") or {})
+    if not local.get("notis") and remote.get("notis"):
+        local["notis"] = remote["notis"]
+    _write_atomic(dst, json.dumps(local, indent=2, ensure_ascii=False))
+    return True
+
+
 def main(argv):
     cmd = argv[0] if argv else ""
     if cmd == "ny-kod":
@@ -120,8 +138,15 @@ def main(argv):
     elif cmd == "las-upp":
         unlock_state()
         print("Upplåst: data/state.json")
+    elif cmd == "sla-ihop" and len(argv) > 1:
+        if not Path(argv[1]).exists():
+            print(f"Ingen {argv[1]} – inget att slå ihop.")
+        elif merge_owner_cache(argv[1], _need_key(None)):
+            print("Slog ihop daily/notis från owner.enc i data/owner-cache.json")
+        else:
+            print(f"VARNING: kunde inte låsa upp {argv[1]} (ny kod?) – fortsätter utan gamla dagsvärden.")
     else:
-        sys.exit("Använd: walter_vault.py ny-kod | las | las-upp")
+        sys.exit("Använd: walter_vault.py ny-kod | las | las-upp | sla-ihop FIL")
 
 
 if __name__ == "__main__":

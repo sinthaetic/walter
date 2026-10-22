@@ -3,6 +3,9 @@
 GitHub hämtar data och publicerar sidan åt dig (`.github/workflows/walter-auto.yml`).
 Du behöver bara skriva journalposter i `data/state.json` och köra `walter deploy`.
 
+Sidan är publik, men **din** data (journal, portfölj, K4, dagsvärden, notis) publiceras bara krypterad.
+Allt annat på sidan är marknaden: lampor, läge, priser och den dagliga loggen.
+
 ## Hur ofta den hämtar
 
 | Läge | Hur ofta |
@@ -17,6 +20,18 @@ GitHub kan starta schemalagda körningar 5–30 minuter sent.
 Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppen position.
 
 ## En gång: sätt upp det
+
+0. **Skapa din åtkomstkod** (låser din data):
+   ```
+   .venv\Scripts\python.exe fetcher\walter_vault.py ny-kod
+   ```
+   - Spara koden i din **lösenordshanterare**. Tappar du den går `state.enc` och `owner.enc` inte att öppna.
+   - Lägg den i `fetcher/.env`:
+     ```
+     WALTER_OWNER_KEY=koden-här
+     ```
+   - Lägg den som GitHub Secret `WALTER_OWNER_KEY` (se steg 4).
+   - Lås din data första gången: `.venv\Scripts\python.exe fetcher\walter_vault.py las`.
 
 1. **Skapa ett tomt GitHub-repo** som heter `walter` på https://github.com/new.
    Gör det **Public**: GitHub Pages och obegränsade Action-minuter är gratis bara för publika repon.
@@ -35,6 +50,7 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
 4. **Lägg in dem som Secrets i GitHub:** repot → **Settings → Secrets and variables → Actions → New repository secret**.
    | Namn | Värde | Behövs? |
    |---|---|---|
+   | `WALTER_OWNER_KEY` | koden från steg 0 | **ja** – annars hämtar och publicerar Actionen ingenting |
    | `NETLIFY_AUTH_TOKEN` | token från steg 3 | för Netlify |
    | `NETLIFY_SITE_ID` | Site ID från steg 3 | för Netlify |
    | `BYKARANTELI_API_KEY` | samma som i `fetcher/.env` | annars uppdateras inte ETF-lampan |
@@ -72,17 +88,27 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
 
 ## Vardag
 
-- **Ny journalpost:** ändra `data/state.json` och kör `walter deploy`. Då publiceras sidan direkt och
-  `state.json` pushas till `main`. Actionen startar också när `state.json` ändras på `main`.
-  Ändrar du `state.json` direkt på github.com räcker det, Actionen bygger om sidan.
+- **Ny journalpost:** ändra `data/state.json` och kör `walter deploy`. Då låses `state.json` till
+  `state.enc`, sidan publiceras direkt och `state.enc` pushas till `main`. Actionen startar också när
+  `state.enc` ändras på `main`. `state.json` finns bara hos dig – den går aldrig till GitHub.
+- **Ny dator / efter `git pull`:** `.venv\Scripts\python.exe fetcher\walter_vault.py las-upp` ger dig `state.json`.
+  Är `state.enc` nyare än din `state.json` vägrar `walter deploy` skriva över den – lås upp först.
+- **Paper-affär:** efter JA i `paper.bat` låses `state.json` direkt till `state.enc`.
 - `walter hamta` och `walter visa dashboard` fungerar som förut, lokalt.
 - Lägesbyten görs fortfarande bara via journalen. Actionen ändrar aldrig `mode`.
 
 ## Säkerhet
 
-- Bara `index.html`, `css/`, `js/`, `assets/`, `data/state.js` och `data/cache.json` kopieras till `deploy/`.
-  `.env` och `etf_raw.json` spärras extra, och hittas de stoppas publiceringen.
+- Bara `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `data/market.js`, `data/cache.json` och
+  `data/owner.enc` (krypterad) kopieras till `deploy/`. Aldrig `state.js`, `state.json` eller `reports/`.
+- **Läckspärren** går igenom `deploy/` före varje publicering. Står `journal`, `portfolio`, `k4`,
+  `capitalChange`, `daily`, `notis`, `proposal` eller `WALTER_OWNER_KEY` okrypterat i `deploy/data/`
+  (utom i `owner.enc`), eller finns `state.js`, `reports/`, `.env`, `etf_raw.json` med, stoppas allt.
+- Saknas `WALTER_OWNER_KEY` lokalt publiceras sidan utan `owner.enc` (bara marknaden) och du får en varning.
+  Saknas den som Secret hoppar Actionen över hela körningen och sidan ligger kvar som den var.
 - Actionen använder bara `GITHUB_TOKEN` och dina Secrets. Den committar aldrig till `main`. Senaste
-  `cache.json` läses tillbaka från `gh-pages` vid varje körning.
+  `cache.json` och `owner.enc` läses tillbaka från `gh-pages` vid varje körning, så dagsvärdena följer med.
+- Byter du kod: lägg den nya i `fetcher/.env` och i Secreten, kör `walter_vault.py las` och `walter deploy`.
+  Gamla dagsvärden i `owner.enc` går då förlorade (Actionen varnar och fortsätter).
 - GitHub stänger av schemalagda Actions efter 60 dagar utan commits i repot. Kör `walter deploy`
   då och då, eller tryck **Enable workflow** under Actions.

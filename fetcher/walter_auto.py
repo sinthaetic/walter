@@ -78,8 +78,12 @@ def main():
     newest_cache(sys.argv[1] if len(sys.argv) > 1 else None)
     state = read_json(STATE)
     if state is None:
-        sys.exit(f"Hittar inte {STATE}")
-    run, why = decide(state, read_json(CACHE), os.environ.get("GITHUB_EVENT_NAME", ""))
+        # Utan state.json (ingen WALTER_OWNER_KEY / state.enc gick inte att låsa upp) går inget att bygga.
+        # Hoppa över i stället för att krascha – senast publicerade sidan ligger kvar.
+        print(f"::warning::Hittar inte {STATE.name} (saknas WALTER_OWNER_KEY?) – hoppar över, sidan lämnas orörd.")
+        run, why = False, "ingen state.json"
+    else:
+        run, why = decide(state, read_json(CACHE), os.environ.get("GITHUB_EVENT_NAME", ""))
     print(("KÖR: " if run else "HOPPAR ÖVER: ") + why)
     out = os.environ.get("GITHUB_OUTPUT")
     if out:

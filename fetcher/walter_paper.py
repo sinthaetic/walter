@@ -245,6 +245,11 @@ def main():
     entry = apply(raw, prop, date.today().isoformat())
     wf.BASE.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     wf.write_js(rebuild(wf))
+    import walter_vault
+    if walter_vault.owner_key():
+        walter_vault.lock_state()  # state.enc är det som går till main
+    else:
+        wf.warn("WALTER_OWNER_KEY saknas – state.enc är inte uppdaterad. Kör 'walter_vault.py las' när koden finns.")
     print(f"\nKlart. Journalpost {entry['date']}: {entry['plain']}\nSkrev data/state.json och data/state.js.")
 
 

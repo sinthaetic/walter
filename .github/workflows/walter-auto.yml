@@ -19,7 +19,7 @@ on:
         default: ingen
   push:
     branches: [main]
-    paths: ["data/state.json", "index.html", "cipher.html", "css/**", "js/**", "assets/**"]
+    paths: ["data/state.enc", "index.html", "cipher.html", "css/**", "js/**", "assets/**", "fetcher/**"]
 
 permissions:
   contents: write               # bara för att pusha gh-pages med GITHUB_TOKEN
@@ -38,11 +38,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Hämta senast publicerade cache.json från gh-pages
+      - name: Hämta senast publicerade cache.json och owner.enc från gh-pages
         run: |
           if git fetch -q --depth=1 origin gh-pages 2>/dev/null; then
             git show FETCH_HEAD:data/cache.json > "$RUNNER_TEMP/pages-cache.json" 2>/dev/null \
               || rm -f "$RUNNER_TEMP/pages-cache.json"
+            git show FETCH_HEAD:data/owner.enc > "$RUNNER_TEMP/pages-owner.enc" 2>/dev/null \
+              || rm -f "$RUNNER_TEMP/pages-owner.enc"
           else
             echo "Ingen gh-pages ännu – första körningen."
           fi
@@ -51,21 +53,34 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Installera
+        run: pip install -r fetcher/requirements.txt
+
+      # state.enc -> state.json, och ägarens dagsvärden/notis från förra publiceringen -> owner-cache.json.
+      # Utan secret hoppar steget över; då hittar "Ska vi hämta nu?" ingen state.json och inget publiceras.
+      - name: Lås upp
+        env:
+          WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
+        run: |
+          if [ -z "$WALTER_OWNER_KEY" ]; then
+            echo "::warning::Secret WALTER_OWNER_KEY saknas – kan inte låsa upp state.enc. Inget hämtas eller publiceras."
+            exit 0
+          fi
+          python fetcher/walter_vault.py las-upp
+          python fetcher/walter_vault.py sla-ihop "$RUNNER_TEMP/pages-owner.enc"
+
       - name: Ska vi hämta nu?
         id: gate
         env:
           WALTER_SCHEDULE: ${{ github.event.schedule }}
         run: python fetcher/walter_auto.py "$RUNNER_TEMP/pages-cache.json"
 
-      - name: Installera
-        if: steps.gate.outputs.run == 'true'
-        run: pip install -r fetcher/requirements.txt
-
       - name: Hämta (walter hamta)
         if: steps.gate.outputs.run == 'true'
         env:
           BYKARANTELI_API_KEY: ${{ secrets.BYKARANTELI_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
         run: python fetcher/walter_fetch.py
 
       - name: Notis morgon/kväll
@@ -75,12 +90,14 @@ jobs:
           WALTER_NOTIS: ${{ inputs.notis }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
         run: python fetcher/walter_notis.py
 
       - name: Bygg deploy/ och pusha gh-pages (walter deploy)
         if: steps.gate.outputs.run == 'true'
         env:
           WALTER_PAGES_REPO: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
         run: python fetcher/walter_deploy.py
 
       - name: Netlify (om nycklarna finns)
