@@ -16,10 +16,10 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 |---|---|---|
 | 1 | ✓ Adaptiv layout i skissen: mobil, surfplatta, dator (klar 22 okt) | Opus |
 | 2 | ✓ Logoskisser: hexagon-W och kretskorts-W, vald: "Inskriven" (klar 22 okt) | Opus |
-| 3 | Inställningar: valfri summa, sparmål, tidslinje. Tradelogg och rapporthistorik i skissen | Sonnet |
-| 4 | Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser | Sonnet |
+| 3 | ✓ Inställningar: valfri summa, sparmål, tidslinje. Tradelogg och rapporthistorik i skissen (klar 22 okt) | Sonnet |
+| 4 | ✓ Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser (klar 22 okt) | Sonnet |
 | 5 | W-Cipher: läs in VuManChu A/B, bestäm Walters parametrar, designa grafvyn | Opus |
-| 6 | K4-underlag i ny design | Sonnet |
+| 6 | ✓ K4-underlag i ny design (klar 22 okt) | Sonnet |
 | 7 | Bygg in designen i riktiga koden (index.html, css, js), inkl. nya logon från assets/logo/vald | Opus för plan, Sonnet för utförande |
 | 8 | Logikluckor: trade-motor för paper, buffert 7/6, Sharpe, Level 3 i procent | Opus |
 
