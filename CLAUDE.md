@@ -8,6 +8,9 @@ Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redig
 - `data/cache.json` – senast hämtade marknadsvärden (skrivs av hämtaren).
 - `fetcher/walter_fetch.py` – hämtar, räknar lampor, bygger `state.js` = state.json + cache. `--offline` bygger bara om. `hamta.bat` = dubbelklick.
 - Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode ändras ALDRIG automatiskt – bara via journalpost.
+- `fetcher/walter_paper.py` = trade-motorn. Hämtaren räknar förslaget (`state.proposal`), dagens värde och Sharpe i state.js men handlar aldrig.
+  `paper.bat` visar förslaget; skriver man JA skrivs läge, `portfolio.positions`, kontanter, historik, journalpost och K4-rad in i state.json.
+  `cache.json` → `daily` = portföljvärdet per dag (för Sharpe).
 - En lampa vars data är äldre än `rules.lampMaxAgeDays` blir "väntar" (null), så gammal data aldrig räknas som färsk.
 - bykaranteli kräver gratis nyckel i `fetcher/.env` (`BYKARANTELI_API_KEY`). FRED svarar ofta inte → reserv Yahoo `^TNX`. BGeometrics gratis = ~7 dagar fördröjt och bara 4 års historik, därför räknas MVRV-Z själv från Coin Metrics Community (gratis, hela historiken, 1 dag efter) med BGeometrics som reserv. SOPR kommer fortfarande från BGeometrics.
 - KPI-lampan räknas från `market.cpi` (actual/expected/asOf) som skrivs för hand.
@@ -18,7 +21,10 @@ Dollarindex över 50d-snitt · ETF-flöde negativt senaste 5 handelsdagarna · K
 Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 
 ## Regler (strategi)
-- PARKERA när 7/10 lampor är risk-off.
+- Läge från röda lampor (`rules.modes`): 0–2 = Köper (OFFENSIV, fulla tak), 3–4 = Köper lite (NORMAL, halva taken), 5–6 = Avvaktar (rör inget), 7+ = Vilar (PARKERA, säljer till kontant).
+- Buffert: från Vilar vaknar Walter först vid `rules.wakeAtRed` (5) eller färre röda. 6 röda = vilar kvar.
+- Avgift per affär = taker + slippage (`rules.withdrawalFees`). Affärer under `rules.paper.minTradePct` (2 %) av portföljen görs inte.
+- K4-omkostnad med genomsnittsmetoden (Skatteverkets regel), inte FIFO.
 - Level 1: BTC max 35 %, kontant minst 25 % alltid.
 - Level 2 (ETH 20 %) låses upp av EN av vägarna i `rules.unlock`: tidig (15 dagar, +20 %, DD < 8 %, 7/10 gröna) eller normal (30 dagar, +10 %, DD < 12 %).
   Efter upplåsning köps ETH när BTC LONG + ETH/BTC över 30d MA + högst `rules.ethMaxRed` (4) röda lampor.
@@ -26,7 +32,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
   (VIX över 20 eller S&P under 50d-snitt) och får köpas även när Walter vilar (`rules.gold`).
 - Max 75 % investerat = summan av alla tak. På Level 1 är taket i praktiken 35 %.
 - Procenten är MARKNADSVINST över alla insättningar (startkapital + `capitalChange.manualTopUp`). Insättningar låser aldrig upp. Belopp räknas från procenten, sparas aldrig fast.
-- Sharpe används inte förrän det finns 30 dagar riktig handel (steg 8).
+- Sharpe (årstakt, riskfri ränta 0) visas först efter 30 dagar riktig handel, räknat från `portfolio.firstTrade`. Insättningar (`flow`) räknas bort.
 - `portfolio.history`: insättningar får `"flow": belopp`, paper-testet före start får `"test": true`. Avkastning räknas utan flows.
 
 ## W-Cipher (`cipher.html`)

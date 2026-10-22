@@ -5,7 +5,8 @@
 
 data/state.json är handredigerad (journal, portfölj, mode, regler) och skrivs aldrig av hämtaren.
 data/cache.json minns senast hämtade värden, så att en källa som strular inte nollar något.
-Mode ändras aldrig automatiskt – journalen är facit. Hämtaren räknar bara lamporna.
+Mode ändras aldrig automatiskt – journalen är facit. Hämtaren räknar lamporna och Walters förslag
+(walter_paper.py), men handlar aldrig: förslaget godkänns med paper.bat.
 """
 
 import argparse
@@ -17,6 +18,8 @@ from datetime import date, datetime
 from pathlib import Path
 
 import requests
+
+import walter_paper as wp
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE = ROOT / "data" / "state.json"
@@ -356,6 +359,14 @@ def build(state, cache, fetched_any):
         m["asOf"] = cache.get("fetchedAt", today)[:10]
         state["updatedAt"] = max(state["updatedAt"], m["asOf"])
         state["fetchedAt"] = cache.get("fetchedAt")
+    # Trade-motorn: dagens värde, förslag och Sharpe. Handlar aldrig – förslaget godkänns med paper.bat.
+    pf = state["portfolio"]
+    pf["holdings"], pf["value"] = wp.valuation(pf, wp.prices_sek(m))
+    daily = cache.get("daily", {})
+    pf["peak"] = max([pf["peak"], pf["value"], *daily.values()])
+    flows = {h["date"]: h["flow"] for h in pf.get("history", []) if h.get("flow")}
+    pf["sharpe"] = wp.sharpe({**daily, today: pf["value"]}, flows, pf.get("firstTrade"))
+    state["proposal"] = wp.propose(state)
     if cache.get("notis"):
         state["notis"] = cache["notis"]  # morgon/kväll-notisen från walter_notis.py
     return state
@@ -405,14 +416,16 @@ def main():
 
     state = build(state, cache, ok > 0)
     write_js(state)
+    if ok:  # dagens portföljvärde, för Sharpe (avkastning dag för dag)
+        cache.setdefault("daily", {})[date.today().isoformat()] = state["portfolio"]["value"]
+        CACHE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
 
     s = state["lampScore"]
     print(f"\n{s['red']}/{s['total']} röda lampor ({'data' if s['source'] == 'data' else 'från journalen'}).")
-    if s["source"] == "data":
-        wants_park = s["red"] >= state["rules"]["parkeraAtRed"]
-        if wants_park != (state["mode"] == "PARKERA"):
-            print(f"OBS: datan säger {'PARKERA' if wants_park else 'inte längre PARKERA'}, "
-                  f"men journalen säger {state['mode']}. Skriv en journalpost när du bestämt dig.")
+    p = state["proposal"]
+    print(f"WALTER föreslår: {p['plain']}")
+    if p.get("needsApproval"):
+        print("Dubbelklicka paper.bat för att godkänna.")
     if not args.offline:
         print(f"{ok}/{len(SOURCES)} källor svarade.")
     print(f"Skrev {OUT}")
