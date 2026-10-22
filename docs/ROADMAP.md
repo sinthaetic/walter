@@ -14,7 +14,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 
 | # | Steg | Modell |
 |---|---|---|
-| 1 | Adaptiv layout i skissen: mobil, surfplatta, dator | Opus |
+| 1 | ✓ Adaptiv layout i skissen: mobil, surfplatta, dator (klar 22 okt) | Opus |
 | 2 | Logoskisser: hexagon-W och kretskorts-W | Opus |
 | 3 | Inställningar: valfri summa, sparmål, tidslinje. Tradelogg och rapporthistorik i skissen | Sonnet |
 | 4 | Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser | Sonnet |
