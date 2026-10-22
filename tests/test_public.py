@@ -21,8 +21,8 @@ def fixture_state(statuses=None):
         "lamps": [{"id": f"l{i}", "name": f"L{i}", "rule": "r", "status": s, "value": "v", "asOf": "2026-10-22"}
                   for i, s in enumerate(statuses)],
         "market": {"usdsek": {"value": 10, "asOf": "2026-10-22"}, "eursek": {"value": 11, "asOf": "2026-10-22"},
-                   "btc": {"value": 100, "belowMa200": False}, "ethBtc": {"value": 0.05},
-                   "gold": {"value": 50}, "ethBtcAbove30dMa": True,
+                   "btc": {"value": 100, "belowMa200": False, "asOf": "2026-10-22"}, "ethBtc": {"value": 0.05},
+                   "gold": {"value": 50, "asOf": "2026-10-22"}, "ethBtcAbove30dMa": True,
                    "vix": {"value": 18.5}, "spx": {"belowMa": False}},
     }
 
@@ -69,6 +69,42 @@ class PublicTest(unittest.TestCase):
         self.assertIsNone(s["eursek"])
         self.assertIsNone(s["btcLong"])
         self.assertIsNone(s["vix"])
+
+    def test_stale_btc_gives_null_px(self):
+        st = fixture_state()
+        st["market"]["btc"]["asOf"] = "2026-10-21"
+        row = wpub.append_log([], wpub.snapshot(st))[0]
+        self.assertIsNone(row["px"]["BTC"])
+        self.assertIsNone(row["px"]["ETH"])
+        self.assertEqual(row["px"]["GOLD"], 500)
+
+    def test_old_usdsek_nulls_all_px(self):
+        st = fixture_state()
+        st["rules"]["lampMaxAgeDays"] = {"default": 4}
+        st["market"]["usdsek"]["asOf"] = "2026-10-10"
+        self.assertEqual(wpub.snapshot(st)["px"], {"BTC": None, "ETH": None, "GOLD": None})
+
+    def test_ready_row_not_overwritten_by_not_ready(self):
+        ready = wpub.snapshot(fixture_state())
+        notready = wpub.snapshot(fixture_state(["red"] * 2 + [None] + ["green"] * 7))
+        log = wpub.append_log(wpub.append_log([], ready), notready)
+        self.assertTrue(log[0]["ready"])
+        self.assertEqual(log[0]["red"], 3)
+        log = wpub.append_log(wpub.append_log([], notready), ready)  # omvänt: senaste vinner
+        self.assertTrue(log[0]["ready"])
+
+    def test_gold_failure_keeps_btc(self):
+        from unittest.mock import patch
+        def fake(url, **kw):
+            if kw["params"].get("ids") == "pax-gold":
+                raise RuntimeError("nere")
+            if kw["params"].get("ids") == "bitcoin":
+                return {"bitcoin": {"usd": 100, "usd_24h_change": 1}}
+            return {"prices": [[0, 1.0]] * 220}
+        with patch.object(wf, "get_json", fake):
+            out = wf.fetch_coingecko()
+        self.assertNotIn("gold", out)
+        self.assertIn("btc", out)
 
     def test_append_log_one_row_per_day(self):
         a = dict(wpub.snapshot(fixture_state()), red=1)

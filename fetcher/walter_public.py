@@ -1,6 +1,7 @@
 """Publik marknadsfil: lampor, läge, priser och regler + daglig logg. Aldrig ägarens data."""
 import json
 import os
+from datetime import date as _date
 from pathlib import Path
 
 import walter_paper as wp
@@ -12,16 +13,34 @@ def _value(m, key):
     return (m.get(key) or {}).get("value")
 
 
+def _age_days(as_of, day):
+    try:
+        return (_date.fromisoformat(day) - _date.fromisoformat(as_of[:10])).days
+    except (TypeError, ValueError):
+        return None
+
+
+def _fresh_px(m, px, day, rules):
+    """Gammal data får aldrig loggas som dagens pris: pris utan datum från idag blir null."""
+    max_age = (rules.get("lampMaxAgeDays") or {}).get("default", 4)
+    fx_age = _age_days((m.get("usdsek") or {}).get("asOf"), day)
+    if fx_age is None or fx_age > max_age:
+        return {k: None for k in px}
+    src = {"BTC": "btc", "ETH": "btc", "GOLD": "gold"}
+    return {k: v if (m.get(src[k]) or {}).get("asOf") == day else None for k, v in px.items()}
+
+
 def snapshot(state):
     m = state.get("market", {})
     lamps = [{k: l.get(k) for k in ("id", "name", "rule", "status", "value", "asOf")} for l in state["lamps"]]
     ready = bool(lamps) and all(l["status"] is not None for l in lamps)
     red = sum(l["status"] == "red" for l in lamps)
     below = (m.get("btc") or {}).get("belowMa200")
-    px = wp.prices_sek(m)
     fetched = state.get("fetchedAt")
+    day = (fetched or m.get("asOf") or state.get("updatedAt") or "")[:10]
+    px = _fresh_px(m, wp.prices_sek(m), day, state["rules"])
     return {
-        "date": (fetched or m.get("asOf") or state.get("updatedAt") or "")[:10],
+        "date": day,
         "fetchedAt": fetched,
         "ready": ready,
         "red": red,
@@ -41,6 +60,9 @@ def snapshot(state):
 def append_log(log, snap):
     row = {k: snap.get(k) for k in LOG_KEYS}
     rows = {r["date"]: r for r in log}
+    old = rows.get(row["date"])
+    if old and old.get("ready") and not row["ready"]:
+        return [rows[d] for d in sorted(rows)]  # en klar dag skrivs aldrig över av en halvfärdig
     rows[row["date"]] = row
     return [rows[d] for d in sorted(rows)]
 

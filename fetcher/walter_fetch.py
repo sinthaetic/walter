@@ -143,7 +143,12 @@ def fetch_coingecko():
     chart = get_json("https://api.coingecko.com/api/v3/coins/ethereum/market_chart",
                      params={"vs_currency": "btc", "days": 30, "interval": "daily"})
     prices = [p for _, p in chart["prices"]]
-    gold = get_json("https://api.coingecko.com/api/v3/simple/price", params={"ids": "pax-gold", "vs_currencies": "usd"})
+    try:  # guld får aldrig ta med sig BTC/ETH-lamporna om det felar
+        gold = get_json("https://api.coingecko.com/api/v3/simple/price", params={"ids": "pax-gold", "vs_currencies": "usd"})
+        gold_out = {"gold": {"value": round(gold["pax-gold"]["usd"], 2), "asOf": date.today().isoformat()}}
+    except Exception as e:
+        warn(f"PAXG (guld) kunde inte hämtas ({safe(e)}) – guldpriset blir null.")
+        gold_out = {}
     ma30 = sum(prices) / len(prices)
     hist = get_json("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
                     params={"vs_currency": "usd", "days": 220, "interval": "daily"})
@@ -156,7 +161,7 @@ def fetch_coingecko():
         "btc": {"value": round(btc["bitcoin"]["usd"]), "unit": "usd", "asOf": date.today().isoformat(),
                 "changePct24h": round(btc["bitcoin"]["usd_24h_change"], 2) if btc["bitcoin"].get("usd_24h_change") is not None else None,
                 "ma200": round(ma200), "belowMa200": bp[-1] < ma200, "change7dPct": round(week, 1)},
-        "gold": {"value": round(gold["pax-gold"]["usd"], 2), "asOf": date.today().isoformat()},
+        **gold_out,
         "ethBtc": {"value": round(prices[-1], 5), "ma30": round(ma30, 5)},
         "ethBtcAbove30dMa": prices[-1] > ma30,
     }
@@ -450,11 +455,10 @@ def main():
     snap = wpub.snapshot(state)
     if ok:
         cache["marketLog"] = wpub.append_log(cache.get("marketLog", []), snap)
-        save_caches(cache, owner)
-    wpub.write_market_js(snap, cache.get("marketLog", []), MARKET_OUT)
-    if ok:  # dagens portföljvärde, för Sharpe (avkastning dag för dag)
+        # dagens portföljvärde, för Sharpe (avkastning dag för dag)
         owner.setdefault("daily", {})[date.today().isoformat()] = state["portfolio"]["value"]
         save_caches(cache, owner)
+    wpub.write_market_js(snap, cache.get("marketLog", []), MARKET_OUT)
 
     s = state["lampScore"]
     print(f"\n{s['red']}/{s['total']} röda lampor ({'data' if s['source'] == 'data' else 'från journalen'}).")
