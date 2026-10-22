@@ -7,7 +7,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - Lägen för användaren: Vilar / Avvaktar / Köper lite / Köper. Max 75 % investerat, aldrig "all in".
 - Design: clean Walter från Alien: Covenant. Ljust standard + mörkt läge. Se CLAUDE.md.
 - Startkapital: valfri summa, ingen fast skala (småsparare och miljonärer). Allt mäts i procent.
-- Logos: tillåtet att ta fram nya. Spår: hexagon-W och kretskorts-W.
+- Logo: "Inskriven" hexagon-W (vald 22 okt). Filer i assets/logo/vald/.
 - W-Cipher (Walter Cipher): egen oscillator byggd på VuManChu Cipher A/B (gratis, öppen källkod) men med Walters parametrar och design. Licensen kontrolleras innan kod kopieras.
 
 ## Ordning
@@ -15,7 +15,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | # | Steg | Modell |
 |---|---|---|
 | 1 | ✓ Adaptiv layout i skissen: mobil, surfplatta, dator (klar 22 okt) | Opus |
-| 2 | ✓ Logoskisser: hexagon-W och kretskorts-W, två varianter var (klar 22 okt, val kvar) | Opus |
+| 2 | ✓ Logoskisser: hexagon-W och kretskorts-W, vald: "Inskriven" (klar 22 okt) | Opus |
 | 3 | Inställningar: valfri summa, sparmål, tidslinje. Tradelogg och rapporthistorik i skissen | Sonnet |
 | 4 | Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser | Sonnet |
 | 5 | W-Cipher: läs in VuManChu A/B, bestäm Walters parametrar, designa grafvyn | Opus |
