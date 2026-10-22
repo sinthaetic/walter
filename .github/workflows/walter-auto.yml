@@ -19,7 +19,7 @@ on:
         default: ingen
   push:
     branches: [main]
-    paths: ["data/state.json", "index.html", "css/**", "js/**", "assets/**"]
+    paths: ["data/state.json", "index.html", "cipher.html", "css/**", "js/**", "assets/**"]
 
 permissions:
   contents: write               # bara för att pusha gh-pages med GITHUB_TOKEN

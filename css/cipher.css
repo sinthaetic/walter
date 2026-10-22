@@ -56,7 +56,11 @@ button, input, select { font: inherit; color: inherit; }
 
 .top, .page { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding-inline: 56px; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 32px; }
-.brand { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink); }
+.brand { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--ink); }
+.brand .mark { width: 40px; height: 40px; flex: none; }
+.brand .mark-dark, [data-theme="dark"] .brand .mark-light { display: none; }
+[data-theme="dark"] .brand .mark-dark { display: block; }
+.brand .words { display: flex; flex-direction: column; gap: 6px; }
 .brand .word { font-size: 20px; font-weight: 500; letter-spacing: .62em; line-height: 1; }
 .brand .sub { font-size: 9px; font-weight: 400; letter-spacing: .9em; color: var(--teal); line-height: 1; }
 .nav, .seg {
@@ -147,6 +151,12 @@ h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-h
 .foot { margin: 28px 0 0; padding: 0 0 40px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .foot p { margin: 0 0 6px; }
 
+@media (max-width: 1280px) {
+  .top { flex-wrap: wrap; }
+  .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { flex: 1; white-space: nowrap; }
+}
 @media (max-width: 1100px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
   .read { height: auto; min-height: 260px; }

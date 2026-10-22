@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "deploy"
-ALLOW = ["index.html", "css", "js", "assets", "data/state.js", "data/cache.json", "reports"]
+ALLOW = ["index.html", "cipher.html", "css", "js", "assets", "data/state.js", "data/cache.json", "reports"]
 BLOCK = {".env", "etf_raw.json"}  # extra spärr om någon lägger något fel i en tillåten mapp
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

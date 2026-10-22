@@ -49,7 +49,7 @@ yfinance (^IXIC ^GSPC ^VIX DX-Y.NYB), FRED DGS10, Coin Metrics Community (MVRV-Z
 - Notiser skrivs till en vanlig människa, inte en siffervägg. Siffror får ligga bakom "Siffrorna".
 
 ## LOGOS
-Det är OK att ta fram och byta logos (ändrat okt 2026). Filer i `assets/logo/` (symbol, wordmark, full).
+Det är OK att ta fram och byta logos (ändrat okt 2026). Vald logo ("Inskriven" hexagon-W) ligger i `assets/logo/vald/` och används av index.html och cipher.html.
 Spåren just nu: hexagon-W och kretskorts-W, i samma rena designspråk. Ingen regnbågs-gradient.
 
 ## Journal = sanning

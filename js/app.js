@@ -1,4 +1,5 @@
-// WALTER V1.13 – renderar data/state.js. Ingen build, inga beroenden.
+// WALTER – renderar data/state.js i nya designen (okt 2026). Ingen build, inga beroenden.
+// Sidor via adressens #: översikt, pro, logg, k4, inställningar. W-Cipher är egen sida (cipher.html).
 (function () {
   "use strict";
 
@@ -23,12 +24,22 @@
   // ---------- Format ----------
   const nf = (d = 0) => new Intl.NumberFormat("sv-SE", { minimumFractionDigits: d, maximumFractionDigits: d });
   const kr = (v) => nf(0).format(v) + " kr";
+  const kr2 = (v) => nf(2).format(v) + " kr";
   const pct = (v, d = 1) => (v > 0 ? "+" : v < 0 ? "−" : "") + nf(d).format(Math.abs(v)) + " %";
   const usd = (v) => "$" + nf(0).format(v);
-  const usdM = (v) => (v < 0 ? "−" : "+") + "$" + nf(0).format(Math.abs(v) / 1e6) + "M";
   const MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
-  const day = (iso) => { const d = new Date(iso + "T12:00:00"); return d.getDate() + " " + MONTHS[d.getMonth()]; };
+  const day = (iso) => { const d = new Date(iso.slice(0, 10) + "T12:00:00"); return d.getDate() + " " + MONTHS[d.getMonth()]; };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  // "22.10 · 20:11" (statusraden) och "22 okt 20:11" (löptext)
+  const dotStamp = (iso) => { const d = new Date(iso); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} · ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const stamp = (iso) => {
+    if (!iso) return "okänt";
+    const d = new Date(iso);
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  // Små belopp med ören (624,77), stora i hela kronor
+  const amount = (v) => new Intl.NumberFormat("sv-SE", { maximumFractionDigits: Math.abs(v) < 10000 ? 2 : 0 }).format(v);
 
   const daysSince = (iso) => {
     const start = new Date(iso + "T00:00:00");
@@ -37,18 +48,33 @@
     return Math.floor((now - start) / 86400000) + 1;
   };
 
-  // true = uppfyllt, false = inte, null = väntar på data
+  // true = uppfyllt (grön), false = inte (röd), null = väntar på data (streckad)
   const check = (ok) => ok === null || ok === undefined
-    ? '<span class="dot off" title="Väntar på data"></span>'
+    ? '<span class="dot" title="Väntar på data"></span>'
     : ok ? '<span class="dot green" title="Uppfyllt"></span>'
-         : '<span class="dot" title="Inte uppfyllt"></span>';
+         : '<span class="dot red" title="Inte uppfyllt"></span>';
+
+  // ---------- Tema (ljust standard, mörkt via knappen) ----------
+  const themeBtn = $("theme");
+  const syncTheme = () => {
+    const dark = document.documentElement.dataset.theme === "dark";
+    themeBtn.setAttribute("aria-label", dark ? "Byt till ljust läge" : "Byt till mörkt läge");
+    document.querySelector('meta[name="theme-color"]').content = dark ? "#0A1216" : "#D7E0E3";
+  };
+  themeBtn.addEventListener("click", () => {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    if (dark) document.documentElement.dataset.theme = "dark"; else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem("walterDark", dark ? "1" : "0"); } catch { /* lagring blockerad */ }
+    syncTheme();
+  });
+  syncTheme();
 
   // ---------- Härledda värden ----------
   const pf = S.portfolio;
   const m = S.market;
   const dd = pf.peak > 0 ? ((pf.peak - pf.value) / pf.peak) * 100 : 0;
   const invested = pf.value > 0 ? (pf.value - pf.holdings.CASH) / pf.value : 0;
-  // Alltid 10 lampor. PARKERA när rules.parkeraAtRed (7) av 10 är risk-off.
+  // Alltid 10 lampor. Walter vilar när rules.parkeraAtRed (7) av 10 är risk-off.
   const LAMPS = 10;
   const red = S.lampScore.red;
   const total = LAMPS;
@@ -64,6 +90,17 @@
   const marketGain = pf.value - deposits;
   const marketPct = deposits > 0 ? (marketGain / deposits) * 100 : 0;
 
+  // Journalens läge → ordet användaren ser. Läget ändras bara via journalen.
+  // Vilka lampnivåer som ska ge Avvaktar / Köper lite / Köper beslutas i steg 8 – här översätts bara ordet.
+  const MODES = {
+    PARKERA: { word: "VILAR", acc: "red", quote: "Marknaden är orolig. Pengarna står i kontanter tills datan vänder." },
+    AVVAKTAR: { word: "AVVAKTAR", acc: "blurple", quote: "Signalerna pekar åt olika håll. Jag rör ingenting förrän bilden klarnar." },
+    NORMAL: { word: "KÖPER LITE", acc: "green", quote: "Fler lampor är gröna. Jag går in med en liten del, resten ligger kvar." },
+    OFFENSIV: { word: "KÖPER", acc: "green", quote: "Läget är bra. Jag går in, aldrig över 75 %. En fjärdedel ligger alltid kvar." }
+  };
+  const modeOf = (k) => MODES[k] || { word: String(k || "OKÄNT"), acc: "blurple", quote: "Journalen har ett läge Walter inte känner igen. Rätta det i state.json." };
+  const MODE = modeOf(S.mode);
+
   // USDSEK: senast sparade live-kurs med datum, annars null. Ingen fast reservkurs.
   // Funktion, eftersom Uppdatera-knappen kan byta ut m.usdsek / m.btc mot färskare värden.
   const fx = () => {
@@ -74,193 +111,151 @@
     return { usdsek, stale, btcSek };
   };
 
-  // ---------- Logos (fasta filer, aldrig genererade) ----------
-  const logos = document.querySelectorAll("[data-logo]");
-  let failed = 0;
-  const onLogoError = (img) => {
-    img.hidden = true;
-    if (++failed === logos.length) document.querySelector(".logo-text").hidden = false;
+  // Taket på nuvarande level = summan av upplåsta tak (Level 1: 35 %, Level 3: 75 %)
+  const unlocked = { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
+  const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
+
+  // Rapporterna skickas 08:13 och 22:05 (se .github/workflows/walter-auto.yml)
+  const nextReport = () => {
+    const now = new Date(), mins = now.getHours() * 60 + now.getMinutes();
+    return mins < 8 * 60 + 13 || mins >= 22 * 60 + 5 ? "08:13" : "22:05";
   };
-  logos.forEach((img) => {
-    // Bilden kan ha hunnit misslyckas innan skriptet körs
-    if (img.complete && img.naturalWidth === 0) onLogoError(img);
-    else img.addEventListener("error", () => onLogoError(img));
-  });
 
-  // ---------- Topbar ----------
-  $("version").textContent = "V" + S.version;
-  const pill = $("mode-pill");
-  pill.innerHTML = `<span class="dot${parked ? "" : " green"}"></span>${esc(S.mode)}`;
-  pill.classList.toggle("is-active", !parked);
+  // ---------- Topp, sidfot ----------
+  $("stamp").textContent = "NÄSTA RAPPORT " + nextReport();
 
-  // ---------- Ticker ----------
-  const renderTicker = () => {
-  const { usdsek, stale: fxStale } = fx();
-  const ticks = [
-    { l: "10Y", v: nf(2).format(m.us10y.value) + " %", d: (m.us10y.changeBp > 0 ? "+" : "−") + Math.abs(m.us10y.changeBp) + " bp", c: m.us10y.changeBp > 0 ? "down" : "up" },
-    { l: "DXY", v: nf(2).format(m.dxy.value), d: "", c: "flat" },
-    { l: "VIX", v: m.vix.value != null ? nf(2).format(m.vix.value) : pct(m.vix.changePct), d: m.vix.value != null ? pct(m.vix.changePct) : day(m.vix.asOf), c: m.vix.changePct > 0 ? "down" : "up" },
-    { l: "ETF", v: usdM(m.etfFlow.mtdUsd), d: m.etfFlow.asOf ? MONTHS[+m.etfFlow.asOf.slice(5, 7) - 1] : "okt", c: m.etfFlow.mtdUsd < 0 ? "down" : "up" },
-    { l: "NDX", v: pct(m.nasdaq.changePct), d: "", c: m.nasdaq.changePct < 0 ? "down" : "up" },
-    { l: "SPX", v: pct(m.spx.changePct), d: "", c: m.spx.changePct < 0 ? "down" : "up" },
-    { l: "BTC", v: usd(m.btc.value), d: "", c: "flat" },
-    { l: "USDSEK", v: usdsek ? nf(2).format(usdsek.value) : "väntar på data", d: usdsek && fxStale ? "per " + day(usdsek.asOf) : "", c: fxStale ? "down" : "flat" }
-  ];
-  $("ticker").innerHTML = ticks.map((t, i) =>
-    (i ? '<span class="tick-sep">·</span>' : "") +
-    `<span class="tick"><span class="tick-label">${t.l}</span>` +
-    `<span class="tick-value num ${t.c}">${esc(t.v)}</span>` +
-    (t.d ? `<span class="tick-delta num ${t.c}">${esc(t.d)}</span>` : "") + "</span>"
-  ).join("");
-  };
-  renderTicker();
+  // ================================================================
+  // ÖVERSIKT
+  // ================================================================
+  $("status-line").textContent = "STATUS · " + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
+  $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
+    <h1 class="mode-name">${esc(MODE.word)}</h1>`;
+  $("quote").textContent = MODE.quote;
 
-  // ---------- Portfolio ----------
-  // Faser: capitalChange i state.json delar historiken. Före = fas 1 (paper-test), från och med = fas 2.
-  // Insättningen är ingen vinst, så faserna ritas aldrig som en sammanhängande linje.
-  const cc = pf.capitalChange || null;
-  const allHist = (pf.history || []).slice();
-  if (allHist.length && allHist[allHist.length - 1].date < S.updatedAt) allHist.push({ date: S.updatedAt, value: pf.value, cash: pf.holdings.CASH });
-  const phase1 = cc ? allHist.filter((h) => h.date < cc.date) : [];
-  const phase2 = cc ? [{ date: cc.date, value: cc.value, note: "insättning" }, ...allHist.filter((h) => h.date >= cc.date)] : allHist;
-
-  // Graf: fas 2 (eller hela historiken utan kapitalbyte) + dagens värde om det är nyare.
-  // Tom historik = platt linje på startkapitalet, så grafen alltid ritas.
-  const hist = phase2.slice();
-  if (!hist.length) hist.push({ date: S.startDate, value: start }, { date: S.updatedAt, value: start });
-  if (hist.length < 2) hist.unshift({ date: S.startDate, value: start });
-  const chart = (() => {
-    const W = 320, H = 110, P = 8;
-    const vals = hist.map((h) => h.value);
-    let lo = Math.min(...vals, start), hi = Math.max(...vals, start);
-    if (hi - lo < 1) { lo -= 5; hi += 5; }
-    const x = (i) => P + (i * (W - 2 * P)) / (hist.length - 1);
-    const y = (v) => H - P - ((v - lo) * (H - 2 * P)) / (hi - lo);
-    const pts = hist.map((h, i) => `${x(i).toFixed(1)},${y(h.value).toFixed(1)}`).join(" ");
-    const last = hist[hist.length - 1];
-    return `<svg class="pf-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Portföljens värde ${day(hist[0].date)} till ${day(last.date)}">
-        <line x1="${P}" x2="${W - P}" y1="${y(start)}" y2="${y(start)}" class="pf-start"/>
-        <polyline points="${P},${H - P} ${pts} ${W - P},${H - P}" class="pf-area"/>
-        <polyline points="${pts}" class="pf-line"/>
-        ${hist.map((h, i) => `<circle cx="${x(i)}" cy="${y(h.value)}" r="${i === hist.length - 1 ? 4.5 : 2.5}" class="pf-dot"/>`).join("")}
-        <text x="${W - P - 12}" y="${Math.max(14, y(last.value) - 10)}" text-anchor="end" class="pf-label">${nf(0).format(last.value)} kr</text>
+  // ---------- Ringen: tio bågar, en per lampa ----------
+  const lampState = (l) => (l.status === "red" ? "red" : l.status === "green" ? "green" : "wait");
+  const nRed = S.lamps.filter((l) => l.status === "red").length;
+  const nGreen = S.lamps.filter((l) => l.status === "green").length;
+  const nWait = S.lamps.length - nRed - nGreen;
+  const pt = (a, r) => { const t = (a - 90) * Math.PI / 180; return `${(75 + r * Math.cos(t)).toFixed(2)} ${(75 + r * Math.sin(t)).toFixed(2)}`; };
+  const arcs = S.lamps.slice(0, LAMPS).map((l, i) =>
+    `<path class="arc ${lampState(l)}" d="M ${pt(i * 36 + 3, 62)} A 62 62 0 0 1 ${pt(i * 36 + 33, 62)}" style="animation-delay:${(-i * 0.48).toFixed(2)}s"/>`).join("");
+  const left = S.rules.parkeraAtRed - red;
+  $("ring").innerHTML = `
+    <div class="ring">
+      <svg viewBox="0 0 150 150" role="img" aria-label="Tio lampor: ${nRed} röda, ${nGreen} gröna, ${nWait} väntar på data">
+        <circle class="base" cx="75" cy="75" r="72"/>${arcs}
       </svg>
-      <div class="pf-axis sub"><span>${day(hist[0].date)}</span><span>streckat = startkapital</span><span>${day(last.date)}</span></div>`;
+      <div class="ring-center" aria-hidden="true"><span class="num">${pad(red)}/${total}</span><span class="label">RÖDA</span></div>
+    </div>
+    <div class="legend">
+      <span><i class="r"></i>${nRed} röda</span>
+      <span><i class="g"></i>${nGreen} gröna</span>
+      <span><i class="w"></i>${nWait} väntar</span>
+      <span class="note">VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}</span>
+    </div>`;
+
+  // ---------- Portfölj ----------
+  const avk = Math.abs(marketPct) < 0.005 ? "±0,00 %" : pct(marketPct, 2);
+  $("pf").innerHTML = `
+    <div class="pf-top">
+      <div class="pf-value"><span class="label">PORTFÖLJ</span><strong>${kr(pf.value)}</strong></div>
+      <div class="stats">
+        <div><span>AVKASTNING</span><strong title="Marknadsvinst över alla insättningar">${avk}</strong></div>
+        <div><span>KONTANT</span><strong>${nf(0).format((1 - invested) * 100)} %</strong></div>
+        <div><span>INVESTERAT</span><strong title="Tak på Level ${S.level}">${nf(0).format(invested * 100)} / ${nf(0).format(levelCap * 100)} %</strong></div>
+      </div>
+    </div>
+    <div class="candles" id="candles"><span class="small">Hämtar bitcoin …</span></div>
+    <div class="pf-foot"><span id="candles-label">BITCOIN · HEIKIN-ASHI · DAG</span><a href="#siffror">SIFFRORNA →</a></div>`;
+
+  // Bitcoin-ljus (Heikin-Ashi, dag) direkt från en öppen börs-källa. Ingen data = ingen graf, aldrig påhittade ljus.
+  const SHOW = 28;
+  const candleSources = [
+    ["Binance", "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=60",
+      (j) => j.map((k) => [+k[1], +k[2], +k[3], +k[4]])],
+    ["Coinbase", "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400",
+      (j) => j.slice(0, 60).reverse().map((k) => [k[3], k[2], k[1], k[4]])]
+  ];
+  const heikin = (ohlc) => {
+    const out = [];
+    ohlc.forEach(([o, h, l, c], i) => {
+      const hc = (o + h + l + c) / 4;
+      const ho = i ? (out[i - 1][0] + out[i - 1][3]) / 2 : (o + c) / 2;
+      out.push([ho, Math.max(h, ho, hc), Math.min(l, ho, hc), hc]);
+    });
+    return out;
+  };
+  const drawCandles = (bars, src) => {
+    const W = SHOW * 20, H = 130, P = 4;
+    const lo = Math.min(...bars.map((b) => b[2])), hi = Math.max(...bars.map((b) => b[1]));
+    const y = (v) => P + (hi - v) * (H - 2 * P) / (hi - lo || 1);
+    const body = bars.map(([o, h, l, c], i) => {
+      const x = i * 20 + 5, top = y(Math.max(o, c)), bh = Math.max(2, Math.abs(y(o) - y(c)));
+      return `<line class="wick" x1="${x + 5}" x2="${x + 5}" y1="${y(h).toFixed(1)}" y2="${y(l).toFixed(1)}" vector-effect="non-scaling-stroke"/>` +
+        `<rect class="body${c < o ? " fall" : ""}" x="${x}" y="${top.toFixed(1)}" width="10" height="${bh.toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
+    }).join("");
+    const first = bars[0][3], last = bars[bars.length - 1][3];
+    $("candles").innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+      aria-label="Bitcoin senaste ${SHOW} dagarna, Heikin-Ashi, från ${src}: ${last >= first ? "upp" : "ned"} ${nf(1).format(Math.abs(last / first - 1) * 100)} %">${body}</svg>`;
+    $("candles-label").textContent = `BITCOIN · HEIKIN-ASHI · ${SHOW} DAGAR · ${src.toUpperCase()}`;
+  };
+  (async () => {
+    for (const [name, url, parse] of candleSources) {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error(r.status);
+        const bars = heikin(parse(await r.json())).slice(-SHOW);
+        if (bars.length < 5) throw new Error("för få ljus");
+        drawCandles(bars, name);
+        return;
+      } catch { /* prova nästa källa */ }
+    }
+    $("candles").innerHTML = '<span class="small">Kunde inte hämta bitcoin-ljus just nu. Väntar på data.</span>';
   })();
 
-  // ---------- Resan: fas 1 och fas 2 som två grafer med ett brott emellan ----------
-  const phaseChart = (pts, label) => {
-    const W = 300, H = 130, P = 14, TOP = 24, BOT = 22;
-    const vals = pts.map((h) => h.value);
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    const pad = (hi - lo) * 0.15 || Math.max(1, hi * 0.02);
-    lo -= pad; hi += pad;
-    const x = (i) => P + 18 + (i * (W - 2 * P - 36)) / Math.max(1, pts.length - 1);
-    const y = (v) => H - BOT - ((v - lo) * (H - TOP - BOT)) / (hi - lo);
-    const line = pts.map((h, i) => `${x(i).toFixed(1)},${y(h.value).toFixed(1)}`).join(" ");
-    return `<svg class="pf-chart journey-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}: ${pts.map((h) => `${day(h.date)} ${nf(0).format(h.value)} kr`).join(", ")}">
-      <polyline points="${x(0).toFixed(1)},${H - BOT} ${line} ${x(pts.length - 1).toFixed(1)},${H - BOT}" class="pf-area"/>
-      <polyline points="${line}" class="pf-line"/>
-      ${pts.map((h, i) => `<circle cx="${x(i)}" cy="${y(h.value)}" r="${i === pts.length - 1 ? 4.5 : 3}" class="pf-dot"/>
-        <text x="${x(i)}" y="${y(h.value) - 9}" text-anchor="middle" class="journey-val">${amount(h.value)}</text>
-        <text x="${i === 0 ? P : i === pts.length - 1 ? W - P : x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle"}" class="journey-date">${[i && pts[i - 1].date === h.date ? "" : day(h.date), i === pts.length - 1 && !h.note ? "nu" : h.note || ""].filter(Boolean).map(esc).join(" · ")}</text>`).join("")}
-    </svg>`;
-  };
-  // Små belopp med ören (624,77), stora i hela kronor
-  const amount = (v) => new Intl.NumberFormat("sv-SE", { maximumFractionDigits: Math.abs(v) < 10000 ? 2 : 0 }).format(v);
-  // Fas 1 innehåller en DCA-insättning, så skillnaden där är ingen vinst – visa bara från/till.
-  // Fas 2: capitalChange.manualTopUp = manuella insättningar efter startkapitalet (paper, tills LIVE).
-  // Bara det som blir kvar efter insättningarna kallas marknad.
-  const phaseSpan = (pts, split) => {
-    const from = `${amount(pts[0].value)} kr`, to = `${amount(pts[pts.length - 1].value)} kr`;
-    if (!split) return `${from} → ${to}`;
-    const sign = (v) => (v < 0 ? "−" : "+") + kr(Math.abs(v));
-    const manual = cc.manualTopUp || 0;
-    const market = pts[pts.length - 1].value - pts[0].value - manual;
-    const parts = [manual ? `${sign(manual)} insättning, manuell` : "", Math.abs(market) >= 1 ? `${sign(market)} marknad` : ""].filter(Boolean);
-    return `${from} (insättning) → ${to}${parts.length ? ` (${parts.join(", ")})` : ""}`;
-  };
-  if (cc && phase1.length && phase2.length > 1) {
-    // Hur stor "vinsten" hade sett ut om linjen dragits rakt igenom, avrundat nedåt (40 650 % -> 40 000 %)
-    const raw = (phase2[phase2.length - 1].value / phase1[phase1.length - 1].value - 1) * 100;
-    const mag = 10 ** Math.floor(Math.log10(Math.max(1, raw)));
-    const jump = Math.floor(raw / mag) * mag;
-    $("journey").hidden = false;
-    $("journey").innerHTML = `
-      <h2>Resan</h2>
-      <div class="journey-grid">
-        <div class="journey-phase">
-          <div class="journey-head"><b>Fas 1 · paper-test</b><span class="sub num">${esc(phaseSpan(phase1, false))}</span></div>
-          ${phaseChart(phase1, "Fas 1, paper-test")}
-        </div>
-        <div class="journey-break" role="separator"><span>${day(cc.date)}</span>${esc(cc.text)}</div>
-        <div class="journey-phase">
-          <div class="journey-head"><b>Fas 2 · nu</b><span class="sub num">${esc(phaseSpan(phase2, true))}</span></div>
-          ${phaseChart(phase2, "Fas 2, nytt startkapital")}
-        </div>
-      </div>
-      <p class="sub journey-foot">Fas 1 = paper-test ${kr(phase1[0].value)}. Fas 2 = nytt kapital ${kr(cc.value)}. Ingen ${nf(0).format(jump)} % vinst – hoppet är en insättning.${cc.manualTopUp ? ` Även ${kr(cc.value)} → ${kr(phase2[phase2.length - 1].value)} är manuella insättningar, inte marknadsvinst, tills WALTER går LIVE.` : ""}</p>`;
-  }
-
-  // ---------- K4-rader (portfolio-tabellen + K4-kortet) ----------
-  // Avgifter: trading_fee (taker + slippage vid försäljningen) + withdrawal_fee. Bankens FX-avgift hör inte till K4.
-  // Samma regler som fetcher/walter_k4.py: vinst beskattas 30 %, förlust dras av till 70 %.
-  const kr2 = (v) => nf(2).format(v) + " kr";
-  const k4 = (S.k4 || []).map((r) => ({
-    ...r,
-    vinst: r.forsaljningspris_sek - r.omkostnad_sek - (r.trading_fee_sek || 0) - (r.withdrawal_fee_sek || 0)
-  }));
-  // Samma årsregel som fetcher/walter_k4.py: senaste försäljningens år, annars innevarande år
-  const sales = (S.k4 || []).map((r) => r.saljdatum).filter(Boolean).sort();
-  const reportYear = sales.length ? sales[sales.length - 1].slice(0, 4) : String(new Date().getFullYear());
-  $("portfolio").innerHTML = `
-    <h2>Portfolio</h2>
-    <div class="pf-value num">${nf(0).format(pf.value)}<small>kr</small></div>
-    ${chart}
-    <div class="pf-cash"><span class="pulse" aria-hidden="true"></span>Kontant <strong class="num">${kr(pf.holdings.CASH)}</strong></div>
-    <div class="chips">
-      <span class="chip"><span class="dot ${dd < 8 ? "green" : dd < 12 ? "amber" : ""}"></span>DD <strong class="num">${nf(1).format(dd)} %</strong></span>
-      <span class="chip">Level <strong>${S.level}</strong></span>
-      <span class="chip">Kontant <strong class="num">${nf(0).format((1 - invested) * 100)} %</strong></span>
-      <span class="chip">Dag <strong class="num">${days}</strong></span>
-    </div>
-    <div class="pf-ref num" id="pf-ref"></div>
-    <div class="pf-actions">
-      <a class="btn" href="reports/K4_${reportYear}_WALTER_PAPER.pdf" download>Ladda ner K4 (PAPER)</a>
-      <a class="btn" href="reports/Avgiftsrapport_${reportYear}_WALTER_PAPER.pdf" download>Avgiftsrapport (PAPER)</a>
-    </div>
-    ${k4.length ? `<div class="pf-k4"><table class="k4-table num">
-      <caption class="sub">K4 ${reportYear} · PAPER – simulering, belopp i kr</caption>
-      <thead><tr><th>Köpdatum</th><th>Säljdatum</th><th>Antal</th><th>Försäljning</th><th>Omkostnad</th><th>Vinst</th><th>Avgift</th><th>Beteckning</th></tr></thead>
-      <tbody>${k4.map((r) => `<tr><td data-label="Köpdatum">${esc(r.kopdatum)}</td><td data-label="Säljdatum">${esc(r.saljdatum)}</td><td data-label="Antal">${nf(8).format(r.antal)}</td><td data-label="Försäljning">${nf(2).format(r.forsaljningspris_sek)}</td><td data-label="Omkostnad">${nf(2).format(r.omkostnad_sek)}</td><td data-label="${r.vinst < 0 ? "Förlust" : "Vinst"}" class="${r.vinst < 0 ? "down" : "up"}">${r.vinst < 0 ? "−" : ""}${nf(2).format(Math.abs(r.vinst))}</td><td data-label="Avgift">${nf(2).format((r.trading_fee_sek || 0) + (r.withdrawal_fee_sek || 0))}</td><td data-label="Beteckning">${esc(r.beteckning || "")}</td></tr>`).join("")}</tbody>
-    </table></div>` : `<p class="sub">Inga försäljningar ${reportYear} ännu.</p>`}`;
-  const renderRef = () => {
-    const { usdsek, stale, btcSek } = fx();
-    $("pf-ref").textContent = `Referens: ${nf(5).format(pf.refBtc)} BTC · insättningar ${kr(deposits)} · 1 BTC ` +
-      (btcSek != null ? "≈ " + kr(btcSek) + (stale ? " (kurs per " + day(usdsek.asOf) + ")" : "") : "i kr: väntar på data");
-  };
-  renderRef();
+  // ---------- Tio lampor ----------
+  const STATE_WORD = { red: "RISK", green: "LUGN", wait: "VÄNTAR" };
+  const confirmed = S.lamps.filter((l) => l.status !== null).length;
+  const fromData = S.lampScore.source === "data";
+  // Läget ändras bara via journalen – säg till om datan pekar åt andra hållet
+  const dataWantsPark = red >= S.rules.parkeraAtRed;
+  const lampNote = !fromData
+    ? `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
+    : dataWantsPark === parked
+      ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
+      : `Datan (${day(S.lampScore.asOf)}) säger ${dataWantsPark ? "att Walter borde vila" : "att Walter inte längre behöver vila"}, men journalen säger ${MODE.word}. Läget ändras först när du skriver en journalpost.`;
+  $("lamps").innerHTML = `
+    <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
+    <ul class="lamp-grid">
+      ${S.lamps.map((l) => { const s = lampState(l); return `
+        <li><span class="dot ${s === "wait" ? "" : s + " lit"}"></span>
+          <span class="txt"><span class="nm">${esc(l.name)}</span><span class="rl">${esc(l.rule)}</span></span>
+          <span class="st">${STATE_WORD[s]}</span></li>`; }).join("")}
+    </ul>
+    <p class="lamp-note">${esc(lampNote)} <a href="#pro">Värdena bakom lamporna →</a></p>
+    ${lampCountOk ? "" : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
 
   // ---------- Status + Uppdatera ----------
   // Webbläsaren kan bara hämta från källor som tillåter det (CORS): CoinGecko och valutakurser.
   // Riksbanken provas först; den skickar i dag inget CORS-svar, så då används ECB:s referenskurs (Frankfurter).
   // Lamporna (yfinance, BGeometrics, ETF m.fl.) kräver hämtaren.
-  const MODE_TEXT = { PARKERA: "vilar", NORMAL: "är igång", OFFENSIV: "kör offensivt" };
-  const stamp = (iso) => {
-    if (!iso) return "okänt";
-    const d = new Date(iso);
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  };
-  // Samma takt som .github/workflows/walter-auto.yml: PARKERA ca var 3:e timme, annars var 15:e minut.
-  const autoMsg = `Uppdateras automatiskt ${parked ? "ungefär var 3:e timme (WALTER är parkerad)" : "var 15e min"} via GitHub Actions – både kurser och WALTER-lampor.`;
+  // Samma takt som .github/workflows/walter-auto.yml: vilar = ca var 3:e timme, annars var 15:e minut.
+  const autoMsg = `Uppdateras automatiskt ${parked ? "ungefär var 3:e timme (Walter vilar)" : "var 15:e minut"} via GitHub Actions – både kurser och lampor.`;
+  const latest = S.journal[0];
+  const notisOld = S.notis && S.notis.at && Date.now() - new Date(S.notis.at) > 36 * 3600 * 1000;
   $("status").innerHTML = `
-    <div class="status-grid">
-      <div class="status-item"><span class="sub">Senast uppdaterad</span><strong class="num" id="status-time">${stamp(S.fetchedAt)}</strong></div>
-      <div class="status-item"><span class="sub">WALTER</span><strong><span class="dot${parked ? "" : " green"}"></span>${esc(S.mode)} – ${esc(MODE_TEXT[S.mode] || "okänt läge")}</strong><span class="sub num">${red}/${total} röda lampor</span></div>
-      <div class="status-item"><span class="sub">Portfölj</span><strong class="num">${kr(pf.value)}</strong><span class="sub num">Insättningar ${kr(deposits)}${topUp ? ` (${kr(start)} + ${kr(topUp)})` : ""}</span><span class="num ${marketGain < 0 ? "down" : marketGain > 0 ? "up" : ""}">Marknadsvinst ${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))} (${pct(marketPct)})</span></div>
-      <button type="button" class="btn btn-primary status-btn" id="btn-refresh">Uppdatera</button>
+    <h3>STATUS</h3>
+    <div class="kv">
+      <div><span>SENAST HÄMTAD</span><strong id="status-time">${stamp(S.fetchedAt)}</strong></div>
+      <div><span>WALTER</span><strong>${esc(MODE.word)} · ${red}/${total}</strong></div>
+      <div><span>MARKNADSVINST</span><strong class="${marketGain < 0 ? "down" : marketGain > 0 ? "up" : ""}">${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))}</strong></div>
     </div>
-    <p class="sub status-msg" id="status-msg" aria-live="polite">Knappen hämtar färska kurser för BTC, USDSEK och EURSEK. ${autoMsg}</p>`;
+    ${S.notis && S.notis.text ? `<p class="plain">${esc(S.notis.text)}${notisOld ? ` <span class="small">(från ${day(S.notis.at)})</span>` : ""}</p>` : ""}
+    ${latest ? `<p class="plain"><b>Senast (${day(latest.date)}):</b> ${esc(latest.plain)}</p>` : ""}
+    <div class="status-actions"><button type="button" class="btn btn-primary" id="btn-refresh">UPPDATERA</button>
+      <span class="small">Insättningar ${kr(deposits)}${topUp ? ` (${kr(start)} + ${kr(topUp)})` : ""}</span></div>
+    <p class="status-msg" id="status-msg" aria-live="polite">Knappen hämtar färska kurser för BTC, USDSEK och EURSEK. ${autoMsg}</p>`;
 
   const getJson = async (url) => {
     const r = await fetch(url, { cache: "no-store" });
@@ -282,7 +277,7 @@
   $("btn-refresh").addEventListener("click", async (ev) => {
     const btn = ev.currentTarget;
     btn.disabled = true;
-    btn.textContent = "Hämtar …";
+    btn.textContent = "HÄMTAR …";
     const got = [], failedSrc = [];
     const [btcRes, fxRes] = await Promise.allSettled([
       getJson("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"),
@@ -290,85 +285,26 @@
     ]);
     const now = new Date();
     if (btcRes.status === "fulfilled" && btcRes.value.bitcoin) {
-      m.btc = { value: Math.round(btcRes.value.bitcoin.usd), unit: "usd", asOf: now.toISOString().slice(0, 10) };
+      m.btc = { ...m.btc, value: Math.round(btcRes.value.bitcoin.usd), asOf: now.toISOString().slice(0, 10) };
       got.push(`BTC ${usd(m.btc.value)}`);
     } else failedSrc.push("CoinGecko");
     if (fxRes.status === "fulfilled") {
       Object.assign(m, fxRes.value);
       got.push(`USDSEK ${nf(4).format(m.usdsek.value)} och EURSEK ${nf(4).format(m.eursek.value)} (${m.usdsek.source}, ${day(m.usdsek.asOf)})`);
     } else failedSrc.push("valutakurser");
-    renderTicker();
-    renderRef();
+    renderPrices();
+    renderGoal();
     if (got.length) $("status-time").textContent = stamp(now.toISOString()) + " (kurser)";
     $("status-msg").innerHTML =
       (got.length ? `Färskt ${stamp(now.toISOString())}: ${esc(got.join(" · "))}. ` : "") +
       (failedSrc.length ? `<span class="warn">Kunde inte hämta: ${esc(failedSrc.join(", "))}. Senast sparade värden visas.</span> ` : "") +
       autoMsg;
     btn.disabled = false;
-    btn.textContent = "Uppdatera";
+    btn.textContent = "UPPDATERA";
   });
 
-  // ---------- Morgon/kväll-notis (skrivs av fetcher/walter_notis.py i Actionen) ----------
-  if (S.notis && S.notis.text) {
-    const at = new Date(S.notis.at);
-    const old = Date.now() - at > 36 * 3600 * 1000;  // äldre än ett och ett halvt dygn = inte längre aktuell
-    $("notis").hidden = false;
-    $("notis").innerHTML = `<span class="dot ${parked ? "amber" : "green"}"></span>
-      <p>${esc(S.notis.text)}${old ? ` <span class="sub">(från ${day(S.notis.at.slice(0, 10))})</span>` : ""}</p>`;
-  }
-
-  // ---------- Notis (vanlig människa, inte siffervägg) ----------
-  const notice = (() => {
-    if (parked) {
-      return {
-        title: "WALTER står still – pengarna är parkerade",
-        body: `${red} av ${total} varningslampor lyser. Marknaden är orolig just nu, så ${pf.holdings.CASH >= pf.value ? `alla ${kr(pf.value)} ligger kvar som kontanter` : `${kr(pf.holdings.CASH)} av ${kr(pf.value)} ligger som kontanter`}. Du behöver inte göra något.`,
-        next: `WALTER börjar köpa igen när högst ${S.rules.parkeraAtRed - 1} lampor lyser.`
-      };
-    }
-    return {
-      title: "WALTER är igång",
-      body: `${red} av ${total} varningslampor lyser. ${nf(0).format(invested * 100)} % av pengarna är investerade, resten ligger som kontanter.`,
-      next: `WALTER parkerar allt om ${S.rules.parkeraAtRed} lampor eller fler börjar lysa.`
-    };
-  })();
-  const latest = S.journal[0];
-  $("notice").innerHTML = `
-    <h2>Läget just nu</h2>
-    <p class="notice-title">${esc(notice.title)}</p>
-    <p class="notice-body">${esc(notice.body)}</p>
-    ${latest ? `<p class="notice-body"><b>Senast (${day(latest.date)}):</b> ${esc(latest.plain)}</p>` : ""}
-    <div class="notice-next"><span class="dot ${parked ? "amber" : "green"}" style="margin-top:6px"></span><span><b>Nästa steg:</b> ${esc(notice.next)}</span></div>`;
-
-  // ---------- Lampor ----------
-  const confirmed = S.lamps.filter((l) => l.status !== null).length;
-  const fromData = S.lampScore.source === "data";
-  // Mode ändras bara via journalen – säg till om datan pekar åt andra hållet
-  const dataWantsPark = red >= S.rules.parkeraAtRed;
-  const lampNote = !fromData
-    ? `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
-    : dataWantsPark === parked
-      ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
-      : `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}). Datan säger ${dataWantsPark ? "PARKERA" : "att WALTER inte längre behöver parkera"}, men journalen säger ${S.mode}. Läget ändras först när du skriver en journalpost.`;
-  $("lamps").innerHTML = `
-    <h2>Varningslampor</h2>
-    <div class="lamp-score"><span class="big num">${red}/${total}</span><span class="sub">risk-off · ${day(S.lampScore.asOf)} · PARKERA vid ${S.rules.parkeraAtRed}/${total}</span></div>
-    <div class="lamp-row">${Array.from({ length: total }, (_, i) => `<span class="${i < red ? "red" : ""}"></span>`).join("")}</div>
-    <ul class="lamp-list">
-      ${S.lamps.map((l) => `
-        <li>${check(l.status === null ? null : l.status === "green")}
-          <span class="name">${esc(l.name)}<span class="rule">${esc(l.rule)}</span></span>
-          <span class="val num">${l.value ? esc(l.value) : "väntar på data"}</span>
-        </li>`).join("")}
-    </ul>
-    <p class="sub" style="margin:14px 0 0">${esc(lampNote)}</p>
-    ${lampCountOk ? "" : `<p class="warn">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). WALTER räknar alltid med 10 – rätta i state.json.</p>`}`;
-
-  // ---------- Allokering ----------
+  // ---------- Fördelning ----------
   const share = (k) => (pf.value > 0 ? pf.holdings[k] / pf.value : 0);
-  const unlocked = { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
-  // Taket på nuvarande level = summan av upplåsta tak (Level 1: 35 %, Level 3: 75 %)
-  const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
   const rows = [
     { k: "BTC", name: "Bitcoin", note: "Level 1", cap: S.rules.caps.BTC },
     { k: "ETH", name: "Ethereum", note: "Level 2", cap: S.rules.caps.ETH },
@@ -376,7 +312,7 @@
     { k: "CASH", name: "Kontant", note: "minst 25 %", cap: null }
   ];
   $("allocation").innerHTML = `
-    <h2>Fördelning</h2>
+    <h3>FÖRDELNING</h3>
     <div class="alloc">
       ${rows.map((r) => {
         const locked = r.cap !== null && !unlocked[r.k];
@@ -388,13 +324,13 @@
             <span class="fill" style="width:${s * 100}%"></span>
             <span class="cap" style="left:${capPos}%" title="${r.cap !== null ? "Tak" : "Golv"} ${capPos} %"></span>
           </div>
-          <div class="pct num">${locked ? "låst" : nf(0).format(s * 100) + " %"}${r.cap !== null ? " / " + r.cap * 100 + " %" : ""}</div>
+          <div class="pct">${locked ? "låst" : nf(0).format(s * 100) + " %"}${r.cap !== null ? " / " + r.cap * 100 + " %" : ""}</div>
         </div>`;
       }).join("")}
     </div>
-    <p class="alloc-foot">Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).</p>`;
+    <p class="small" style="margin-top:16px">Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).</p>`;
 
-  // ---------- Levels ----------
+  // ---------- Nivåer ----------
   // Upplåsning räknas ALLTID på marknadsvinst över insättningarna – insättningar låser aldrig upp.
   // Level 2: en av vägarna i rules.unlock räcker. Level 3: +levels.3.gainPct % och drawdown under levels.3.maxDd.
   // Beloppen räknas här (inte fasta i state.json), så en ny insättning flyttar kraven med sig.
@@ -419,6 +355,8 @@
   const lvUnlocked = (n) => n === 1
     || (n === 2 && marketGain > 0 && paths.some((p) => p.conds.every(([, ok]) => ok === true)))
     || (n === 3 && lv3 != null && marketGain > 0 && marketPct >= lv3.gainPct && dd < lv3.maxDd);
+  // Närmaste vägens vinstkrav till Level 2 (används i nivåerna och i planen)
+  const lv2Gain = Math.min(u.early.gainPct, u.normal.gainPct);
 
   // Guld är skyddet: önskas när oron är hög (VIX över gränsen eller S&P under sitt snitt). null = väntar på data.
   const g = S.rules.gold;
@@ -427,77 +365,354 @@
   const goldWanted = vixHigh === true || spxLow === true ? true : vixHigh === null || spxLow === null ? null : false;
 
   // Låst level: villkoren visas släckta ("tänds" först när leveln är upplåst)
-  const lockedDot = '<span class="dot off" title="Låst tills leveln är upplåst"></span>';
+  const lockedDot = '<span class="dot" title="Låst tills leveln är upplåst"></span>';
+  const lv2Profit = deposits * lv2Gain / 100;
+  const lv2pct = lv2Profit > 0 ? Math.min(100, Math.max(0, marketGain) / lv2Profit * 100) : 0;
   const levels = [
     { n: 1, name: "Level 1 · Bitcoin", tag: "BTC max 35 % · kontant minst 25 %", conds: [
       ["Aktiv från start", true],
-      [`Inte PARKERA (färre än ${S.rules.parkeraAtRed}/${total} röda lampor)`, !parked]
+      [`Walter vilar inte (färre än ${S.rules.parkeraAtRed}/${total} röda lampor i journalen)`, !parked]
     ] },
-    { n: 2, name: "Level 2 · Ethereum", tag: "ETH 20 %", conds: [
-      [`Upplåst: tidig eller normal väg klar (marknadsvinst nu ${kr(Math.max(0, marketGain))})`, lvUnlocked(2), true],
+    { n: 2, name: "Level 2 · Ethereum", tag: "ETH 20 %", bar: lvUnlocked(2) ? null : lv2pct, conds: [
+      [`Upplåst: tidig eller normal väg klar (marknadsvinst nu ${kr(Math.max(0, marketGain))} av ${kr(lv2Profit)})`, lvUnlocked(2), true],
       ["BTC är LONG", m.btcLong],
       ["ETH/BTC över 30-dagars snitt", m.ethBtcAbove30dMa],
-      [`Färre än ${S.rules.ethMaxRed + 1} röda lampor (nu ${red})`, red <= S.rules.ethMaxRed]
+      [`Högst ${S.rules.ethMaxRed} röda lampor (nu ${red})`, red <= S.rules.ethMaxRed]
     ] },
-    { n: 3, name: "Level 3 · Guld", tag: "PAXG / XAUT 20 % · även när WALTER vilar", conds: [
+    { n: 3, name: "Level 3 · Guld", tag: "PAXG / XAUT 20 % · även när Walter vilar", conds: [
       [`Upplåst: +${lv3 ? lv3.gainPct : "?"} % marknadsvinst (${kr(Math.max(0, marketGain))} / ${lv3 ? krFor(lv3.gainPct) : "?"})`, lvUnlocked(3), true],
       [`Oro: VIX över ${g.vixAbove} (nu ${m.vix.value != null ? nf(1).format(m.vix.value) : "?"}) eller S&P 500 under 50-dagarssnitt`, goldWanted]
     ] }
   ];
   $("levels").innerHTML = `
-    <h2>Nivåer</h2>
+    <h3>NIVÅER</h3>
     ${levels.map((l) => `
       <div class="level${l.n === S.level ? " current" : ""}">
-        <div class="level-head"><span>${l.name}${l.n === S.level ? " · nu" : ""}</span><span class="tag">${esc(l.tag)}</span></div>
-        <ul class="conds">${l.conds.map(([t, ok, gate]) => `<li>${gate || lvUnlocked(l.n) ? check(ok) : lockedDot}${esc(t)}</li>`).join("")}</ul>
+        <div class="level-head"><b>${l.name}${l.n === S.level ? " · nu" : ""}</b><span>${esc(l.tag)}</span></div>
+        ${l.bar != null ? `<div class="lv-bar" role="progressbar" aria-label="Marknadsvinst mot Level 2" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(l.bar)}"><span style="width:${l.bar}%"></span></div>` : ""}
+        <ul class="conds">${l.conds.map(([t, ok, gate]) => `<li>${gate || lvUnlocked(l.n) ? check(ok) : lockedDot}<span>${esc(t)}</span></li>`).join("")}</ul>
       </div>`).join("")}`;
 
-  // ---------- Level-rad under Resan: BTC ✓ · ETH 🔒 med progress · GULD 🔒 ----------
-  if (LV[1]) {
-    const lv2Gain = Math.min(u.early.gainPct, u.normal.gainPct);  // närmaste vägens vinstkrav
-    const lv2Profit = deposits * lv2Gain / 100;
-    const lv2pct = lv2Profit > 0 ? Math.min(100, Math.max(0, marketGain) / lv2Profit * 100) : 0;
-    const k = (v) => (v >= 1000 ? new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 1 }).format(v / 1000) + "k" : kr(v));  // 254,6k · 500k
-    $("level-strip").hidden = false;
-    $("level-strip").innerHTML = `
-      <div class="lv-item${lvUnlocked(1) ? " open" : ""}"><b>Level 1 ${esc(LV[1].asset)}</b><span>✓ (${k(pf.value)})</span></div>
-      ${LV[2] ? `<div class="lv-item lv-progress${lvUnlocked(2) ? " open" : ""}">
-        <b>Level 2 ${esc(LV[2].asset)}</b><span>${lvUnlocked(2) ? "✓" : "🔒"} ${kr(Math.max(0, marketGain))} / ${kr(lv2Profit)} (${nf(0).format(lv2pct)} %) → ${kr(deposits + lv2Profit)}</span>
-        <div class="lv-bar" role="progressbar" aria-label="Marknadsvinst mot Level 2" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(lv2pct)}"><span style="width:${lv2pct}%"></span></div>
-      </div>` : ""}
-      ${lv3 ? `<div class="lv-item${lvUnlocked(3) ? " open" : ""}"><b>Level 3 ${esc(lv3.asset)}</b><span>${lvUnlocked(3) ? "✓" : "🔒"} vid +${lv3.gainPct} % (${k(deposits * (1 + lv3.gainPct / 100))})</span></div>` : ""}`;
-  }
-
-  // ---------- Upplåsning (vägen till Level 2) ----------
+  // ---------- Vägen till Level 2 ----------
   $("unlock").innerHTML = `
-    <h2>Vägen till Level 2</h2>
-    <p class="sub">En av vägarna räcker.</p>
+    <h3>VÄGEN TILL LEVEL 2</h3>
+    <p class="small">En av vägarna räcker.</p>
     ${paths.map((p) => {
       const done = p.conds.filter(([, ok]) => ok === true).length;
-      return `<div class="unlock-path">
-        <h3>${p.name} <span class="sub">· ${done}/${p.conds.length}</span></h3>
-        <ul class="conds">${p.conds.map(([t, ok]) => `<li>${check(ok)}${esc(t)}</li>`).join("")}</ul>
+      return `<div class="unlock-path" style="margin-top:14px">
+        <h4>${p.name} <span class="small">· ${done}/${p.conds.length}</span></h4>
+        <ul class="conds">${p.conds.map(([t, ok]) => `<li>${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul>
       </div>`;
     }).join("")}`;
 
-  // ---------- Journal ----------
-  $("journal").innerHTML = `
-    <h2>Journal</h2>
-    <div class="entries">
-      ${S.journal.map((e) => `
-        <article class="entry">
-          <div class="entry-head">
-            <span class="entry-date">${day(e.date)}</span>
-            <span class="chip"><span class="dot${e.mode === "PARKERA" ? "" : " green"}"></span>${esc(e.mode)}</span>
-            <span class="chip"><strong class="num">${e.red}/${total}</strong> röda</span>
-          </div>
-          <p class="entry-plain">${esc(e.plain)}</p>
-          <details><summary>Siffrorna</summary><ul>${e.facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>
-        </article>`).join("")}
-    </div>`;
+  // ---------- Resan: fas 1 och fas 2 som två grafer med ett brott emellan ----------
+  // Faser: capitalChange i state.json delar historiken. Före = fas 1 (paper-test), från och med = fas 2.
+  // Insättningen är ingen vinst, så faserna ritas aldrig som en sammanhängande linje.
+  const cc = pf.capitalChange || null;
+  const allHist = (pf.history || []).slice();
+  if (allHist.length && allHist[allHist.length - 1].date < S.updatedAt) allHist.push({ date: S.updatedAt, value: pf.value, cash: pf.holdings.CASH });
+  const phase1 = cc ? allHist.filter((h) => h.date < cc.date) : [];
+  const phase2 = cc ? [{ date: cc.date, value: cc.value, note: "insättning" }, ...allHist.filter((h) => h.date >= cc.date)] : allHist;
+  const phaseChart = (pts, label) => {
+    const W = 300, H = 130, P = 14, TOP = 24, BOT = 22;
+    const vals = pts.map((h) => h.value);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pd = (hi - lo) * 0.15 || Math.max(1, hi * 0.02);
+    lo -= pd; hi += pd;
+    const x = (i) => P + 18 + (i * (W - 2 * P - 36)) / Math.max(1, pts.length - 1);
+    const y = (v) => H - BOT - ((v - lo) * (H - TOP - BOT)) / (hi - lo);
+    const line = pts.map((h, i) => `${x(i).toFixed(1)},${y(h.value).toFixed(1)}`).join(" ");
+    return `<svg class="pf-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}: ${pts.map((h) => `${day(h.date)} ${nf(0).format(h.value)} kr`).join(", ")}">
+      <polyline points="${x(0).toFixed(1)},${H - BOT} ${line} ${x(pts.length - 1).toFixed(1)},${H - BOT}" class="pf-area"/>
+      <polyline points="${line}" class="pf-line"/>
+      ${pts.map((h, i) => `<circle cx="${x(i)}" cy="${y(h.value)}" r="${i === pts.length - 1 ? 4 : 2.5}" class="pf-dot"/>
+        <text x="${x(i)}" y="${y(h.value) - 9}" text-anchor="middle" class="journey-val">${amount(h.value)}</text>
+        <text x="${i === 0 ? P : i === pts.length - 1 ? W - P : x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle"}" class="journey-date">${[i && pts[i - 1].date === h.date ? "" : day(h.date), i === pts.length - 1 && !h.note ? "nu" : h.note || ""].filter(Boolean).map(esc).join(" · ")}</text>`).join("")}
+    </svg>`;
+  };
+  // Fas 1 innehåller en DCA-insättning, så skillnaden där är ingen vinst – visa bara från/till.
+  // Fas 2: bara det som blir kvar efter insättningarna kallas marknad.
+  const phaseSpan = (pts, split) => {
+    const from = `${amount(pts[0].value)} kr`, to = `${amount(pts[pts.length - 1].value)} kr`;
+    if (!split) return `${from} → ${to}`;
+    const sign = (v) => (v < 0 ? "−" : "+") + kr(Math.abs(v));
+    const manual = cc.manualTopUp || 0;
+    const market = pts[pts.length - 1].value - pts[0].value - manual;
+    const parts = [manual ? `${sign(manual)} insättning` : "", Math.abs(market) >= 1 ? `${sign(market)} marknad` : ""].filter(Boolean);
+    return `${from} → ${to}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+  };
+  if (cc && phase1.length && phase2.length > 1) {
+    // Hur stor "vinsten" hade sett ut om linjen dragits rakt igenom, avrundat nedåt (40 650 % -> 40 000 %)
+    const raw = (phase2[phase2.length - 1].value / phase1[phase1.length - 1].value - 1) * 100;
+    const mag = 10 ** Math.floor(Math.log10(Math.max(1, raw)));
+    const jump = Math.floor(raw / mag) * mag;
+    $("journey").hidden = false;
+    $("journey").innerHTML = `
+      <h3>RESAN</h3>
+      <div class="journey-grid">
+        <div><div class="journey-head"><b>Fas 1 · paper-test</b><span class="num">${esc(phaseSpan(phase1, false))}</span></div>${phaseChart(phase1, "Fas 1, paper-test")}</div>
+        <div class="journey-break" role="separator"><span>${day(cc.date)}</span>${esc(cc.text)}</div>
+        <div><div class="journey-head"><b>Fas 2 · nu</b><span class="num">${esc(phaseSpan(phase2, true))}</span></div>${phaseChart(phase2, "Fas 2, nytt startkapital")}</div>
+      </div>
+      <p class="small" style="margin-top:12px">Fas 1 = paper-test ${kr(phase1[0].value)}. Fas 2 = nytt kapital ${kr(cc.value)}. Ingen ${nf(0).format(jump)} % vinst – hoppet är en insättning.${cc.manualTopUp ? ` Även ${kr(cc.value)} → ${kr(phase2[phase2.length - 1].value)} är manuella insättningar, inte marknadsvinst, tills Walter går LIVE.` : ""}</p>`;
+  }
 
-  // ---------- Footer ----------
-  // ---------- Mitt mål: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
+  // ================================================================
+  // PRO – varje lampas värde, gräns, källa och tid
+  // ================================================================
+  const SOURCES = {
+    spx: "yfinance ^GSPC", btcTrend: "CoinGecko", btcWeek: "CoinGecko", vix: "yfinance ^VIX",
+    us10y: (m.us10y && m.us10y.source) || "FRED DGS10", dxy: "yfinance DX-Y.NYB", etf: "bykaranteli (ETF-flöden)",
+    cpi: "state.json, handskriven", mvrv: (m.mvrvZ && m.mvrvZ.source) || "Coin Metrics", sopr: "BGeometrics"
+  };
+  const EXPLAIN = {
+    spx: "USA:s breda aktieindex jämfört med sitt eget snitt de senaste 50 dagarna. Under snittet betyder att trenden har vänt nedåt.",
+    btcTrend: "Bitcoins pris mot snittet de senaste 200 dagarna. Under snittet är bitcoin i en svagare, längre trend.",
+    btcWeek: "Hur mycket bitcoin har rört sig på en vecka. Ett fall på mer än 10 % är en varning.",
+    vix: "Marknadens oro-mätare. Över 20 betyder att många är nervösa.",
+    us10y: "USA:s tioåriga statsränta. Stiger den snabbt blir risk dyrare för alla.",
+    dxy: "Dollarns styrka mot andra valutor. En dollar över sitt snitt brukar trycka ned krypto.",
+    etf: "Pengar in i och ut ur bitcoin-fonderna (ETF) de senaste fem handelsdagarna. Utflöde är en varning.",
+    cpi: "Inflationen i USA mot vad marknaden väntade sig. Högre än väntat är en varning. Värdet skrivs in för hand.",
+    mvrv: "Visar om bitcoin är dyrt jämfört med vad ägarna har betalat. Över 3 betyder att det börjar bli varmt, inte att toppen är nådd.",
+    sopr: "Visar om bitcoin säljs med vinst eller förlust. Under 1 i snitt över en vecka betyder att folk säljer med förlust."
+  };
+  const maxAge = S.rules.lampMaxAgeDays || {};
+  let proSel = Math.max(0, S.lamps.findIndex((l) => l.status === "red"));
+  const pv = (v, f) => (v == null ? "väntar på data" : f(v));
+  const renderPrices = () => {
+    const el = $("prices");
+    if (!el) return;
+    const { usdsek } = fx();
+    const list = [
+      ["Bitcoin", pv(m.btc && m.btc.value, usd)],
+      [`ETH/BTC${m.ethBtc && m.ethBtc.ma30 ? ` (30d-snitt ${nf(5).format(m.ethBtc.ma30)})` : ""}`, pv(m.ethBtc && m.ethBtc.value, (v) => nf(5).format(v))],
+      ["USD/SEK", pv(usdsek && usdsek.value, (v) => nf(4).format(v))],
+      ["EUR/SEK", pv(m.eursek && m.eursek.value, (v) => nf(4).format(v))],
+      ["S&P 500", pv(m.spx && m.spx.value, (v) => nf(0).format(v))],
+      ["VIX", pv(m.vix && m.vix.value, (v) => nf(2).format(v))],
+      ["Dollarindex", pv(m.dxy && m.dxy.value, (v) => nf(2).format(v))],
+      ["10-årig ränta", pv(m.us10y && m.us10y.value, (v) => nf(2).format(v) + " %")]
+    ];
+    el.innerHTML = list.map(([n, v]) => `<li><span>${esc(n)}</span><span class="num">${esc(v)}</span></li>`).join("");
+  };
+  const renderPro = () => {
+    const l = S.lamps[proSel], s = lampState(l);
+    const word = { red: "RISK", green: "LUGN", wait: "VÄNTAR" };
+    $("view-pro").innerHTML = `
+      <p class="kicker">PRO · DATAN BAKOM LAMPORNA · SENAST HÄMTAD ${S.fetchedAt ? dotStamp(S.fetchedAt) : "OKÄNT"}</p>
+      <div class="title-row">
+        <h1>PRO</h1>
+        <div class="legend row">
+          <span><i class="r"></i>${nRed} röda</span><span><i class="g"></i>${nGreen} gröna</span><span><i class="w"></i>${nWait} väntar</span>
+          <span class="note" style="margin:0">VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}</span>
+        </div>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <div class="table-wrap"><table class="pro-table">
+            <thead><tr><th>LAMPA</th><th class="r">VÄRDE</th><th>GRÄNS</th><th>STATUS</th><th>KÄLLA</th><th class="r">DATA FRÅN</th></tr></thead>
+            <tbody>${S.lamps.map((x, i) => { const st = lampState(x); return `
+              <tr class="pro-row" data-i="${i}" aria-selected="${i === proSel}">
+                <td><span class="nm"><button type="button" data-i="${i}" aria-pressed="${i === proSel}"><span class="dot ${st === "wait" ? "" : st}"></span>${esc(x.name)}</button></span></td>
+                <td class="r"><span class="mono">${x.value ? esc(x.value) : "väntar på data"}</span></td>
+                <td><span class="mono">${esc(x.rule)}</span></td>
+                <td><span class="mono">${word[st]}</span></td>
+                <td><span class="src">${esc(SOURCES[x.id] || "–")}</span></td>
+                <td class="r"><span class="mono">${x.asOf ? day(x.asOf) : "–"}</span></td>
+              </tr>`; }).join("")}</tbody>
+          </table></div>
+          <p class="small" style="margin-top:12px">Tryck på en rad för detaljer. En lampa vars data är äldre än ${maxAge.default || "?"} dagar (ETF ${maxAge.etf || "?"}, MVRV-Z och SOPR ${maxAge.mvrv || "?"}, KPI ${maxAge.cpi || "?"}) blir "väntar", så gammal data aldrig räknas som färsk.</p>
+        </div>
+        <div class="side">
+          <div class="panel sel" aria-live="polite">
+            <span class="label">VALD LAMPA</span>
+            <div class="sel-name"><span class="dot ${s === "wait" ? "" : s}"></span>${esc(l.name)}</div>
+            <p class="sel-text">${esc(EXPLAIN[l.id] || l.rule)} Nu: ${esc(l.value || "väntar på data")}.</p>
+            <div class="sel-foot"><span>${esc(SOURCES[l.id] || "–")}</span><span>${l.asOf ? day(l.asOf) : "–"}</span></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><span>DAGENS PRISER</span><span class="num">${esc(day(m.asOf || S.updatedAt).toUpperCase())}</span></div>
+            <ul class="rows" id="prices"></ul>
+          </div>
+        </div>
+      </div>`;
+    renderPrices();
+    $("view-pro").querySelectorAll(".pro-row").forEach((tr) => tr.addEventListener("click", () => {
+      proSel = +tr.dataset.i;
+      renderPro();
+      const b = $("view-pro").querySelector(`button[data-i="${proSel}"]`);
+      if (b) b.focus();
+    }));
+  };
+  renderPro();
+
+  // ================================================================
+  // LOGG – tradelogg och rapporter
+  // ================================================================
+  // Avgifter: trading_fee (taker + slippage vid försäljningen) + withdrawal_fee. Samma som fetcher/walter_k4.py.
+  const k4 = (S.k4 || []).map((r) => {
+    const fee = (r.trading_fee_sek || 0) + (r.withdrawal_fee_sek || 0);
+    return { ...r, fee, vinst: r.forsaljningspris_sek - r.omkostnad_sek - fee };
+  });
+  // Trades: försäljningar från K4 + köp/DCA ur historiken. Insättningar (flow) är inga trades.
+  // Tillgången står bara där den är känd (K4-raden med samma köpdatum), annars "–".
+  const trades = [
+    ...k4.map((r) => ({ date: r.saljdatum, type: "SÄLJ", dot: "red", asset: r.beteckning, note: `${r.typ || "försäljning"}, ${nf(8).format(r.antal)} st`, amt: kr2(r.forsaljningspris_sek), fee: kr2(r.fee) })),
+    ...allHist.filter((h) => h.note && !h.flow && /^(köp|dca)$/i.test(h.note)).map((h) => {
+      const k = k4.find((r) => r.kopdatum === h.date);
+      return { date: h.date, type: h.note.toUpperCase(), dot: "green", asset: k ? k.beteckning : "–",
+        note: `Portföljen värd ${amount(h.value)} kr${h.test ? " · paper-test" : ""}`, amt: "–", fee: "–" };
+    })
+  ].sort((a, b) => b.date.localeCompare(a.date));
+  const sold = k4.reduce((a, r) => a + r.vinst, 0);
+  const feeSum = k4.reduce((a, r) => a + r.fee, 0);
+  const flows = allHist.filter((h) => h.flow);
+  let logTab = 0, logSel = 0;
+  const renderLog = () => {
+    const e = S.journal[logSel];
+    $("view-logg").innerHTML = `
+      <p class="kicker">LOGG · TRADELOGG OCH RAPPORTER</p>
+      <div class="title-row">
+        <h1>${logTab ? "RAPPORTER" : "TRADELOGG"}</h1>
+        <div class="seg" role="group" aria-label="Välj logg">
+          <button type="button" data-tab="0" aria-pressed="${!logTab}">TRADELOGG</button>
+          <button type="button" data-tab="1" aria-pressed="${!!logTab}">RAPPORTER</button>
+        </div>
+      </div>
+      <p class="intro">${logTab ? "Walters rapporter med ett svar du kan läsa på tio sekunder. Siffrorna ligger bakom." : "Varje köp och sälj Walter har gjort, i tidsordning. Allt är paper, inga riktiga pengar."}</p>
+      <div class="two">
+        <div class="panel">
+          <div class="panel-head"><span>${logTab ? "RAPPORTHISTORIK" : "ALLA TRADES"}</span><span class="num">${logTab ? S.journal.length + " RAPPORTER" : trades.length + " POSTER"}</span></div>
+          ${logTab ? `
+            <ul class="reports" style="margin-top:8px">${S.journal.map((j, i) => `
+              <li><button type="button" data-sel="${i}" aria-pressed="${i === logSel}">
+                <span class="when">${day(j.date)}</span>
+                <span class="md"><span class="dot ${modeOf(j.mode).acc}"></span>${esc(modeOf(j.mode).word)}</span>
+                <span class="tx">${esc(j.plain)}</span>
+                <span class="rd">${j.red}/${total}</span>
+              </button></li>`).join("")}</ul>
+            <p class="small" style="margin-top:12px">Tryck på en rapport för siffrorna bakom. Journalen är facit.</p>` : `
+            <div class="table-wrap"><table class="log-table">
+              <thead><tr><th>DATUM</th><th>TYP</th><th>TILLGÅNG</th><th class="r">BELOPP</th><th class="r">AVGIFT</th></tr></thead>
+              <tbody>${trades.map((t) => `<tr>
+                <td class="num">${day(t.date)}</td>
+                <td><span class="type"><span class="dot ${t.dot}"></span>${esc(t.type)}</span></td>
+                <td><span class="asset">${esc(t.asset)}<span>${esc(t.note)}</span></span></td>
+                <td class="r num">${esc(t.amt)}</td><td class="r num">${esc(t.fee)}</td></tr>`).join("") || '<tr><td colspan="5" class="small">Inga trades ännu.</td></tr>'}</tbody>
+            </table></div>
+            <p class="small" style="margin-top:12px">Okända belopp visas som "–".${flows.length ? ` Insättningar (${flows.map((h) => day(h.date)).join(", ")}) är inga trades och syns inte här.` : ""}</p>`}
+        </div>
+        <div class="side">
+          ${logTab && e ? `
+          <div class="panel">
+            <span class="label">SIFFRORNA · ${esc(day(e.date).toUpperCase())}</span>
+            <div class="sel-name" style="font-size:18px"><span class="dot ${modeOf(e.mode).acc}"></span>${esc(modeOf(e.mode).word)} · ${e.red}/${total}</div>
+            <ul class="facts">${(e.facts || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+          </div>` : `
+          <div class="panel">
+            <span class="label">SAMMANFATTNING</span>
+            <ul class="rows">
+              <li><span>Antal trades</span><span class="num">${trades.length}</span></li>
+              <li><span>Sålda affärer</span><span class="num">${k4.length}</span></li>
+              <li><span>Resultat sålda</span><span class="num ${sold < 0 ? "down" : sold > 0 ? "up" : ""}">${sold < 0 ? "−" : "+"}${kr2(Math.abs(sold))}</span></li>
+              <li><span>Avgifter totalt</span><span class="num">${kr2(feeSum)}</span></li>
+            </ul>
+            <p class="plain">${invested === 0 ? "Walter står helt i kontanter just nu." : `${nf(0).format(invested * 100)} % av pengarna är investerade.`}</p>
+          </div>`}
+        </div>
+      </div>`;
+    $("view-logg").querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { logTab = +b.dataset.tab; renderLog(); }));
+    $("view-logg").querySelectorAll("[data-sel]").forEach((b) => b.addEventListener("click", () => {
+      logSel = +b.dataset.sel; renderLog();
+      const nb = $("view-logg").querySelector(`[data-sel="${logSel}"]`);
+      if (nb) nb.focus();
+    }));
+  };
+  renderLog();
+
+  // ================================================================
+  // K4 – underlag (PAPER). Hela kronor som fetcher/walter_k4.py: försäljning efter avgift, omkostnad.
+  // ================================================================
+  const sales = k4.map((r) => r.saljdatum).filter(Boolean).sort();
+  const reportYear = sales.length ? sales[sales.length - 1].slice(0, 4) : String(new Date().getFullYear());
+  const yearRows = k4.filter((r) => (r.saljdatum || "").startsWith(reportYear));
+  const gains = yearRows.filter((r) => r.vinst >= 0).reduce((a, r) => a + r.vinst, 0);
+  const losses = Math.abs(yearRows.filter((r) => r.vinst < 0).reduce((a, r) => a + r.vinst, 0));
+  const k4Sale = (r) => Math.round(r.forsaljningspris_sek - r.fee);
+  const k4Cost = (r) => Math.round(r.omkostnad_sek);
+  const FILES = [
+    [`K4_${reportYear}_WALTER_PAPER.pdf`, "Läsbar version", "PDF"],
+    [`K4-WALTER-${reportYear}-PAPER.xlsx`, "Kalkylark", "XLSX"],
+    [`K4_${reportYear}_WALTER_PAPER.csv`, "Rådata", "CSV"],
+    [`Avgiftsrapport_${reportYear}_WALTER_PAPER.pdf`, "Alla avgifter", "PDF"]
+  ];
+  let k4Open = -1;
+  const renderK4 = () => {
+    $("view-k4").innerHTML = `
+      <p class="kicker">K4 · UNDERLAG ${reportYear}</p>
+      <div class="title-row"><h1>K4-UNDERLAG</h1><span class="label" style="color:var(--teal)">PAPER · SIMULERING</span></div>
+      <p class="intro">Så skulle försäljningarna se ut i en K4-blankett. Inte för Skatteverket eller banken.</p>
+      <div class="two">
+        <div class="panel">
+          <div class="panel-head"><span>SEKTION D · ÖVRIGA TILLGÅNGAR (KRYPTO)</span><span class="num">${yearRows.length} RAD${yearRows.length === 1 ? "" : "ER"}</span></div>
+          ${yearRows.length ? `
+          <div class="table-wrap"><table class="pro-table" style="min-width:640px">
+            <thead><tr><th>BETECKNING</th><th class="r">ANTAL</th><th class="r">FÖRSÄLJNING</th><th class="r">OMKOSTNAD</th><th class="r">VINST</th></tr></thead>
+            <tbody>${yearRows.map((r, i) => `
+              <tr class="pro-row" data-k="${i}" aria-selected="${i === k4Open}">
+                <td><span class="nm"><button type="button" data-k="${i}" aria-expanded="${i === k4Open}"><span style="display:flex;flex-direction:column;gap:2px;line-height:1.3">${esc(r.beteckning)}<span class="small" style="color:inherit;opacity:.75">köpt ${day(r.kopdatum)} · såld ${day(r.saljdatum)}</span></span></button></span></td>
+                <td class="r"><span class="mono">${nf(8).format(r.antal)}</span></td>
+                <td class="r"><span class="mono">${nf(2).format(r.forsaljningspris_sek)}</span></td>
+                <td class="r"><span class="mono">${nf(2).format(r.omkostnad_sek)}</span></td>
+                <td class="r"><span class="mono">${r.vinst < 0 ? "−" : "+"}${nf(2).format(Math.abs(r.vinst))}</span></td>
+              </tr>`).join("")}</tbody>
+          </table></div>
+          <div class="k4-sums">
+            <div><span class="label">I KRONOR OCH ÖREN</span>${yearRows.map((r) => `<span class="num">Försäljning ${nf(2).format(r.forsaljningspris_sek)} · Omkostnad ${nf(2).format(r.omkostnad_sek)} · Avgift ${nf(2).format(r.fee)} · ${r.vinst < 0 ? "Förlust" : "Vinst"} ${nf(2).format(Math.abs(r.vinst))}</span>`).join("")}</div>
+            <div><span class="label">AVRUNDAT TILL HELA KRONOR (K4)</span>${yearRows.map((r) => `<span class="num">Försäljning ${k4Sale(r)} · Omkostnad ${k4Cost(r)} · ${k4Sale(r) - k4Cost(r) < 0 ? "Förlust" : "Vinst"} ${Math.abs(k4Sale(r) - k4Cost(r))}</span>`).join("")}</div>
+          </div>
+          <p class="plain" style="min-height:52px">${k4Open >= 0 ? esc(`Typ: ${yearRows[k4Open].typ || "–"}. ${yearRows[k4Open].not || ""}`) : "Tryck på raden för detaljer. Försäljningspriset på blanketten är efter avgiften, avrundat till hela kronor."}</p>`
+          : `<p class="plain">Inga försäljningar ${reportYear} ännu, så det finns inget att deklarera.</p>`}
+          <p class="small">Omkostnad räknas med genomsnittsmetoden (Skatteverkets regel för krypto) inklusive köpavgift. Vinster och förluster står på separata rader.</p>
+        </div>
+        <div class="side">
+          <div class="panel">
+            <span class="label">SUMMA ${reportYear}</span>
+            <ul class="rows">
+              <li><span>Vinster</span><span class="num">${kr2(gains)}</span></li>
+              <li><span>Förluster</span><span class="num">${kr2(losses)}</span></li>
+              <li class="total"><span>Skatt, ungefär</span><span class="num">${kr2(Math.max(0, (gains - losses * 0.7) * 0.3))}</span></li>
+            </ul>
+            <p class="small" style="margin-top:12px">30 % skatt på vinsten, 70 % av förlusten får dras av.${topUp ? ` Insättningen på ${kr(topUp)} är ingen försäljning och syns inte här.` : ""}</p>
+          </div>
+          <div class="panel">
+            <span class="label">FILER</span>
+            <ul class="files">${FILES.map(([f, hint, kind]) => `<li><a href="reports/${f}" download><span class="fn">${f}<span>${hint}</span></span><span class="kind">${kind}</span></a></li>`).join("")}</ul>
+            <p class="small" style="margin-top:12px">Filerna byggs av hämtaren (walter_k4.py) och finns på den publicerade sidan.</p>
+          </div>
+        </div>
+      </div>`;
+    $("view-k4").querySelectorAll(".pro-row").forEach((tr) => tr.addEventListener("click", () => {
+      const i = +tr.dataset.k; k4Open = k4Open === i ? -1 : i; renderK4();
+      const b = $("view-k4").querySelector(`button[data-k="${i}"]`);
+      if (b) b.focus();
+    }));
+  };
+  renderK4();
+
+  // ================================================================
+  // INSTÄLLNINGAR – din plan, uttag, avgifter, PAPER/LIVE. Allt sparas bara i den här webbläsaren.
+  // ================================================================
+  const GOALS = [10, 20, 50, 100];
+  const TIMES = [[6, "6 MÅN"], [12, "1 ÅR"], [36, "3 ÅR"], [60, "5 ÅR"]];
+  const QUICK = [5000, 25000, 100000, deposits, 1000000].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
+  const plan = Object.assign({ start: deposits, goal: 1, time: 1 }, store.get("walter.plan", {}));
+  if (!(plan.start > 0)) plan.start = deposits;
+  if (!GOALS[plan.goal]) plan.goal = 1;
+  if (!TIMES[plan.time]) plan.time = 1;
+  const stepOf = (v) => (v >= 500000 ? 100000 : v >= 100000 ? 25000 : v >= 25000 ? 5000 : v >= 5000 ? 1000 : 500);
+
   const PURPOSES = { bil: ["Bil", "en bil"], husinsats: ["Husinsats", "en husinsats"], resa: ["Resa", "en resa"], rakningar: ["Räkningar", "räkningar"], buffert: ["Buffert", "en buffert"], annat: ["Annat", "ditt mål"] };
   const HORIZONS = { "1v": [7, "1 vecka"], "1m": [30, "1 månad"], "3m": [91, "3 månader"], "6m": [182, "6 månader"] };
   const goal = Object.assign({ amount: 50000, purpose: "buffert", horizon: "1m" }, store.get("walter.goal", {}));
@@ -506,6 +721,125 @@
   if (!(goal.amount > 0)) goal.amount = 50000;
   const feesKnown = FEE_KEYS.every((k) => fees[k] != null);
 
+  $("view-installningar").innerHTML = `
+    <p class="kicker">INSTÄLLNINGAR · DIN PLAN</p>
+    <div class="title-row"><h1>DIN PLAN</h1></div>
+    <p class="intro">Välj hur mycket du börjar med, vad du vill nå och hur lång tid du ger det. Allt mäts i procent. Planen är en räknesnurra – den ändrar inget i Walter.</p>
+    <div class="plan">
+      <div class="panel">
+        <div class="field-head"><span>STARTSUMMA</span><em>VALFRI SUMMA</em></div>
+        <div class="stepper">
+          <button type="button" id="plan-minus" aria-label="Sänk startsumman">−</button>
+          <input id="plan-start" class="num" type="number" min="1" step="1" inputmode="numeric" aria-label="Startsumma i kronor">
+          <button type="button" id="plan-plus" aria-label="Höj startsumman">+</button>
+        </div>
+        <div class="seg full sm" role="group" aria-label="Snabbval startsumma">${QUICK.map((v) =>
+          `<button type="button" data-start="${v}">${v >= 1000000 ? nf(0).format(v / 1000000) + " MKR" : nf(0).format(v)}</button>`).join("")}</div>
+        <div class="field-head"><span>SPARMÅL</span><em>MARKNADSVINST, INTE INSÄTTNINGAR</em></div>
+        <div class="seg full" role="group" aria-label="Sparmål i procent">${GOALS.map((v, i) => `<button type="button" data-goal="${i}">+${v} %</button>`).join("")}</div>
+        <div class="field-head"><span>TIDSLINJE</span><em>TID ATT NÅ MÅLET</em></div>
+        <div class="seg full" role="group" aria-label="Tidslinje">${TIMES.map(([, t], i) => `<button type="button" data-time="${i}">${t}</button>`).join("")}</div>
+        <div class="fixed">
+          <span class="label">FASTA REGLER · GÅR INTE ATT ÄNDRA</span>
+          <div><span>Max investerat</span><span class="num">${nf(0).format(S.rules.maxInvested * 100)} %</span></div>
+          <div><span>Kontant, alltid minst</span><span class="num">${nf(0).format(S.rules.minCash * 100)} %</span></div>
+          <div><span>Walter vilar vid</span><span class="num">${S.rules.parkeraAtRed} / ${total} röda</span></div>
+        </div>
+      </div>
+      <div class="panel" style="display:flex;flex-direction:column">
+        <div class="plan-kpis" id="plan-kpis"></div>
+        <div class="panel-head" style="margin-top:24px"><span>TIDSLINJE</span><span>VÄG MOT MÅLET · RÄKNEEXEMPEL</span></div>
+        <svg class="plan-chart" id="plan-chart" viewBox="0 0 660 280" preserveAspectRatio="none" role="img"></svg>
+        <div class="plan-legend" id="plan-legend"></div>
+        <p class="small" style="margin-top:14px">Ett mål är en riktning, inte ett löfte. Walter vilar hellre än jagar. Insättningar räknas aldrig som vinst och låser inte upp något.</p>
+      </div>
+    </div>
+
+    <div class="section-title"><h2>UTTAG</h2><span class="small">Vad du kan ta ut, och när.</span></div>
+    <div class="panel" style="margin-top:20px" id="goal">
+      <div class="form-grid">
+        <label class="field wide"><span>BELOPP ATT TA UT (NETTO)</span>
+          <div class="goal-amount">
+            <input type="range" id="goal-range" min="5000" max="500000" step="1000" aria-label="Målbelopp">
+            <input type="number" id="goal-custom" min="1" step="1" inputmode="numeric" class="input num" aria-label="Eget belopp i kronor">
+          </div>
+        </label>
+        <label class="field"><span>TILL VAD?</span>
+          <select id="goal-purpose">${Object.entries(PURPOSES).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("")}</select>
+        </label>
+        <div class="field"><span>NÄR?</span>
+          <div class="seg full" role="group" aria-label="Tidshorisont">${Object.keys(HORIZONS).map((k) =>
+            `<button type="button" data-h="${k}">${k.toUpperCase()}</button>`).join("")}</div>
+        </div>
+      </div>
+      <div id="goal-out"></div>
+    </div>
+
+    <div class="cards">
+      <section class="panel" aria-label="Avgifter">
+        <h3>AVGIFTER</h3>
+        <form id="settings-form">
+          <div class="form-grid">
+            ${[["takerPct", "KRAKEN TAKER FEE (%)"], ["slippagePct", "SLIPPAGE (%)"], ["sepaEur", "SEPA-UTTAG (€)"], ["fxPct", "VALUTAVÄXLING PÅ BANKEN (%)"]].map(([k, t]) => `
+            <label class="field"><span>${t}</span>
+              <input class="input num" type="number" name="${k}" min="0" max="100" step="0.01" placeholder="${feeDefaults[k] != null ? esc(feeDefaults[k]) + " (standard)" : "från din börs prislista"}">
+            </label>`).join("")}
+          </div>
+          <p class="small" style="margin-top:12px">Tomt fält = standard från state.json. Sparas bara i den här webbläsaren. API-nycklar läggs aldrig in här.</p>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">SPARA</button></div>
+        </form>
+      </section>
+      <section class="panel" aria-label="Handelsläge">
+        <h3>HANDELSLÄGE</h3>
+        <div class="seg" role="group" aria-label="Handelsläge" style="width:max-content">
+          <button type="button" id="btn-paper">PAPER</button>
+          <button type="button" id="btn-live">LIVE</button>
+        </div>
+        <p class="small" style="margin-top:12px">PAPER är standard: inga riktiga pengar. LIVE kräver att du skriver JA GÅ LIVE och gäller bara den här fliken. Walter lägger aldrig order själv.</p>
+      </section>
+    </div>`;
+
+  // ---------- Din plan ----------
+  const renderPlan = () => {
+    const gPct = GOALS[plan.goal], [months] = TIMES[plan.time];
+    const target = plan.start * (1 + gPct / 100);
+    const yr = (Math.pow(1 + gPct / 100, 12 / months) - 1) * 100;
+    const mo = (Math.pow(1 + gPct / 100, 1 / months) - 1) * 100;
+    $("plan-start").value = plan.start;
+    document.querySelectorAll("[data-start]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.start === plan.start)));
+    document.querySelectorAll("[data-goal]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.goal === plan.goal)));
+    document.querySelectorAll("[data-time]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.time === plan.time)));
+    $("plan-kpis").innerHTML = `
+      <div><span>DITT MÅL</span><strong class="num">${kr(target)}</strong><em>+${kr(target - plan.start)} marknadsvinst</em></div>
+      <div><span>PER ÅR, I SNITT</span><strong class="num">${nf(1).format(yr)} %</strong><em>ränta på ränta</em></div>
+      <div><span>PER MÅNAD, I SNITT</span><strong class="num">${nf(2).format(mo)} %</strong><em>${months} månader</em></div>`;
+    // Kurvan: jämn tillväxt från start till mål. Markeringar där Level 2 och Level 3 skulle låsas upp.
+    const X0 = 40, X1 = 620, Y0 = 250, Y1 = 30, n = 40;
+    const frac = (p) => Math.log(1 + p / 100) / Math.log(1 + gPct / 100);
+    const yOf = (p) => Y0 - (p / gPct) * (Y0 - Y1);
+    const pts = Array.from({ length: n + 1 }, (_, i) => { const f = i / n; return [X0 + f * (X1 - X0), yOf((Math.pow(1 + gPct / 100, f) - 1) * 100)]; });
+    const d = pts.map((p, k) => (k ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+    const marks = [[lv2Gain, "ETH"], [lv3 ? lv3.gainPct : null, "GULD"]].filter(([p]) => p != null && p <= gPct);
+    const when = (p) => { const mm = Math.round(frac(p) * months); return mm < 1 ? "direkt" : mm >= 12 ? nf(1).format(mm / 12) + " år" : mm + " mån"; };
+    $("plan-chart").setAttribute("aria-label", `Kurva från ${kr(plan.start)} till ${kr(target)} på ${months} månader`);
+    $("plan-chart").innerHTML = `
+      <line class="axis" x1="${X0}" y1="${Y0}" x2="${X1}" y2="${Y0}"/>
+      <line class="goal-line" x1="${X0}" y1="${Y1}" x2="${X1}" y2="${Y1}"/>
+      <path class="area" d="${d} L ${X1} ${Y0} L ${X0} ${Y0} Z"/>
+      <path class="curve" d="${d}" vector-effect="non-scaling-stroke"/>
+      ${marks.map(([p]) => { const x = X0 + frac(p) * (X1 - X0), y = yOf(p); return `<line class="l2" x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${Y0}" vector-effect="non-scaling-stroke"/><circle class="l2dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`; }).join("")}`;
+    $("plan-legend").innerHTML = `<span>START · ${kr(plan.start)}</span>${marks.map(([p, a]) => `<span class="l2t">${a} VID +${p} % · ${when(p)}</span>`).join("")}<span>MÅL +${gPct} % · ${kr(target)}</span>`;
+    store.set("walter.plan", plan);
+  };
+  $("plan-minus").addEventListener("click", () => { plan.start = Math.max(500, plan.start - stepOf(plan.start - 1)); renderPlan(); });
+  $("plan-plus").addEventListener("click", () => { plan.start = Math.min(100000000, plan.start + stepOf(plan.start)); renderPlan(); });
+  $("plan-start").addEventListener("change", (e) => { const v = Math.round(+e.target.value); if (v > 0) plan.start = v; renderPlan(); });
+  document.querySelectorAll("[data-start]").forEach((b) => b.addEventListener("click", () => { plan.start = +b.dataset.start; renderPlan(); }));
+  document.querySelectorAll("[data-goal]").forEach((b) => b.addEventListener("click", () => { plan.goal = +b.dataset.goal; renderPlan(); }));
+  document.querySelectorAll("[data-time]").forEach((b) => b.addEventListener("click", () => { plan.time = +b.dataset.time; renderPlan(); }));
+  renderPlan();
+
+  // ---------- Uttag: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
   // Brutto = det som måste säljas för att netto ska landa på banken i SEK:
   // sälj på Kraken (taker + slippage) → EUR → SEPA-uttag (fast €) → banken växlar till SEK (FX %).
   // null när avgifter eller dagens EURSEK saknas – då räknas inget på gissning.
@@ -526,31 +860,11 @@
       ]
     };
   };
-
-  $("goal").innerHTML = `
-    <h2>Mitt mål</h2>
-    <div class="goal-form">
-      <label class="field field-wide"><span>Belopp att ta ut (netto)</span>
-        <div class="goal-amount">
-          <input type="range" id="goal-range" min="5000" max="500000" step="1000" aria-label="Målbelopp">
-          <input type="number" id="goal-custom" min="1" step="1" inputmode="numeric" class="input num" aria-label="Eget belopp i kronor">
-        </div>
-      </label>
-      <label class="field"><span>Till vad?</span>
-        <select id="goal-purpose" class="input">${Object.entries(PURPOSES).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("")}</select>
-      </label>
-      <div class="field"><span>När?</span>
-        <div class="seg" role="group" aria-label="Tidshorisont">${Object.keys(HORIZONS).map((k) =>
-          `<button type="button" class="seg-btn" data-h="${k}">${k}</button>`).join("")}</div>
-      </div>
-    </div>
-    <div id="goal-out"></div>`;
-
-  const renderGoal = () => {
+  function renderGoal() {
     const [daysH, label] = HORIZONS[goal.horizon];
     const netto = goal.amount;
-    const g = grossFor(netto);
-    const brutto = g ? g.brutto : netto;
+    const gr0 = grossFor(netto);
+    const brutto = gr0 ? gr0.brutto : netto;
     const what = PURPOSES[goal.purpose][1];
     const enough = pf.value > 0 && pf.value >= brutto;
     const growth = (target) => {
@@ -565,10 +879,10 @@
     else {
       const gr = growth(brutto);
       plain = `För ${what} om ${label} behöver ${kr(pf.value)} växa till ${kr(brutto)}. Det är ${pct(gr.need * 100, 0)}, ungefär ${pct(gr.perMonth * 100, 0)} i månaden.` +
-        (parked ? " Just nu är pengarna parkerade och växer inte." : " Det finns ingen garanti att nå dit – det här visar bara hur stor ökningen skulle behöva vara.");
+        (parked ? " Just nu vilar Walter och pengarna växer inte." : " Det finns ingen garanti att nå dit – det här visar bara hur stor ökningen skulle behöva vara.");
     }
 
-    // Tre vägar. BALANSERAT = när WALTER inte skulle parkera. OPTIMERAT (TP) = när uttaget ryms över startkapitalet –
+    // Tre vägar. BALANSERAT = när Walter inte skulle vila. OPTIMERAT (TP) = när uttaget ryms över startkapitalet –
     // i marknadsvinst om det finns, annars i de manuella insättningarna (sägs rakt ut).
     const maxRed = S.rules.parkeraAtRed - 1;
     const calm = red <= maxRed;
@@ -576,7 +890,7 @@
     const tp = start + brutto;
     const alts = [
       { name: "AKUT", when: "Sälj nu", ok: enough,
-        text: enough ? `Du kan ta ut ${kr(netto)} i dag. Kvar i WALTER: ${kr(pf.value - brutto)}.` : `Räcker inte i dag – det fattas ${short}.` },
+        text: enough ? `Du kan ta ut ${kr(netto)} i dag. Kvar i Walter: ${kr(pf.value - brutto)}.` : `Räcker inte i dag – det fattas ${short}.` },
       { name: "BALANSERAT", when: `När högst ${maxRed} lampor lyser`, ok: enough && calm,
         text: !calm ? `Vänta tills högst ${maxRed} av ${total} lampor lyser (nu ${red}).`
           : enough ? `Marknaden är lugn nog (${red} av ${total} lampor). Du kan sälja direkt.` : `Lugnt nu (${red} av ${total} lampor), men det fattas ${short}.` },
@@ -588,24 +902,24 @@
     ];
 
     $("goal-out").innerHTML = `
-      <p class="notice-body goal-plain">${esc(plain)}</p>
-      ${feesKnown ? "" : '<p class="warn">Avgifterna är inte angivna, så beloppet räknas utan avgifter. Fyll i dem under <a href="#installningar">Inställningar</a>.</p>'}
-      ${feesKnown && !g ? '<p class="warn">Dagens EURSEK saknas, så beloppet räknas utan avgifter tills kursen har hämtats.</p>' : ""}
+      <p class="goal-plain">${esc(plain)}</p>
+      ${feesKnown ? "" : '<p class="warn small">Avgifterna är inte angivna, så beloppet räknas utan avgifter. Fyll i dem under Avgifter nedan.</p>'}
+      ${feesKnown && !gr0 ? '<p class="warn small">Dagens EURSEK saknas, så beloppet räknas utan avgifter tills kursen har hämtats.</p>' : ""}
       <div class="goal-alts">${alts.map((a) => `
         <div class="goal-alt">
-          <div class="goal-alt-head">${check(a.ok)}<b>${a.name}</b><span class="sub">${esc(a.when)}</span></div>
+          <div class="goal-alt-head">${check(a.ok)}<b>${a.name}</b><span>${esc(a.when)}</span></div>
           <p>${esc(a.text)}</p>
         </div>`).join("")}
       </div>
-      <details><summary>Siffrorna</summary><ul class="facts">
+      <details style="margin-top:12px"><summary>SIFFRORNA</summary><ul>
         <li>Netto (det du får på banken): ${kr(netto)}</li>
-        ${g ? g.parts.map(([n, v]) => `<li>${esc(n)}: ${kr(v)}</li>`).join("") : ""}
-        <li>Avgifter totalt: ${g ? kr(brutto - netto) : "inte uträknade"}</li>
+        ${gr0 ? gr0.parts.map(([n, v]) => `<li>${esc(n)}: ${kr(v)}</li>`).join("") : ""}
+        <li>Avgifter totalt: ${gr0 ? kr(brutto - netto) : "inte uträknade"}</li>
         <li>Brutto (det som måste säljas): ${kr(brutto)}</li>
         <li>TP (startkapital + brutto): ${kr(tp)}</li>
         <li>Portfölj nu: ${kr(pf.value)} · tid: ${label} (${daysH} dagar)</li>
       </ul></details>`;
-  };
+  }
 
   const range = $("goal-range"), custom = $("goal-custom");
   const syncGoal = () => {
@@ -622,58 +936,19 @@
   document.querySelectorAll("#goal [data-h]").forEach((b) => b.addEventListener("click", () => { goal.horizon = b.dataset.h; syncGoal(); }));
   syncGoal();
 
-  // ---------- K4 ----------
-  const gains = k4.filter((r) => r.vinst >= 0).reduce((a, r) => a + r.vinst, 0);
-  const losses = Math.abs(k4.filter((r) => r.vinst < 0).reduce((a, r) => a + r.vinst, 0));
-  $("k4").innerHTML = `
-    <h2>K4 · deklaration</h2>
-    ${!k4.length ? '<p class="notice-body">Inga försäljningar ännu, så det finns inget att deklarera.</p>' : `
-    <p class="notice-body">${k4.length === 1 ? "En försäljning" : `${k4.length} försäljningar`} i paper-journalen. Vinster ${kr2(gains)}, förluster ${kr2(losses)}. Skatten blir ungefär ${kr2(Math.max(0, (gains - losses * 0.7) * 0.3))} (30 % av vinsten, 70 % av förlusten får dras av).</p>
-    <p class="sub">PAPER – simulering, inte för Skatteverket. <a href="reports/K4-WALTER-${reportYear}-PAPER.xlsx" download>K4 som Excel</a> · <a href="reports/K4_${reportYear}_WALTER_PAPER.csv" download>CSV</a></p>
-    <details><summary>Siffrorna</summary><div class="table-wrap"><table class="k4-table num">
-      <thead><tr><th>Köpt</th><th>Såld</th><th>Antal</th><th>Försäljningspris</th><th>Omkostnad</th><th>Trading fee</th><th>Withdrawal fee</th><th>Vinst/förlust</th><th>Typ</th></tr></thead>
-      <tbody>${k4.map((r) => `<tr><td>${esc(r.kopdatum)}</td><td>${esc(r.saljdatum)}</td><td>${esc(r.antal)}</td><td>${kr2(r.forsaljningspris_sek)}</td><td>${kr2(r.omkostnad_sek)}</td><td>${kr2(r.trading_fee_sek || 0)}</td><td>${kr2(r.withdrawal_fee_sek || 0)}</td><td class="${r.vinst < 0 ? "down" : "up"}">${kr2(r.vinst)}</td><td>${esc(r.typ || "")}</td></tr>`).join("")}</tbody>
-    </table></div></details>`}
-    <p class="sub">Omkostnad räknas med genomsnittsmetoden (Skatteverkets regel för krypto) inklusive köpavgift. Vinster och förluster står på separata rader.</p>`;
-
-  // ---------- Inställningar (sparas bara i den här webbläsaren) ----------
-  const SETTING_KEYS = [...FEE_KEYS];
-  $("settings").innerHTML = `
-    <section class="card glass settings-card">
-      <h2>Inställningar</h2>
-      <form id="settings-form" class="settings-form">
-        ${[["takerPct", "Kraken taker fee (%)"], ["slippagePct", "Slippage (%)"], ["sepaEur", "SEPA-uttag (€)"], ["fxPct", "Valutaväxling på banken (%)"]].map(([k, t]) => `
-        <label class="field"><span>${t}</span>
-          <input class="input num" type="number" name="${k}" min="0" max="100" step="0.01" placeholder="${feeDefaults[k] != null ? esc(feeDefaults[k]) + " (från state.json)" : "från din börs prislista"}">
-        </label>`).join("")}
-        <p class="sub">Sparas bara i den här webbläsaren. API-nycklar läggs aldrig in här.</p>
-        <div class="dialog-actions">
-          <a class="btn" href="#">Tillbaka</a>
-          <button type="submit" class="btn btn-primary">Spara</button>
-        </div>
-      </form>
-    </section>`;
+  // ---------- Avgifter ----------
   const sf = $("settings-form");
-  SETTING_KEYS.forEach((k) => { if (Number.isFinite(settings[k])) sf.elements[k].value = settings[k]; });
+  FEE_KEYS.forEach((k) => { if (Number.isFinite(settings[k])) sf.elements[k].value = settings[k]; });
   sf.addEventListener("submit", (e) => {
     e.preventDefault();
     const next = {};
-    SETTING_KEYS.forEach((k) => {
+    FEE_KEYS.forEach((k) => {
       const raw = sf.elements[k].value.trim();
       if (raw !== "" && Number.isFinite(+raw) && +raw >= 0) next[k] = +raw;
     });
     store.set("walter.settings", next);
-    location.hash = "";
     location.reload();
   });
-
-  const route = () => {
-    const onSettings = location.hash === "#installningar";
-    $("settings").hidden = !onSettings;
-    document.querySelector(".grid").hidden = onSettings;
-  };
-  window.addEventListener("hashchange", route);
-  route();
 
   // ---------- PAPER / LIVE ----------
   // PAPER är standard. LIVE kräver "JA GÅ LIVE" och gäller bara den här fliken (sessionStorage).
@@ -684,9 +959,10 @@
     $("btn-paper").setAttribute("aria-pressed", String(!live));
     $("btn-live").setAttribute("aria-pressed", String(live));
     document.body.classList.toggle("is-live", live);
+    $("trade-mode").textContent = live ? "LIVE" : "PAPER";
     $("footer").textContent = (live
-      ? "LIVE · riktiga pengar · WALTER lägger inga order själv"
-      : "Paper trading · inga riktiga pengar") + ` · data per ${day(S.updatedAt)}`;
+      ? "LIVE · RIKTIGA PENGAR · WALTER LÄGGER INGA ORDER SJÄLV"
+      : "PAPER TRADING · INGA RIKTIGA PENGAR") + ` · V${S.version} · DATA PER ${day(S.updatedAt).toUpperCase()}`;
   };
   $("btn-paper").addEventListener("click", () => { live = false; store.set("walter.live", false, sessionStorage); renderLive(); });
   $("btn-live").addEventListener("click", () => {
@@ -705,4 +981,21 @@
     renderLive();
   });
   renderLive();
+
+  // ================================================================
+  // Sidbyte via # (#siffror och okända # visar översikten)
+  // ================================================================
+  const PAGES = ["oversikt", "pro", "logg", "k4", "installningar"];
+  const route = () => {
+    const h = location.hash.slice(1);
+    const page = PAGES.includes(h) ? h : "oversikt";
+    document.querySelectorAll("[data-page]").forEach((s) => { s.hidden = s.dataset.page !== page; });
+    document.querySelectorAll(".nav [data-view]").forEach((a) => {
+      if (a.dataset.view === page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    document.title = page === "oversikt" ? `WALTER · ${MODE.word}` : `WALTER · ${page === "installningar" ? "INSTÄLLNINGAR" : page.toUpperCase()}`;
+    if (PAGES.includes(h)) window.scrollTo(0, 0);
+  };
+  window.addEventListener("hashchange", route);
+  route();
 })();

@@ -20,7 +20,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | 4 | ✓ Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser (klar 22 okt) | Sonnet |
 | 5 | ✓ W-Cipher: parametrar föreslagna, skiss klar, och en fungerande sida `cipher.html` med livedata från 5 börser + Pine Script för TradingView (klar 22 okt, parametrar väntar på ditt ja) | Opus |
 | 6 | ✓ K4-underlag i ny design (klar 22 okt) | Sonnet |
-| 7 | Bygg in designen i riktiga koden (index.html, css, js), inkl. nya logon från assets/logo/vald. Länka W-CIPHER i menyn | Opus för plan, Sonnet för utförande |
+| 7 | ✓ Designen inbyggd i riktiga koden: index.html med flikarna Översikt, Pro, Logg, K4, Inställningar + W-CIPHER i menyn, nya logon, ljust/mörkt, mobil. cipher.html publiceras nu också (klar 22 okt) | Opus |
 | 8 | Logikluckor: trade-motor för paper, buffert 7/6, Sharpe (räknas utan flows). ~~Level 3 i procent~~ klart 22 okt | Opus |
 
 ## W-Cipher (steg 5, förslag)
@@ -28,7 +28,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - Vågen (WaveTrend): 9 / 12 / 3 på hlc3, samma som VuManChu.
 - Starka zoner bara vid ±60 (VuManChu har även 53). Färre, lugnare signaler.
 - Pengaflöde (MFI-yta): 60 perioder, ×150, samma som VuManChu.
-- Trendband: EMA 5, 11, 15, 18, 21, 24, 28, 34 (VuManChu Cipher A, kontrolleras mot originalet i steg 7).
+- Trendband: EMA 5, 11, 15, 18, 21, 24, 28, 34 (VuManChu Cipher A). Inte bekräftat mot originalkoden: en webbsökning 22 okt hittade inte originalet, bara en annan öppen version med 5, 11, 15, 18, 21, 25, 29, 33. Kolla inställningarna i originalskriptet på TradingView.
 - Bara vanliga divergenser, inga dolda. Stoch RSI av i V1.
 - Standard-tidsram: DAG (15 min, 1 tim, 4 tim och vecka valbara).
 - Två visningar: WALTER (lugn, bara starka signaler, text i vanliga ord) och CIPHER (som Market Cipher/VuManChu: köp/sälj/guld-prickar, grönt/rött pengaflöde, VWAP, Stoch RSI, divergenslinjer, KÖP/SÄLJ/BLOD i prisgrafen). Röd/grön i Cipher-läget är ett medvetet undantag från färgregeln.
@@ -49,6 +49,6 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
   Testade även anpassade gränser (percentil av senaste 2–4 åren): ingen var bättre, flera missade 2024–25.
 
 ## Öppna frågor
-- Vilka lampnivåer ger Avvaktar, Köper lite och Köper? Beslutas i steg 8.
+- Vilka lampnivåer ger Avvaktar, Köper lite och Köper? Beslutas i steg 8. Tills dess översätter app.js bara journalens läge: PARKERA = Vilar, NORMAL = Köper lite, OFFENSIV = Köper (preliminärt).
 - Ska W-Cipher någonsin bli en lampa? Nu: nej.
 - W-Cipher för aktier/index (Nasdaq, S&P): kräver att hämtaren skriver ljus till en fil. Senare.

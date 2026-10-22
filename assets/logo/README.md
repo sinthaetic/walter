@@ -29,7 +29,7 @@ När en variant är vald: gör om den till walter-symbol/-full/-wordmark.svg (st
 
 ## Vald logo (22 okt 2026): "Inskriven"
 Hexagon som är öppen upptill, W:ets spetsar sitter i hexagonens hörn, teal-lampan i öppningen.
-Filerna ligger i `vald/` och används inte av sidan än (steg 7 kopplar in dem):
+Filerna ligger i `vald/` och används av `index.html` och `cipher.html` (inkopplade i steg 7). De gamla namnen i tabellen överst finns inte längre.
 
 | Fil | Används till |
 |---|---|
