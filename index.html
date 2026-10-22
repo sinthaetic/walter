@@ -3,71 +3,89 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#080A12">
-  <title>WALTER V1.13</title>
+  <meta name="theme-color" content="#D7E0E3">
+  <title>WALTER</title>
+  <link rel="icon" href="assets/logo/vald/walter-favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/logo/vald/walter-appikon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/walter.css">
+  <!-- Samma nyckel som W-Cipher, så mörkt läge följer med mellan sidorna -->
+  <script>try { if (localStorage.getItem("walterDark") === "1") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
 </head>
 <body>
-  <!-- Bakgrund: tre suddiga blobs bakom glaset -->
-  <div class="blobs" aria-hidden="true">
-    <span class="blob blob-indigo"></span>
-    <span class="blob blob-cyan"></span>
-    <span class="blob blob-violet"></span>
+  <div class="bg" aria-hidden="true">
+    <i class="fog fog1"></i><i class="fog fog2"></i>
+    <div class="halo-wrap"><div class="halo"></div></div>
+    <i class="beam"></i>
   </div>
 
-  <div class="app">
-    <header class="topbar glass">
-      <!-- LOGOS: fasta filer i assets/logo/. Byts aldrig ut, genereras aldrig. -->
-      <div class="brand">
-        <img class="logo logo-full" src="assets/logo/walter-full.svg" alt="WALTER" data-logo>
-        <img class="logo logo-symbol" src="assets/logo/walter-symbol.svg" alt="WALTER" data-logo>
-        <!-- Reserv när logofilerna saknas: vanlig text, solid vit. Ingen genererad logo. -->
-        <span class="logo-text" hidden>WALTER</span>
-        <span class="version" id="version"></span>
-      </div>
-      <div class="top-actions">
-        <div class="mode-pill" id="mode-pill"></div>
-        <div class="seg" role="group" aria-label="Handelsläge">
-          <button type="button" id="btn-paper" class="seg-btn">PAPER</button>
-          <button type="button" id="btn-live" class="seg-btn">LIVE</button>
+  <header class="top">
+    <!-- Logo: "Inskriven" hexagon-W (assets/logo/vald). Ordet skrivs som text i Jost. -->
+    <a class="brand" href="#oversikt" aria-label="WALTER, till översikten">
+      <img class="mark mark-light" src="assets/logo/vald/walter-symbol-ljust.svg" alt="" width="40" height="40">
+      <img class="mark mark-dark" src="assets/logo/vald/walter-symbol-morkt.svg" alt="" width="40" height="40">
+      <span class="words"><span class="word">WALTER</span><span class="sub" id="trade-mode">PAPER</span></span>
+    </a>
+    <nav class="nav" aria-label="Sidor">
+      <a href="#oversikt" data-view="oversikt">ÖVERSIKT</a>
+      <a href="#pro" data-view="pro">PRO</a>
+      <a href="#logg" data-view="logg">LOGG</a>
+      <a href="#k4" data-view="k4">K4</a>
+      <a href="#installningar" data-view="installningar">INSTÄLLNINGAR</a>
+      <a href="cipher.html" class="ext">W-CIPHER</a>
+    </nav>
+    <div class="top-right">
+      <span class="stamp" id="stamp"></span>
+      <button type="button" id="theme" class="round" aria-label="Byt till mörkt läge">
+        <svg class="moon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- Översikt: läget är hjälten, siffrorna ligger längre ned -->
+    <section id="view-oversikt" data-page="oversikt" aria-label="Översikt">
+      <div class="hero">
+        <div class="hero-left">
+          <p class="kicker" id="status-line"></p>
+          <div class="mode" id="mode"></div>
+          <p class="quote" id="quote"></p>
+          <div class="panel ring-panel" id="ring"></div>
         </div>
-        <a class="icon-btn" id="nav-settings" href="#installningar">Inställningar</a>
+        <div class="hero-right">
+          <div class="panel pf" id="pf"></div>
+          <div class="panel lamps" id="lamps"></div>
+        </div>
       </div>
-    </header>
 
-    <!-- Mobil: kompakt 48px ticker direkt ovanför portfolion -->
-    <nav class="ticker glass" id="ticker" aria-label="Marknadsläge"></nav>
+      <div class="section-title" id="siffror"><h2>SIFFRORNA</h2><span class="small">Allt bakom läget, för den som vill se.</span></div>
+      <div class="cards">
+        <section class="panel" id="status" aria-label="Status och uppdatering"></section>
+        <section class="panel" id="allocation" aria-label="Fördelning"></section>
+        <section class="panel" id="levels" aria-label="Nivåer"></section>
+        <section class="panel" id="unlock" aria-label="Vägen till Level 2"></section>
+        <section class="panel wide" id="journey" aria-label="Resan" hidden></section>
+      </div>
+    </section>
 
-    <main class="grid">
-      <section class="card glass notis" id="notis" aria-live="polite" hidden></section>
-      <section class="card glass journey" id="journey" hidden></section>
-      <section class="card glass level-strip" id="level-strip" aria-label="Levels" hidden></section>
-      <section class="card glass status" id="status" aria-label="Status och uppdatering"></section>
-      <section class="card glass portfolio" id="portfolio"></section>
-      <section class="card glass notice" id="notice" aria-live="polite"></section>
-      <section class="card glass goal" id="goal"></section>
-      <section class="card glass lamps" id="lamps"></section>
-      <section class="card glass allocation" id="allocation"></section>
-      <section class="card glass levels" id="levels"></section>
-      <section class="card glass unlock" id="unlock"></section>
-      <section class="card glass journal" id="journal"></section>
-      <section class="card glass k4" id="k4"></section>
-    </main>
+    <section id="view-pro" data-page="pro" aria-label="Pro" hidden></section>
+    <section id="view-logg" data-page="logg" aria-label="Logg" hidden></section>
+    <section id="view-k4" data-page="k4" aria-label="K4" hidden></section>
+    <section id="view-installningar" data-page="installningar" aria-label="Inställningar" hidden></section>
+  </main>
 
-    <!-- Inställningar: sparas bara i den här webbläsaren (localStorage), inget skickas någonstans -->
-    <main class="settings-view" id="settings" hidden></main>
+  <footer class="footer" id="footer"></footer>
 
-    <footer class="footer" id="footer"></footer>
-  </div>
-
-  <dialog class="live-dialog glass" id="live-dialog">
+  <dialog class="live-dialog" id="live-dialog">
     <form method="dialog" id="live-form">
       <h2>Gå över till LIVE?</h2>
       <p>I LIVE gäller riktiga pengar. Skriv <b>JA GÅ LIVE</b> för att bekräfta.</p>
-      <input id="live-confirm" type="text" autocomplete="off" spellcheck="false" placeholder="JA GÅ LIVE">
-      <div class="dialog-actions">
-        <button type="submit" value="cancel" class="btn">Avbryt</button>
-        <button type="submit" value="live" class="btn btn-danger" id="live-ok" disabled>Gå live</button>
+      <input id="live-confirm" class="input" type="text" autocomplete="off" spellcheck="false" placeholder="JA GÅ LIVE" aria-label="Bekräftelse">
+      <div class="form-actions">
+        <button type="submit" value="cancel" class="btn">AVBRYT</button>
+        <button type="submit" value="live" class="btn btn-danger" id="live-ok" disabled>GÅ LIVE</button>
       </div>
     </form>
   </dialog>

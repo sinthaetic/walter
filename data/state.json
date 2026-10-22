@@ -7,8 +7,8 @@
   "level": 1,
   "levels": {
     "1": { "asset": "BTC", "name": "Bitcoin", "unlocked": true, "since": "2026-10-21" },
-    "2": { "asset": "ETH", "name": "Ethereum", "gainPct": 20, "description": "+20 % riktig marknadsvinst över alla insättningar" },
-    "3": { "asset": "GULD", "name": "Guld", "targetTotal": 500000, "description": "Portfölj 500 000 kr – av marknadsvinst, inte insättningar" }
+    "2": { "asset": "ETH", "name": "Ethereum", "description": "Låses upp när en av vägarna i rules.unlock är klar (tidig eller normal)" },
+    "3": { "asset": "GULD", "name": "Guld", "gainPct": 50, "maxDd": 12, "description": "+50 % marknadsvinst över alla insättningar, drawdown under 12 %" }
   },
 
   "portfolio": {
@@ -19,11 +19,11 @@
     "refBtc": 0.30447,
     "sharpe": null,
     "history": [
-      { "date": "2026-10-15", "value": 500, "cash": 500 },
-      { "date": "2026-10-16", "value": 500, "cash": 500 },
-      { "date": "2026-10-17", "value": 499, "cash": null, "note": "köp" },
-      { "date": "2026-10-19", "value": 624.77, "cash": null, "note": "DCA" },
-      { "date": "2026-10-21", "value": 254600, "cash": 254600, "note": "insättning" }
+      { "date": "2026-10-15", "value": 500, "cash": 500, "test": true },
+      { "date": "2026-10-16", "value": 500, "cash": 500, "test": true },
+      { "date": "2026-10-17", "value": 499, "cash": null, "note": "köp", "test": true },
+      { "date": "2026-10-19", "value": 624.77, "cash": null, "note": "DCA", "test": true },
+      { "date": "2026-10-21", "value": 254600, "cash": 254600, "note": "insättning", "flow": 254600 }
     ],
     "capitalChange": { "date": "2026-10-21", "value": 200000, "text": "Nytt startkapital 200 000 kr (manuell insättning)", "manualTopUp": 54600 }
   },
@@ -42,17 +42,24 @@
     "caps": { "BTC": 0.35, "ETH": 0.20, "GOLD": 0.20 },
     "unlock": {
       "early":  { "days": 15, "gainPct": 20, "maxDd": 8, "minGreen": 7 },
-      "normal": { "days": 30, "minGainPct": 10, "maxDd": 12, "minSharpe": 1 }
+      "normal": { "days": 30, "gainPct": 10, "maxDd": 12 }
     },
+    "ethMaxRed": 4,
+    "gold": { "vixAbove": 20, "spxBelowMa": true, "allowedWhenParked": true },
     "withdrawalFees": { "takerPct": 0.40, "slippagePct": 0.2, "sepaEur": 1, "fxPct": 1 },
     "lampThresholds": {
-      "indexDropPct": -1,
-      "vixRisePct": 10,
-      "us10y": 4.5,
-      "dxy": 105,
-      "mvrvZ": 7,
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
       "sopr": 1
-    }
+    },
+    "lampMaxAgeDays": { "default": 4, "etf": 6, "mvrv": 10, "sopr": 10, "cpi": 35 }
   },
 
   "market": {
@@ -65,8 +72,7 @@
     "vix":      { "value": null, "changePct": 10.5, "asOf": "2026-10-15" },
     "etfFlow":  { "mtdUsd": -276000000, "note": "trots IBIT +370M och ny ETF i Thailand" },
     "nasdaq":   { "changePct": -2.1 },
-    "spx":      { "changePct": -1.1 },
-    "dow":      { "changePct": null },
+    "spx":      { "changePct": -1.1, "belowMa": null },
     "cpi":      { "actual": 3.7, "expected": 3.6, "asOf": "2026-10-15" },
     "mvrvZ":    { "value": null },
     "sopr":     { "value": null },
@@ -77,16 +83,16 @@
   "lampScore": { "red": 8, "total": 10, "asOf": "2026-10-16", "source": "journal" },
 
   "lamps": [
-    { "id": "nasdaq", "name": "Nasdaq",          "rule": "Faller mer än 1 % på en dag",    "status": "red",   "value": "−2,1 %" },
-    { "id": "spx",    "name": "S&P 500",         "rule": "Faller mer än 1 % på en dag",    "status": "red",   "value": "−1,1 %" },
-    { "id": "dow",    "name": "Dow Jones",       "rule": "Faller mer än 1 % på en dag",    "status": null,    "value": null },
-    { "id": "vix",    "name": "VIX (oro-index)", "rule": "Stiger mer än 10 % på en dag",   "status": null,    "value": "15 okt: +10,5 %" },
-    { "id": "us10y",  "name": "10-årig ränta",   "rule": "Över 4,5 %",                     "status": "red",   "value": "5,09 %" },
-    { "id": "dxy",    "name": "Dollarindex",     "rule": "Över 105",                       "status": "green", "value": "102,95" },
-    { "id": "etf",    "name": "Bitcoin-fonder",  "rule": "Pengar flödar ut",               "status": "red",   "value": "−$276M i okt" },
-    { "id": "cpi",    "name": "Inflation (KPI)", "rule": "Högre än väntat",                "status": "red",   "value": "3,7 % mot 3,6 %" },
-    { "id": "mvrv",   "name": "MVRV-Z",          "rule": "Överhettad värdering",           "status": null,    "value": null },
-    { "id": "sopr",   "name": "SOPR",            "rule": "Under 1,0 (säljer med förlust)", "status": null,    "value": null }
+    { "id": "spx",      "name": "S&P 500",         "rule": "Under sitt 50-dagarssnitt",              "status": null, "value": null },
+    { "id": "btcTrend", "name": "Bitcoin-trend",   "rule": "Under sitt 200-dagarssnitt",             "status": null, "value": null },
+    { "id": "btcWeek",  "name": "Bitcoin, vecka",  "rule": "Fallit mer än 10 % på 7 dagar",          "status": null, "value": null },
+    { "id": "vix",      "name": "VIX (oro-index)", "rule": "Över 20",                                "status": null, "value": null },
+    { "id": "us10y",    "name": "10-årig ränta",   "rule": "Stigit mer än 0,25 %-enheter på en månad", "status": null, "value": null },
+    { "id": "dxy",      "name": "Dollarindex",     "rule": "Över sitt 50-dagarssnitt",               "status": null, "value": null },
+    { "id": "etf",      "name": "Bitcoin-fonder",  "rule": "Pengar ut senaste 5 handelsdagarna",     "status": null, "value": null },
+    { "id": "cpi",      "name": "Inflation (KPI)", "rule": "Högre än väntat",                        "status": "red", "value": "3,7 % mot 3,6 %" },
+    { "id": "mvrv",     "name": "MVRV-Z",          "rule": "Överhettad värdering (över 3)",          "status": null, "value": null },
+    { "id": "sopr",     "name": "SOPR",            "rule": "Under 1,0 i snitt över 7 dagar",         "status": null, "value": null }
   ],
 
   "journal": [
