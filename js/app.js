@@ -367,6 +367,8 @@
   // ---------- Allokering ----------
   const share = (k) => (pf.value > 0 ? pf.holdings[k] / pf.value : 0);
   const unlocked = { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
+  // Taket på nuvarande level = summan av upplåsta tak (Level 1: 35 %, Level 3: 75 %)
+  const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
   const rows = [
     { k: "BTC", name: "Bitcoin", note: "Level 1", cap: S.rules.caps.BTC },
     { k: "ETH", name: "Ethereum", note: "Level 2", cap: S.rules.caps.ETH },
@@ -390,18 +392,40 @@
         </div>`;
       }).join("")}
     </div>
-    <p class="alloc-foot">Investerat ${nf(0).format(invested * 100)} % av max ${S.rules.maxInvested * 100} %. Strecket visar tak (eller golv för kontanter).</p>`;
+    <p class="alloc-foot">Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).</p>`;
 
   // ---------- Levels ----------
   // Upplåsning räknas ALLTID på marknadsvinst över insättningarna – insättningar låser aldrig upp.
-  // Level 2: +gainPct % över insättningarna. Level 3: targetTotal kr, där allt över insättningarna är marknadsvinst.
+  // Level 2: en av vägarna i rules.unlock räcker. Level 3: +levels.3.gainPct % och drawdown under levels.3.maxDd.
   // Beloppen räknas här (inte fasta i state.json), så en ny insättning flyttar kraven med sig.
   const LV = S.levels || {};
-  const lvReq = {
-    2: LV[2] ? { profit: deposits * LV[2].gainPct / 100, total: deposits * (1 + LV[2].gainPct / 100) } : null,
-    3: LV[3] ? { profit: Math.max(0, LV[3].targetTotal - deposits), total: LV[3].targetTotal } : null
-  };
-  const lvUnlocked = (n) => n === 1 || (lvReq[n] != null && pf.value >= lvReq[n].total && marketGain >= lvReq[n].profit && marketGain > 0);
+  const u = S.rules.unlock;
+  const krFor = (p) => kr(deposits * p / 100);
+  const gainCond = (p) => [`Marknadsvinst ${nf(0).format(Math.max(0, marketPct))} % / ${p} % (krävs +${krFor(p)} över insättningarna ${kr(deposits)})`, marketPct >= p];
+  const paths = [
+    { name: "Tidig väg", conds: [
+      [`Minst ${u.early.days} dagar (dag ${days})`, days >= u.early.days],
+      gainCond(u.early.gainPct),
+      [`Drawdown under ${u.early.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.early.maxDd],
+      [`Minst ${u.early.minGreen}/${total} gröna lampor (nu ${green})`, green >= u.early.minGreen]
+    ] },
+    { name: "Normal väg", conds: [
+      [`Minst ${u.normal.days} dagar (dag ${days})`, days >= u.normal.days],
+      gainCond(u.normal.gainPct),
+      [`Drawdown under ${u.normal.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.normal.maxDd]
+    ] }
+  ];
+  const lv3 = LV[3] || null;
+  const lvUnlocked = (n) => n === 1
+    || (n === 2 && marketGain > 0 && paths.some((p) => p.conds.every(([, ok]) => ok === true)))
+    || (n === 3 && lv3 != null && marketGain > 0 && marketPct >= lv3.gainPct && dd < lv3.maxDd);
+
+  // Guld är skyddet: önskas när oron är hög (VIX över gränsen eller S&P under sitt snitt). null = väntar på data.
+  const g = S.rules.gold;
+  const vixHigh = m.vix.value == null ? null : m.vix.value > g.vixAbove;
+  const spxLow = m.spx.belowMa == null ? null : m.spx.belowMa;
+  const goldWanted = vixHigh === true || spxLow === true ? true : vixHigh === null || spxLow === null ? null : false;
+
   // Låst level: villkoren visas släckta ("tänds" först när leveln är upplåst)
   const lockedDot = '<span class="dot off" title="Låst tills leveln är upplåst"></span>';
   const levels = [
@@ -410,16 +434,14 @@
       [`Inte PARKERA (färre än ${S.rules.parkeraAtRed}/${total} röda lampor)`, !parked]
     ] },
     { n: 2, name: "Level 2 · Ethereum", tag: "ETH 20 %", conds: [
-      [`Upplåst: +${LV[2] ? LV[2].gainPct : "?"} % marknadsvinst (${kr(Math.max(0, marketGain))} / ${kr(lvReq[2] ? lvReq[2].profit : 0)})`, lvUnlocked(2), true],
+      [`Upplåst: tidig eller normal väg klar (marknadsvinst nu ${kr(Math.max(0, marketGain))})`, lvUnlocked(2), true],
       ["BTC är LONG", m.btcLong],
       ["ETH/BTC över 30-dagars snitt", m.ethBtcAbove30dMa],
-      ["SOPR under 1,0", m.sopr.value == null ? null : m.sopr.value < 1]
+      [`Färre än ${S.rules.ethMaxRed + 1} röda lampor (nu ${red})`, red <= S.rules.ethMaxRed]
     ] },
-    { n: 3, name: "Level 3 · Guld", tag: "PAXG / XAUT 20 %", conds: [
-      [`Upplåst: portfölj ${kr(lvReq[3] ? lvReq[3].total : 0)} av marknadsvinst (${kr(Math.max(0, marketGain))} / ${kr(lvReq[3] ? lvReq[3].profit : 0)})`, lvUnlocked(3), true],
-      [`Dollarindex över 105 (nu ${nf(1).format(m.dxy.value)})`, m.dxy.value > 105],
-      [`10-årig ränta över 4,5 % (nu ${nf(2).format(m.us10y.value)} %)`, m.us10y.value > 4.5],
-      [`VIX upp mer än 10 % (${day(m.vix.asOf)}: ${pct(m.vix.changePct)})`, m.vix.changePct > 10]
+    { n: 3, name: "Level 3 · Guld", tag: "PAXG / XAUT 20 % · även när WALTER vilar", conds: [
+      [`Upplåst: +${lv3 ? lv3.gainPct : "?"} % marknadsvinst (${kr(Math.max(0, marketGain))} / ${lv3 ? krFor(lv3.gainPct) : "?"})`, lvUnlocked(3), true],
+      [`Oro: VIX över ${g.vixAbove} (nu ${m.vix.value != null ? nf(1).format(m.vix.value) : "?"}) eller S&P 500 under 50-dagarssnitt`, goldWanted]
     ] }
   ];
   $("levels").innerHTML = `
@@ -432,37 +454,24 @@
 
   // ---------- Level-rad under Resan: BTC ✓ · ETH 🔒 med progress · GULD 🔒 ----------
   if (LV[1]) {
-    const lv2pct = lvReq[2] && lvReq[2].profit > 0 ? Math.min(100, Math.max(0, marketGain) / lvReq[2].profit * 100) : 0;
+    const lv2Gain = Math.min(u.early.gainPct, u.normal.gainPct);  // närmaste vägens vinstkrav
+    const lv2Profit = deposits * lv2Gain / 100;
+    const lv2pct = lv2Profit > 0 ? Math.min(100, Math.max(0, marketGain) / lv2Profit * 100) : 0;
     const k = (v) => (v >= 1000 ? new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 1 }).format(v / 1000) + "k" : kr(v));  // 254,6k · 500k
     $("level-strip").hidden = false;
     $("level-strip").innerHTML = `
       <div class="lv-item${lvUnlocked(1) ? " open" : ""}"><b>Level 1 ${esc(LV[1].asset)}</b><span>✓ (${k(pf.value)})</span></div>
-      ${lvReq[2] ? `<div class="lv-item lv-progress${lvUnlocked(2) ? " open" : ""}">
-        <b>Level 2 ${esc(LV[2].asset)}</b><span>${lvUnlocked(2) ? "✓" : "🔒"} ${kr(Math.max(0, marketGain))} / ${kr(lvReq[2].profit)} (${nf(0).format(lv2pct)} %) → ${kr(lvReq[2].total)}</span>
+      ${LV[2] ? `<div class="lv-item lv-progress${lvUnlocked(2) ? " open" : ""}">
+        <b>Level 2 ${esc(LV[2].asset)}</b><span>${lvUnlocked(2) ? "✓" : "🔒"} ${kr(Math.max(0, marketGain))} / ${kr(lv2Profit)} (${nf(0).format(lv2pct)} %) → ${kr(deposits + lv2Profit)}</span>
         <div class="lv-bar" role="progressbar" aria-label="Marknadsvinst mot Level 2" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(lv2pct)}"><span style="width:${lv2pct}%"></span></div>
       </div>` : ""}
-      ${lvReq[3] ? `<div class="lv-item${lvUnlocked(3) ? " open" : ""}"><b>Level 3 ${esc(LV[3].asset)}</b><span>${lvUnlocked(3) ? "✓" : "🔒"} vid ${k(lvReq[3].total)}</span></div>` : ""}`;
+      ${lv3 ? `<div class="lv-item${lvUnlocked(3) ? " open" : ""}"><b>Level 3 ${esc(lv3.asset)}</b><span>${lvUnlocked(3) ? "✓" : "🔒"} vid +${lv3.gainPct} % (${k(deposits * (1 + lv3.gainPct / 100))})</span></div>` : ""}`;
   }
 
-  // ---------- Upplåsning ----------
-  const u = S.rules.unlock;
-  const paths = [
-    { name: "Tidig upplåsning", conds: [
-      [`Minst ${u.early.days} dagar (dag ${days})`, days >= u.early.days],
-      [`Marknadsvinst ${nf(0).format(Math.max(0, marketPct))} % / ${u.early.gainPct} %${marketPct >= u.early.gainPct ? "" : " – väntar"} (krävs +${kr(deposits * u.early.gainPct / 100)} över insättningarna ${kr(deposits)})`, marketPct >= u.early.gainPct],
-      [`Drawdown under ${u.early.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.early.maxDd],
-      [`Minst ${u.early.minGreen}/${total} gröna lampor (nu ${green})`, green >= u.early.minGreen]
-    ] },
-    { name: "Normal upplåsning", conds: [
-      [`Minst ${u.normal.days} dagar (dag ${days})`, days >= u.normal.days],
-      // +minGainPct över alla insättningar – samma logik som tidig upplåsning, så insättningar aldrig låser upp
-      [`Över ${kr(deposits * (1 + u.normal.minGainPct / 100))} = +${u.normal.minGainPct} % marknadsvinst (nu ${kr(pf.value)})${marketPct >= u.normal.minGainPct ? "" : " – väntar"}`, marketPct >= u.normal.minGainPct],
-      [`Drawdown under ${u.normal.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.normal.maxDd],
-      [`Sharpe över ${u.normal.minSharpe}${pf.sharpe != null ? " (nu " + nf(2).format(pf.sharpe) + ")" : ""}`, pf.sharpe == null ? null : pf.sharpe > u.normal.minSharpe]
-    ] }
-  ];
+  // ---------- Upplåsning (vägen till Level 2) ----------
   $("unlock").innerHTML = `
-    <h2>Nästa level</h2>
+    <h2>Vägen till Level 2</h2>
+    <p class="sub">En av vägarna räcker.</p>
     ${paths.map((p) => {
       const done = p.conds.filter(([, ok]) => ok === true).length;
       return `<div class="unlock-path">

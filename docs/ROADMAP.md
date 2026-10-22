@@ -21,7 +21,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | 5 | ✓ W-Cipher: parametrar föreslagna, skiss klar, och en fungerande sida `cipher.html` med livedata från 5 börser + Pine Script för TradingView (klar 22 okt, parametrar väntar på ditt ja) | Opus |
 | 6 | ✓ K4-underlag i ny design (klar 22 okt) | Sonnet |
 | 7 | Bygg in designen i riktiga koden (index.html, css, js), inkl. nya logon från assets/logo/vald. Länka W-CIPHER i menyn | Opus för plan, Sonnet för utförande |
-| 8 | Logikluckor: trade-motor för paper, buffert 7/6, Sharpe, Level 3 i procent | Opus |
+| 8 | Logikluckor: trade-motor för paper, buffert 7/6, Sharpe (räknas utan flows). ~~Level 3 i procent~~ klart 22 okt | Opus |
 
 ## W-Cipher (steg 5, förslag)
 - Grafen: Heikin-Ashi-ljus + trendband (Cipher A) överst, vågen + pengaflöde (Cipher B) under.
@@ -38,8 +38,13 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - W-Cipher ändrar aldrig läget. Den är Walters andra åsikt i text, inte en lampa.
 - Licens: originalet är märkt "© vumanchu" och bygger på LazyBears WaveTrend. Vi kopierar ingen kod, vi skriver egen kod från de öppna formlerna.
 
+## Regelgranskning (22 okt, alla 14 förslag godkända)
+- Fel rättade: en upplåsningsregel för Level 2 (tidig ELLER normal väg), Sharpe borttaget tills det finns data, ETH-villkoret "SOPR < 1" bytt mot "högst 4 röda lampor", insättningar märkta med `flow`, paper-testet märkt `test`, gammal data blir "väntar".
+- Lamporna mäter trend och nivå i stället för enstaka dagar (se CLAUDE.md). Nasdaq och Dow borta, BTC-trend och BTC-vecka in.
+- Level 3: +50 % marknadsvinst i stället för 500 000 kr. Guld = skydd vid oro, får köpas även när Walter vilar.
+- MVRV-Z-gränsen: väntar på beslut efter att historiken visats (topp 3,35 i dec 2024 på 4 års data).
+
 ## Öppna frågor
-- Level 3 är i dag 500 000 kr fast belopp. Med valfri summa bör den bli procent. Beslutas i steg 8.
 - Vilka lampnivåer ger Avvaktar, Köper lite och Köper? Beslutas i steg 8.
 - Ska W-Cipher någonsin bli en lampa? Nu: nej.
 - W-Cipher för aktier/index (Nasdaq, S&P): kräver att hämtaren skriver ljus till en fil. Senare.

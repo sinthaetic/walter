@@ -61,50 +61,75 @@ def get_json(url, **kw):
 
 
 # ---------- Källor ----------
-def yahoo(symbol):
-    """Senaste och föregående dagsstängning från yfinance."""
+def yahoo_hist(symbol, period="6mo"):
+    """Dagsstängningar från yfinance, äldst först: [(datum, stängning), ...]."""
     import yfinance as yf
 
-    h = yf.Ticker(symbol).history(period="10d", interval="1d", auto_adjust=False).dropna(subset=["Close"])
+    h = yf.Ticker(symbol).history(period=period, interval="1d", auto_adjust=False).dropna(subset=["Close"])
     if len(h) < 2:
         raise ValueError(f"för lite data för {symbol}")
-    last, prev = float(h["Close"].iloc[-1]), float(h["Close"].iloc[-2])
-    return last, prev, h.index[-1].date().isoformat()
+    return [(i.date().isoformat(), float(c)) for i, c in zip(h.index, h["Close"])]
+
+
+def ma(closes, n):
+    """Snitt av de senaste n värdena (eller alla, om det finns färre)."""
+    tail = closes[-n:]
+    return sum(tail) / len(tail)
+
+
+def month_ago(series):
+    """Värdet ungefär en månad (30 dagar) före det senaste. series: [(datum, värde)], äldst först."""
+    last = date.fromisoformat(series[-1][0])
+    older = [v for d, v in series if (last - date.fromisoformat(d)).days >= 30]
+    if not older:
+        raise ValueError("för kort historik för en månad bakåt")
+    return older[-1]
 
 
 def fetch_indices():
     out = {}
-    for key, sym in (("nasdaq", "^IXIC"), ("spx", "^GSPC"), ("dow", "^DJI")):
-        last, prev, as_of = yahoo(sym)
-        out[key] = {"changePct": round((last / prev - 1) * 100, 2), "asOf": as_of}
+    nd = yahoo_hist("^IXIC", "10d")
+    out["nasdaq"] = {"changePct": round((nd[-1][1] / nd[-2][1] - 1) * 100, 2), "asOf": nd[-1][0]}
+    sp = yahoo_hist("^GSPC", "6mo")
+    closes = [c for _, c in sp]
+    ma50 = ma(closes, 50)
+    out["spx"] = {"value": round(closes[-1], 2), "changePct": round((closes[-1] / closes[-2] - 1) * 100, 2),
+                  "ma50": round(ma50, 2), "belowMa": closes[-1] < ma50, "asOf": sp[-1][0]}
     return out
 
 
 def fetch_vix():
-    last, prev, as_of = yahoo("^VIX")
-    return {"vix": {"value": round(last, 2), "changePct": round((last / prev - 1) * 100, 1), "asOf": as_of}}
+    h = yahoo_hist("^VIX", "10d")
+    last, prev = h[-1][1], h[-2][1]
+    return {"vix": {"value": round(last, 2), "changePct": round((last / prev - 1) * 100, 1), "asOf": h[-1][0]}}
 
 
 def fetch_dxy():
-    last, _, as_of = yahoo("DX-Y.NYB")
-    return {"dxy": {"value": round(last, 3), "asOf": as_of}}
+    h = yahoo_hist("DX-Y.NYB", "6mo")
+    closes = [c for _, c in h]
+    ma50 = ma(closes, 50)
+    return {"dxy": {"value": round(closes[-1], 3), "ma50": round(ma50, 3), "aboveMa": closes[-1] > ma50, "asOf": h[-1][0]}}
 
 
 def fetch_us10y():
-    """FRED DGS10 (officiellt API) i första hand, Yahoo ^TNX om FRED inte svarar."""
+    """FRED DGS10 (officiellt API) i första hand, Yahoo ^TNX om FRED inte svarar.
+    Lampan tittar på förändringen mot en månad sedan."""
     try:
-        (as_of, last), (_, prev) = fred_api("DGS10")
+        series = fred_api("DGS10", 40)
         src = "FRED"
     except Exception as e:
         if not os.environ.get("FRED_API_KEY"):
             warn("FRED_API_KEY saknas i fetcher/.env – 10-årig ränta tas från Yahoo ^TNX i stället.")
         else:
             print(f"    FRED svarade inte ({type(e).__name__}), tar ^TNX från Yahoo")
-        last, prev, as_of = yahoo("^TNX")
-        if last > 20:  # gammal Yahoo-skala (räntan × 10)
-            last, prev = last / 10, prev / 10
+        series = yahoo_hist("^TNX", "3mo")
+        if series[-1][1] > 20:  # gammal Yahoo-skala (räntan × 10)
+            series = [(d, v / 10) for d, v in series]
         src = "Yahoo ^TNX"
-    return {"us10y": {"value": round(last, 2), "changeBp": round((last - prev) * 100), "asOf": as_of, "source": src}}
+    (as_of, last), (_, prev) = series[-1], series[-2]
+    m1 = month_ago(series)
+    return {"us10y": {"value": round(last, 2), "changeBp": round((last - prev) * 100), "monthAgo": round(m1, 2),
+                      "change1mPp": round(last - m1, 2), "asOf": as_of, "source": src}}
 
 
 def fetch_coingecko():
@@ -113,9 +138,17 @@ def fetch_coingecko():
                      params={"vs_currency": "btc", "days": 30, "interval": "daily"})
     prices = [p for _, p in chart["prices"]]
     ma30 = sum(prices) / len(prices)
+    hist = get_json("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
+                    params={"vs_currency": "usd", "days": 220, "interval": "daily"})
+    bp = [p for _, p in hist["prices"]]
+    if len(bp) < 200:
+        raise ValueError(f"för kort BTC-historik ({len(bp)} dagar)")
+    ma200 = ma(bp, 200)
+    week = (bp[-1] / bp[-8] - 1) * 100
     return {
         "btc": {"value": round(btc["bitcoin"]["usd"]), "unit": "usd", "asOf": date.today().isoformat(),
-                "changePct24h": round(btc["bitcoin"]["usd_24h_change"], 2) if btc["bitcoin"].get("usd_24h_change") is not None else None},
+                "changePct24h": round(btc["bitcoin"]["usd_24h_change"], 2) if btc["bitcoin"].get("usd_24h_change") is not None else None,
+                "ma200": round(ma200), "belowMa200": bp[-1] < ma200, "change7dPct": round(week, 1)},
         "ethBtc": {"value": round(prices[-1], 5), "ma30": round(ma30, 5)},
         "ethBtcAbove30dMa": prices[-1] > ma30,
     }
@@ -124,23 +157,29 @@ def fetch_coingecko():
 def fetch_bgeometrics():
     # Gratisnivån ligger ungefär en vecka efter – asOf visar vilken dag värdet gäller.
     z = get_json("https://bitcoin-data.com/v1/mvrv-zscore/last")
-    s = get_json("https://bitcoin-data.com/v1/sopr/last")
+    start = date.fromordinal(date.today().toordinal() - 25).isoformat()
+    s = [x for x in get_json("https://bitcoin-data.com/v1/sopr", params={"startday": start}) if x.get("sopr") is not None]
+    if len(s) < 7:
+        raise ValueError(f"för lite SOPR-data ({len(s)} dagar)")
+    last7 = [float(x["sopr"]) for x in s[-7:]]
     return {
         "mvrvZ": {"value": round(float(z["mvrvZscore"]), 2), "asOf": z["d"]},
-        "sopr": {"value": round(float(s["sopr"]), 4), "asOf": s["d"]},
+        "sopr": {"value": round(last7[-1], 4), "avg7": round(sum(last7) / 7, 4), "asOf": s[-1]["d"]},
     }
 
 
-def fred_api(series):
-    """FRED:s officiella API (gratis nyckel FRED_API_KEY i fetcher/.env). Senaste två observationerna."""
+def fred_api(series, limit=10):
+    """FRED:s officiella API (gratis nyckel FRED_API_KEY i fetcher/.env). [(datum, värde)], äldst först."""
     key = os.environ.get("FRED_API_KEY")
     if not key:
         raise RuntimeError("ingen FRED_API_KEY")
     data = get_json("https://api.stlouisfed.org/fred/series/observations",
                     params={"series_id": series, "api_key": key, "file_type": "json",
-                            "sort_order": "desc", "limit": 10})
+                            "sort_order": "desc", "limit": limit})
     obs = [(o["date"], float(o["value"])) for o in data["observations"] if o["value"] not in ("", ".")]
-    return obs[0], obs[1]
+    if len(obs) < 2:
+        raise ValueError(f"för lite data för {series}")
+    return obs[::-1]
 
 
 def fetch_fx():
@@ -159,7 +198,7 @@ def fetch_fx():
             if not os.environ.get("FRED_API_KEY"):
                 warn("FRED_API_KEY saknas – ingen reserv för USDSEK. Senast sparade kurs behålls.")
                 continue
-            (as_of, v), _ = fred_api("DEXSDUS")
+            as_of, v = fred_api("DEXSDUS")[-1]
             out[key] = {"value": round(v, 4), "asOf": as_of, "source": "FRED DEXSDUS"}
     if not out:
         raise RuntimeError("ingen valutakurs svarade")
@@ -192,7 +231,8 @@ def fetch_etf():
             if d.get("date") and isinstance(d.get("net_inflow_usd"), (int, float))}
     days[last] = last_flow
     mtd = sum(v for d, v in days.items() if d.startswith(last[:7]))
-    return {"etfFlow": {"mtdUsd": round(mtd), "lastDayUsd": round(last_flow), "asOf": last}}
+    last5 = [days[d] for d in sorted(days)[-5:]]
+    return {"etfFlow": {"mtdUsd": round(mtd), "sum5dUsd": round(sum(last5)), "lastDayUsd": round(last_flow), "asOf": last}}
 
 
 SOURCES = [
@@ -209,36 +249,49 @@ SOURCES = [
 
 # ---------- Lampor ----------
 def lamp_updates(m, t):
-    """id -> (status, värde). Saknas data för en lampa behålls den gamla."""
+    """id -> (status, värde, datum som värdet gäller). Saknas data för en lampa behålls den gamla."""
     out = {}
     red = lambda cond: "red" if cond else "green"
 
-    for key in ("nasdaq", "spx", "dow"):
-        c = m.get(key, {}).get("changePct")
-        if c is not None:
-            out[key] = (red(c < t["indexDropPct"]), pct(c))
+    spx = m.get("spx", {})
+    if spx.get("belowMa") is not None:
+        out["spx"] = (red(spx["belowMa"]), f"{num(spx['value'])} (snitt {num(spx['ma50'])})", spx["asOf"])
+    btc = m.get("btc", {})
+    if btc.get("belowMa200") is not None:
+        out["btcTrend"] = (red(btc["belowMa200"]), f"${num(btc['value'])} (snitt ${num(btc['ma200'])})", btc["asOf"])
+    if btc.get("change7dPct") is not None:
+        out["btcWeek"] = (red(btc["change7dPct"] < t["btcWeekDropPct"]), pct(btc["change7dPct"]), btc["asOf"])
     vix = m.get("vix", {})
-    if vix.get("value") is not None and vix.get("changePct") is not None:
-        out["vix"] = (red(vix["changePct"] > t["vixRisePct"]), f"{num(vix['value'], 2)} ({pct(vix['changePct'])})")
-    if m.get("us10y", {}).get("value") is not None:
-        v = m["us10y"]["value"]
-        out["us10y"] = (red(v > t["us10y"]), num(v, 2) + " %")
-    if m.get("dxy", {}).get("value") is not None:
-        v = m["dxy"]["value"]
-        out["dxy"] = (red(v > t["dxy"]), num(v, 2))
+    if vix.get("value") is not None and vix.get("asOf"):
+        out["vix"] = (red(vix["value"] > t["vixAbove"]), num(vix["value"], 2), vix["asOf"])
+    r = m.get("us10y", {})
+    if r.get("change1mPp") is not None:
+        ch = r["change1mPp"]
+        out["us10y"] = (red(ch > t["us10yRisePp"]),
+                        f"{num(r['value'], 2)} % ({'+' if ch >= 0 else '−'}{num(abs(ch), 2)} på en månad)", r["asOf"])
+    dxy = m.get("dxy", {})
+    if dxy.get("aboveMa") is not None:
+        out["dxy"] = (red(dxy["aboveMa"]), f"{num(dxy['value'], 2)} (snitt {num(dxy['ma50'], 2)})", dxy["asOf"])
     etf = m.get("etfFlow", {})
-    if etf.get("asOf") and etf.get("mtdUsd") is not None:
-        v = etf["mtdUsd"]
-        sign = "−" if v < 0 else "+"
-        out["etf"] = (red(v < 0), f"{sign}${num(abs(v) / 1e6)}M i {MONTHS[int(etf['asOf'][5:7]) - 1]}")
-    if m.get("mvrvZ", {}).get("value") is not None:
-        v = m["mvrvZ"]["value"]
-        out["mvrv"] = (red(v > t["mvrvZ"]), f"{num(v, 2)} ({day(m['mvrvZ']['asOf'])})")
-    if m.get("sopr", {}).get("value") is not None:
-        v = m["sopr"]["value"]
-        out["sopr"] = (red(v < t["sopr"]), f"{num(v, 3)} ({day(m['sopr']['asOf'])})")
-    # KPI (utfall mot förväntan) finns inte gratis – den lampan sköts för hand i state.json.
+    if etf.get("asOf") and etf.get("sum5dUsd") is not None:
+        v = etf["sum5dUsd"]
+        out["etf"] = (red(v < 0), f"{'−' if v < 0 else '+'}${num(abs(v) / 1e6)}M på 5 dagar", etf["asOf"])
+    # KPI (utfall mot förväntan) finns inte gratis – värdena skrivs för hand i state.json → market.cpi.
+    cpi = m.get("cpi", {})
+    if cpi.get("actual") is not None and cpi.get("expected") is not None and cpi.get("asOf"):
+        out["cpi"] = (red(cpi["actual"] > cpi["expected"]), f"{num(cpi['actual'], 1)} % mot {num(cpi['expected'], 1)} %", cpi["asOf"])
+    z = m.get("mvrvZ", {})
+    if z.get("value") is not None and z.get("asOf"):
+        out["mvrv"] = (red(z["value"] > t["mvrvZ"]), f"{num(z['value'], 2)} ({day(z['asOf'])})", z["asOf"])
+    sopr = m.get("sopr", {})
+    if sopr.get("avg7") is not None:
+        out["sopr"] = (red(sopr["avg7"] < t["sopr"]), f"{num(sopr['avg7'], 3)} snitt 7 d ({day(sopr['asOf'])})", sopr["asOf"])
     return out
+
+
+def stale(as_of, max_days, today):
+    """True om värdet är äldre än max_days dagar."""
+    return (date.fromisoformat(today) - date.fromisoformat(as_of[:10])).days > max_days
 
 
 # ---------- Bygg ----------
@@ -252,12 +305,16 @@ def build(state, cache, fetched_any):
 
     if len(state["lamps"]) != 10:
         warn(f"state.json har {len(state['lamps'])} lampor – WALTER räknar med exakt 10. Rätta i state.json.")
+    today = date.today().isoformat()
     upd = lamp_updates(m, state["rules"]["lampThresholds"])
+    ages = state["rules"].get("lampMaxAgeDays", {})
     for lamp in state["lamps"]:
         if lamp["id"] in upd:
-            lamp["status"], lamp["value"] = upd[lamp["id"]]
-
-    today = date.today().isoformat()
+            status, value, as_of = upd[lamp["id"]]
+            # För gammal data räknas inte – lampan blir "väntar" i stället för att låtsas vara färsk.
+            if stale(as_of, ages.get(lamp["id"], ages.get("default", 4)), today):
+                status, value = None, f"{value} – gammal ({day(as_of)})"
+            lamp["status"], lamp["value"], lamp["asOf"] = status, value, as_of
     # Datan tar över poängen först när alla lampor har ett värde, annars gäller journalens.
     if fetched_any or cache.get("market"):
         if all(l["status"] is not None for l in state["lamps"]):

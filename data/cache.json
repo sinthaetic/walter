@@ -1,65 +1,88 @@
 {
   "market": {
     "nasdaq": {
-      "changePct": 1.05,
-      "asOf": "2026-10-21"
+      "changePct": -2.6,
+      "asOf": "2026-10-22"
     },
     "spx": {
-      "changePct": 0.58,
-      "asOf": "2026-10-21"
+      "value": 7651.58,
+      "changePct": -1.36,
+      "ma50": 7702.91,
+      "belowMa": true,
+      "asOf": "2026-10-22"
     },
     "dow": {
       "changePct": 0.69,
       "asOf": "2026-10-21"
     },
     "vix": {
-      "value": 16.68,
-      "changePct": -3.6,
-      "asOf": "2026-10-21"
+      "value": 18.9,
+      "changePct": 13.3,
+      "asOf": "2026-10-22"
     },
     "dxy": {
-      "value": 101.694,
-      "asOf": "2026-10-21"
+      "value": 101.615,
+      "ma50": 100.504,
+      "aboveMa": true,
+      "asOf": "2026-10-22"
     },
     "us10y": {
-      "value": 5.15,
-      "changeBp": 3,
-      "asOf": "2026-10-21",
+      "value": 4.96,
+      "changeBp": -18,
+      "monthAgo": 4.97,
+      "change1mPp": -0.0,
+      "asOf": "2026-10-22",
       "source": "Yahoo ^TNX"
     },
     "btc": {
-      "value": 84650,
+      "value": 81170,
       "unit": "usd",
-      "asOf": "2026-10-21"
+      "asOf": "2026-10-22",
+      "changePct24h": -4.11,
+      "ma200": 72791,
+      "belowMa200": false,
+      "change7dPct": -1.2
     },
     "ethBtc": {
-      "value": 0.03004,
-      "ma30": 0.03091
+      "value": 0.0283,
+      "ma30": 0.03077
     },
     "ethBtcAbove30dMa": false,
     "mvrvZ": {
-      "value": 0.92,
-      "asOf": "2026-10-14"
+      "value": 0.94,
+      "asOf": "2026-10-15"
     },
     "sopr": {
-      "value": 0.9987,
-      "asOf": "2026-10-14"
+      "value": 0.9992,
+      "avg7": 1.0022,
+      "asOf": "2026-10-15"
     },
     "etfFlow": {
-      "mtdUsd": -67407249,
-      "lastDayUsd": 23162423,
-      "asOf": "2026-10-20"
+      "mtdUsd": 460992988,
+      "sum5dUsd": 1000824446,
+      "lastDayUsd": 528400237,
+      "asOf": "2026-10-21"
     },
     "usdsek": {
-      "value": 9.8785,
-      "asOf": "2026-10-21",
+      "value": 9.917,
+      "asOf": "2026-10-22",
       "source": "Riksbanken"
     },
     "eursek": {
-      "value": 11.0975,
-      "asOf": "2026-10-21",
+      "value": 11.112,
+      "asOf": "2026-10-22",
       "source": "Riksbanken"
     }
   },
-  "fetchedAt": "2026-10-21T22:53:35"
+  "fetchedAt": "2026-10-22T20:00:21",
+  "sources": {
+    "Börsindex (yfinance)": "ok",
+    "VIX (yfinance)": "ok",
+    "Dollarindex (yfinance)": "ok",
+    "10-årig ränta (FRED / Yahoo ^TNX)": "ok",
+    "BTC + ETH/BTC (CoinGecko)": "ok",
+    "USDSEK + EURSEK (Riksbanken)": "ok",
+    "MVRV-Z + SOPR (BGeometrics)": "ok",
+    "ETF-flöden (ByKaranteli)": "ok"
+  }
 }

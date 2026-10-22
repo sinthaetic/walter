@@ -8,19 +8,26 @@ Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redig
 - `data/cache.json` – senast hämtade marknadsvärden (skrivs av hämtaren).
 - `fetcher/walter_fetch.py` – hämtar, räknar lampor, bygger `state.js` = state.json + cache. `--offline` bygger bara om. `hamta.bat` = dubbelklick.
 - Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode ändras ALDRIG automatiskt – bara via journalpost.
-- bykaranteli kräver gratis nyckel i `fetcher/.env` (`BYKARANTELI_API_KEY`). FRED svarar ofta inte → reserv Yahoo `^TNX`. BGeometrics gratis = ~7 dagar fördröjt.
-- MVRV-Z-gränsen (7) i `rules.lampThresholds` är ett antagande, inte en dokumenterad WALTER-regel.
+- En lampa vars data är äldre än `rules.lampMaxAgeDays` blir "väntar" (null), så gammal data aldrig räknas som färsk.
+- bykaranteli kräver gratis nyckel i `fetcher/.env` (`BYKARANTELI_API_KEY`). FRED svarar ofta inte → reserv Yahoo `^TNX`. BGeometrics gratis = ~7 dagar fördröjt och bara 4 års historik.
+- KPI-lampan räknas från `market.cpi` (actual/expected/asOf) som skrivs för hand.
+
+## Lamporna (ändrade 22 okt 2026, se docs/ROADMAP.md)
+S&P 500 under 50d-snitt · BTC under 200d-snitt · BTC −10 % på 7 dagar · VIX över 20 · 10Y upp mer än 0,25 %-enheter på en månad ·
+Dollarindex över 50d-snitt · ETF-flöde negativt senaste 5 handelsdagarna · KPI högre än väntat · MVRV-Z över gränsen · SOPR 7d-snitt under 1.
+Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 
 ## Regler (strategi)
 - PARKERA när 7/10 lampor är risk-off.
 - Level 1: BTC max 35 %, kontant minst 25 % alltid.
-- Level 2: ETH 20 %, låst tills BTC LONG + ETH/BTC över 30d MA + SOPR < 1,0.
-- Level 3: Guld 20 % (PAXG/XAUT) när DXY > 105 + 10Y > 4,5 % + VIX > +10 %.
-- Max 75 % investerat.
-- Upplåsning tidig: +20 %, 15 dagar, DD < 8 %, 7/10 gröna. Normal: 30 dagar, +10 %, DD < 12 %, Sharpe > 1.
-- Procenten är MARKNADSVINST över alla insättningar (startkapital + `capitalChange.manualTopUp`). Insättningar låser aldrig upp.
-- `levels` i state.json: Level 2 låses upp vid +20 % marknadsvinst, Level 3 vid 500 000 kr där resten är marknadsvinst. Beloppen räknas från insättningarna, sparas aldrig fast.
-  ETH/guld-villkoren ovan gäller först efter upplåsning (släckta innan).
+- Level 2 (ETH 20 %) låses upp av EN av vägarna i `rules.unlock`: tidig (15 dagar, +20 %, DD < 8 %, 7/10 gröna) eller normal (30 dagar, +10 %, DD < 12 %).
+  Efter upplåsning köps ETH när BTC LONG + ETH/BTC över 30d MA + högst `rules.ethMaxRed` (4) röda lampor.
+- Level 3 (guld 20 %, PAXG/XAUT) låses upp vid +50 % marknadsvinst och DD < 12 % (`levels.3`). Guld är skyddet: köps när oron är hög
+  (VIX över 20 eller S&P under 50d-snitt) och får köpas även när Walter vilar (`rules.gold`).
+- Max 75 % investerat = summan av alla tak. På Level 1 är taket i praktiken 35 %.
+- Procenten är MARKNADSVINST över alla insättningar (startkapital + `capitalChange.manualTopUp`). Insättningar låser aldrig upp. Belopp räknas från procenten, sparas aldrig fast.
+- Sharpe används inte förrän det finns 30 dagar riktig handel (steg 8).
+- `portfolio.history`: insättningar får `"flow": belopp`, paper-testet före start får `"test": true`. Avkastning räknas utan flows.
 
 ## W-Cipher (`cipher.html`)
 - Egen sida: `js/wcipher.js` (ren matte, inga DOM-anrop) + `js/cipher-app.js` (börser, graf, text) + `css/cipher.css` (nya designen).
