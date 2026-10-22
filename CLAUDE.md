@@ -25,15 +25,19 @@ Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redig
 ## Data (bara gratis)
 yfinance (^IXIC ^GSPC ^DJI ^VIX), FRED DGS10, BGeometrics (MVRV-Z, SOPR), bykaranteli (ETF-flöden), CoinGecko. Inga dyra API:er.
 
-## Design
-- Apple liquid glass: bakgrund `#080A12`, blobs `#5741F8` / `#00FFD1` / `#8B5CF6`, glas `backdrop-blur-xl bg-white/[0.06]`.
+## Design (ny riktning okt 2026 – se docs/ROADMAP.md)
+- Walter från Alien: Covenant: clean, städad, metodisk, alltid exakt info. Ljust tema som standard + knapp för mörkt.
+- Dimmig blågrå/teal ton, frostade glaspaneler, Jost med luftig spärrning (W A L T E R), siffror i JetBrains Mono, teal som Walters accent.
+- Färg sparsamt: röd/grön bara i lampor och läge, blurple för Avvaktar.
+- Lugn rörelse: ljussvep, andande ljusring, lampor med sken. Respektera prefers-reduced-motion.
+- Lägen för användaren: Vilar / Avvaktar / Köper lite / Köper (aldrig "all in", max 75 % investerat).
+- Fasta höjder där innehåll byts, så att inget hoppar.
 - INTE Kraken Pro order book.
-- Mobil: kompakt 48px ticker, portfolio direkt under.
 - Notiser skrivs till en vanlig människa, inte en siffervägg. Siffror får ligga bakom "Siffrorna".
 
-## LOGOS – permanent regel
-Fasta filer i `assets/logo/` (symbol, wordmark, full). Byt aldrig ut, generera aldrig nya.
-Wordmark solid vit. Ingen regnbågs-gradient, ingen CSS-regnbåge på WALTER.
+## LOGOS
+Det är OK att ta fram och byta logos (ändrat okt 2026). Filer i `assets/logo/` (symbol, wordmark, full).
+Spåren just nu: hexagon-W och kretskorts-W, i samma rena designspråk. Ingen regnbågs-gradient.
 
 ## Journal = sanning
 Journalposter i `state.js` är facit. Hitta inte på marknadsdata; okänt värde = `null` ("väntar på data").
