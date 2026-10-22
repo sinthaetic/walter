@@ -48,7 +48,7 @@ def prices_sek(m):
     fx = (m.get("usdsek") or {}).get("value")
     btc = (m.get("btc") or {}).get("value")
     eth_btc = (m.get("ethBtc") or {}).get("value")
-    gold = (m.get("gold") or {}).get("value")  # PAXG i USD – hämtas inte än
+    gold = (m.get("gold") or {}).get("value")  # PAXG i USD (CoinGecko pax-gold)
     return {
         "BTC": btc * fx if btc and fx else None,
         "ETH": eth_btc * btc * fx if eth_btc and btc and fx else None,

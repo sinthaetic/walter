@@ -20,12 +20,14 @@ from pathlib import Path
 import requests
 
 import walter_paper as wp
+import walter_public as wpub
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE = ROOT / "data" / "state.json"
 CACHE = ROOT / "data" / "cache.json"
 OWNER_CACHE = ROOT / "data" / "owner-cache.json"  # ägarens dagsvärden och notis, aldrig i repot
 OUT = ROOT / "data" / "state.js"
+MARKET_OUT = ROOT / "data" / "market.js"  # publik marknadsfil (lampor, priser, regler, logg)
 ENV = Path(__file__).resolve().parent / ".env"
 
 HTTP = requests.Session()
@@ -141,6 +143,7 @@ def fetch_coingecko():
     chart = get_json("https://api.coingecko.com/api/v3/coins/ethereum/market_chart",
                      params={"vs_currency": "btc", "days": 30, "interval": "daily"})
     prices = [p for _, p in chart["prices"]]
+    gold = get_json("https://api.coingecko.com/api/v3/simple/price", params={"ids": "pax-gold", "vs_currencies": "usd"})
     ma30 = sum(prices) / len(prices)
     hist = get_json("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
                     params={"vs_currency": "usd", "days": 220, "interval": "daily"})
@@ -153,6 +156,7 @@ def fetch_coingecko():
         "btc": {"value": round(btc["bitcoin"]["usd"]), "unit": "usd", "asOf": date.today().isoformat(),
                 "changePct24h": round(btc["bitcoin"]["usd_24h_change"], 2) if btc["bitcoin"].get("usd_24h_change") is not None else None,
                 "ma200": round(ma200), "belowMa200": bp[-1] < ma200, "change7dPct": round(week, 1)},
+        "gold": {"value": round(gold["pax-gold"]["usd"], 2), "asOf": date.today().isoformat()},
         "ethBtc": {"value": round(prices[-1], 5), "ma30": round(ma30, 5)},
         "ethBtcAbove30dMa": prices[-1] > ma30,
     }
@@ -443,6 +447,11 @@ def main():
 
     state = build(state, cache, ok > 0, owner)
     write_js(state)
+    snap = wpub.snapshot(state)
+    if ok:
+        cache["marketLog"] = wpub.append_log(cache.get("marketLog", []), snap)
+        save_caches(cache, owner)
+    wpub.write_market_js(snap, cache.get("marketLog", []), MARKET_OUT)
     if ok:  # dagens portföljvärde, för Sharpe (avkastning dag för dag)
         owner.setdefault("daily", {})[date.today().isoformat()] = state["portfolio"]["value"]
         save_caches(cache, owner)
@@ -455,7 +464,7 @@ def main():
         print("Dubbelklicka paper.bat för att godkänna.")
     if not args.offline:
         print(f"{ok}/{len(SOURCES)} källor svarade.")
-    print(f"Skrev {OUT}")
+    print(f"Skrev {OUT} och {MARKET_OUT}")
 
 
 if __name__ == "__main__":

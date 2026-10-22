@@ -1,13 +1,13 @@
 {
   "market": {
     "nasdaq": {
-      "changePct": -2.64,
+      "changePct": -2.6,
       "asOf": "2026-10-22"
     },
     "spx": {
-      "value": 7650.2,
-      "changePct": -1.38,
-      "ma50": 7702.88,
+      "value": 7663.43,
+      "changePct": -1.21,
+      "ma50": 7703.15,
       "belowMa": true,
       "asOf": "2026-10-22"
     },
@@ -16,35 +16,35 @@
       "asOf": "2026-10-21"
     },
     "vix": {
-      "value": 19.21,
-      "changePct": 15.2,
+      "value": 19.03,
+      "changePct": 14.1,
       "asOf": "2026-10-22"
     },
     "dxy": {
-      "value": 101.58,
-      "ma50": 100.503,
+      "value": 101.633,
+      "ma50": 100.504,
       "aboveMa": true,
       "asOf": "2026-10-22"
     },
     "us10y": {
       "value": 4.95,
-      "changeBp": -20,
+      "changeBp": -19,
       "monthAgo": 4.97,
-      "change1mPp": -0.02,
+      "change1mPp": -0.01,
       "asOf": "2026-10-22",
       "source": "Yahoo ^TNX"
     },
     "btc": {
-      "value": 81049,
+      "value": 81162,
       "unit": "usd",
       "asOf": "2026-10-22",
-      "changePct24h": -4.27,
-      "ma200": 72790,
+      "changePct24h": -4.12,
+      "ma200": 72791,
       "belowMa200": false,
-      "change7dPct": -1.4
+      "change7dPct": -1.2
     },
     "ethBtc": {
-      "value": 0.02828,
+      "value": 0.02833,
       "ma30": 0.03077
     },
     "ethBtcAbove30dMa": false,
@@ -73,9 +73,13 @@
       "value": 11.112,
       "asOf": "2026-10-22",
       "source": "Riksbanken"
+    },
+    "gold": {
+      "value": 4031.84,
+      "asOf": "2026-10-22"
     }
   },
-  "fetchedAt": "2026-10-22T20:11:58",
+  "fetchedAt": "2026-10-22T23:04:52",
   "sources": {
     "Börsindex (yfinance)": "ok",
     "VIX (yfinance)": "ok",
@@ -85,5 +89,20 @@
     "USDSEK + EURSEK (Riksbanken)": "ok",
     "MVRV-Z (Coin Metrics) + SOPR (BGeometrics)": "ok",
     "ETF-flöden (ByKaranteli)": "ok"
-  }
+  },
+  "marketLog": [
+    {
+      "date": "2026-10-22",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 804883.554,
+        "ETH": 22802.351084820002,
+        "GOLD": 39983.75728
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 19.03,
+      "spxBelowMa": true
+    }
+  ]
 }
