@@ -43,6 +43,49 @@ class VaultTest(unittest.TestCase):
             v.unlock_state("k", s, e)
             self.assertEqual(json.loads(s.read_text(encoding="utf-8")), {"a": "å"})
 
+    def test_tampered_ct_raises(self):
+        e = v.encrypt({"a": 1}, "k", iter=1000)
+        raw = bytearray(base64.b64decode(e["ct"]))
+        raw[0] ^= 1
+        e["ct"] = base64.b64encode(bytes(raw)).decode()
+        with self.assertRaises(v.VaultError):
+            v.decrypt(e, "k")
+
+    def test_broken_envelope_raises(self):
+        e = v.encrypt({"a": 1}, "k", iter=1000)
+        e2 = dict(e)
+        del e2["iv"]
+        with self.assertRaises(v.VaultError):
+            v.decrypt(e2, "k")
+        e["ct"] = e["ct"][:8]
+        with self.assertRaises(v.VaultError):
+            v.decrypt(e, "k")
+
+    def test_unlock_refuses_newer_state(self):
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as t:
+            s, e = Path(t) / "state.json", Path(t) / "state.enc"
+            s.write_text('{"a": 1}', encoding="utf-8")
+            v.lock_state("k", s, e, iter=1000)
+            s.write_text('{"a": 2}', encoding="utf-8")
+            os.utime(e, (1, 1))
+            with self.assertRaises(SystemExit) as cm:
+                v.unlock_state("k", s, e)
+            self.assertIn("las", str(cm.exception))
+            self.assertEqual(s.read_text(encoding="utf-8"), '{"a": 2}')
+
+    def test_missing_files_exit_clearly(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as t:
+            s, e = Path(t) / "state.json", Path(t) / "state.enc"
+            with self.assertRaises(SystemExit) as cm:
+                v.unlock_state("k", s, e)
+            self.assertIn("Hittar inte state.enc", str(cm.exception))
+            with self.assertRaises(SystemExit) as cm:
+                v.lock_state("k", s, e)
+            self.assertIn("Hittar inte state.json", str(cm.exception))
+            self.assertFalse(e.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

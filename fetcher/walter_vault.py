@@ -70,22 +70,39 @@ def _need_key(code):
     return code
 
 
+def _write_atomic(path, text):
+    """Skriv till tempfil i samma katalog och byt sedan, så en avbruten skrivning aldrig lämnar halv fil."""
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def lock_state(code=None, src=STATE, dst=ENC, iter=ITER):
     code = _need_key(code)
-    env = encrypt(json.loads(Path(src).read_text(encoding="utf-8")), code, iter)
-    Path(dst).write_text(json.dumps(env), encoding="utf-8")
+    src = Path(src)
+    if not src.exists():
+        sys.exit(f"Hittar inte {src.name} – inget att låsa.")
+    try:
+        obj = json.loads(src.read_text(encoding="utf-8"))
+    except ValueError:
+        sys.exit(f"{src.name} är trasig (ogiltig JSON) – rätta den först.")
+    _write_atomic(dst, json.dumps(encrypt(obj, code, iter)))
 
 
 def unlock_state(code=None, dst=STATE, src=ENC):
     code = _need_key(code)
     dst, src = Path(dst), Path(src)
+    if not src.exists():
+        sys.exit(f"Hittar inte {src.name} – kör 'las' först.")
     if dst.exists() and dst.stat().st_mtime > src.stat().st_mtime:
-        sys.exit("state.json är nyare än state.enc – vägrar skriva över. Kör 'las' först eller ta bort state.json.")
+        sys.exit(f"{dst.name} är nyare än {src.name} – vägrar skriva över. "
+                 "Kör 'las' först om du vill spara dina ändringar.")
     try:
         obj = decrypt(json.loads(src.read_text(encoding="utf-8")), code)
-    except VaultError as e:
-        sys.exit(str(e))
-    dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+    except (VaultError, ValueError) as e:
+        sys.exit(str(e) if isinstance(e, VaultError) else "Fel kod eller trasig fil")
+    _write_atomic(dst, json.dumps(obj, ensure_ascii=False, indent=2))
 
 
 def main(argv):
