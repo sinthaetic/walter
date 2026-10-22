@@ -154,16 +154,48 @@ def fetch_coingecko():
     }
 
 
+def mvrv_z_coinmetrics():
+    """MVRV-Z räknad själv från Coin Metrics Community (gratis, ingen nyckel, hela historiken sedan 2010):
+    Z = (marknadsvärde − realiserat värde) / standardavvikelsen för marknadsvärdet över all historik t.o.m. dagen.
+    Realiserat värde = marknadsvärde / MVRV. Stämmer med BGeometrics inom ±0,1 (kontrollerat okt 2026)."""
+    url = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
+    params = {"assets": "btc", "metrics": "CapMrktCurUSD,CapMVRVCur", "frequency": "1d",
+              "start_time": "2010-07-01", "page_size": 10000}
+    rows = []
+    while url:
+        data = get_json(url, params=params, timeout=60)
+        rows += data.get("data", [])
+        url, params = data.get("next_page_url"), None
+    n = s = s2 = 0
+    z = None
+    for row in rows:
+        if not row.get("CapMVRVCur") or not row.get("CapMrktCurUSD"):
+            continue
+        mc, mvrv = float(row["CapMrktCurUSD"]), float(row["CapMVRVCur"])
+        n += 1; s += mc; s2 += mc * mc
+        sd = max(s2 / n - (s / n) ** 2, 0) ** 0.5
+        if sd > 0:
+            z, as_of = (mc - mc / mvrv) / sd, row["time"][:10]
+    if z is None or n < 3000:
+        raise ValueError(f"för lite historik från Coin Metrics ({n} dagar)")
+    return {"value": round(z, 2), "asOf": as_of, "source": "Coin Metrics (egen uträkning)"}
+
+
 def fetch_bgeometrics():
-    # Gratisnivån ligger ungefär en vecka efter – asOf visar vilken dag värdet gäller.
-    z = get_json("https://bitcoin-data.com/v1/mvrv-zscore/last")
+    # MVRV-Z: Coin Metrics i första hand (en dag efter), BGeometrics som reserv (ungefär en vecka efter).
+    try:
+        z = mvrv_z_coinmetrics()
+    except Exception as e:
+        print(f"    Coin Metrics svarade inte ({type(e).__name__}), tar MVRV-Z från BGeometrics")
+        b = get_json("https://bitcoin-data.com/v1/mvrv-zscore/last")
+        z = {"value": round(float(b["mvrvZscore"]), 2), "asOf": b["d"], "source": "BGeometrics"}
     start = date.fromordinal(date.today().toordinal() - 25).isoformat()
     s = [x for x in get_json("https://bitcoin-data.com/v1/sopr", params={"startday": start}) if x.get("sopr") is not None]
     if len(s) < 7:
         raise ValueError(f"för lite SOPR-data ({len(s)} dagar)")
     last7 = [float(x["sopr"]) for x in s[-7:]]
     return {
-        "mvrvZ": {"value": round(float(z["mvrvZscore"]), 2), "asOf": z["d"]},
+        "mvrvZ": z,
         "sopr": {"value": round(last7[-1], 4), "avg7": round(sum(last7) / 7, 4), "asOf": s[-1]["d"]},
     }
 
@@ -242,7 +274,7 @@ SOURCES = [
     ("10-årig ränta (FRED / Yahoo ^TNX)", fetch_us10y),
     ("BTC + ETH/BTC (CoinGecko)", fetch_coingecko),
     ("USDSEK + EURSEK (Riksbanken)", fetch_fx),
-    ("MVRV-Z + SOPR (BGeometrics)", fetch_bgeometrics),
+    ("MVRV-Z (Coin Metrics) + SOPR (BGeometrics)", fetch_bgeometrics),
     ("ETF-flöden (ByKaranteli)", fetch_etf),
 ]
 

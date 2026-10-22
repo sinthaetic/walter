@@ -42,7 +42,11 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - Fel rättade: en upplåsningsregel för Level 2 (tidig ELLER normal väg), Sharpe borttaget tills det finns data, ETH-villkoret "SOPR < 1" bytt mot "högst 4 röda lampor", insättningar märkta med `flow`, paper-testet märkt `test`, gammal data blir "väntar".
 - Lamporna mäter trend och nivå i stället för enstaka dagar (se CLAUDE.md). Nasdaq och Dow borta, BTC-trend och BTC-vecka in.
 - Level 3: +50 % marknadsvinst i stället för 500 000 kr. Guld = skydd vid oro, får köpas även när Walter vilar.
-- MVRV-Z-gränsen: 3,0 (beslut 22 okt). På 4 års data (okt 2022–okt 2026) var toppen 3,35 i dec 2024; 3,0 gav rött bara på topparna mars 2024 och nov 2024–jan 2025 (32 dagar). Gamla 7 nåddes aldrig.
+- MVRV-Z-gränsen: 3,0, testad på 13 års historik (Coin Metrics, egen uträkning, stämmer med BGeometrics inom ±0,1).
+  Topparna krymper: 10,7 (2013), 10,1 (2017), 7,2 (2021), 3,4 (2024). Gamla 7 hade missat senaste cykeln helt.
+  3,0 blev röd i varje uppgångscykel och aldrig i en björnmarknad. Den blir röd tidigt (månader före pristoppen), och de två senaste pristopparna kom EFTER MVRV-Z-toppen.
+  Därför är MVRV-Z en värmemätare, inte en topp-signal – rätt som en av tio lampor, fel som ensam säljsignal.
+  Testade även anpassade gränser (percentil av senaste 2–4 åren): ingen var bättre, flera missade 2024–25.
 
 ## Öppna frågor
 - Vilka lampnivåer ger Avvaktar, Köper lite och Köper? Beslutas i steg 8.

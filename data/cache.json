@@ -1,13 +1,13 @@
 {
   "market": {
     "nasdaq": {
-      "changePct": -2.6,
+      "changePct": -2.64,
       "asOf": "2026-10-22"
     },
     "spx": {
-      "value": 7651.58,
-      "changePct": -1.36,
-      "ma50": 7702.91,
+      "value": 7650.2,
+      "changePct": -1.38,
+      "ma50": 7702.88,
       "belowMa": true,
       "asOf": "2026-10-22"
     },
@@ -16,41 +16,42 @@
       "asOf": "2026-10-21"
     },
     "vix": {
-      "value": 18.9,
-      "changePct": 13.3,
+      "value": 19.21,
+      "changePct": 15.2,
       "asOf": "2026-10-22"
     },
     "dxy": {
-      "value": 101.615,
-      "ma50": 100.504,
+      "value": 101.58,
+      "ma50": 100.503,
       "aboveMa": true,
       "asOf": "2026-10-22"
     },
     "us10y": {
-      "value": 4.96,
-      "changeBp": -18,
+      "value": 4.95,
+      "changeBp": -20,
       "monthAgo": 4.97,
-      "change1mPp": -0.0,
+      "change1mPp": -0.02,
       "asOf": "2026-10-22",
       "source": "Yahoo ^TNX"
     },
     "btc": {
-      "value": 81170,
+      "value": 81049,
       "unit": "usd",
       "asOf": "2026-10-22",
-      "changePct24h": -4.11,
-      "ma200": 72791,
+      "changePct24h": -4.27,
+      "ma200": 72790,
       "belowMa200": false,
-      "change7dPct": -1.2
+      "change7dPct": -1.4
     },
     "ethBtc": {
-      "value": 0.0283,
+      "value": 0.02828,
       "ma30": 0.03077
     },
     "ethBtcAbove30dMa": false,
     "mvrvZ": {
-      "value": 0.94,
-      "asOf": "2026-10-15"
+      "value": 0.98,
+      "asOf": "2026-10-21",
+      "source": "Coin Metrics (egen uträkning)"
     },
     "sopr": {
       "value": 0.9992,
@@ -74,7 +75,7 @@
       "source": "Riksbanken"
     }
   },
-  "fetchedAt": "2026-10-22T20:00:21",
+  "fetchedAt": "2026-10-22T20:11:58",
   "sources": {
     "Börsindex (yfinance)": "ok",
     "VIX (yfinance)": "ok",
@@ -82,7 +83,7 @@
     "10-årig ränta (FRED / Yahoo ^TNX)": "ok",
     "BTC + ETH/BTC (CoinGecko)": "ok",
     "USDSEK + EURSEK (Riksbanken)": "ok",
-    "MVRV-Z + SOPR (BGeometrics)": "ok",
+    "MVRV-Z (Coin Metrics) + SOPR (BGeometrics)": "ok",
     "ETF-flöden (ByKaranteli)": "ok"
   }
 }
