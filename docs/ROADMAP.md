@@ -20,7 +20,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | 4 | Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser | Sonnet |
 | 5 | W-Cipher: läs in VuManChu A/B, bestäm Walters parametrar, designa grafvyn | Opus |
 | 6 | K4-underlag i ny design | Sonnet |
-| 7 | Bygg in designen i riktiga koden (index.html, css, js) | Opus för plan, Sonnet för utförande |
+| 7 | Bygg in designen i riktiga koden (index.html, css, js), inkl. nya logon från assets/logo/vald | Opus för plan, Sonnet för utförande |
 | 8 | Logikluckor: trade-motor för paper, buffert 7/6, Sharpe, Level 3 i procent | Opus |
 
 ## Öppna frågor
