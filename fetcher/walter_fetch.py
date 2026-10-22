@@ -355,7 +355,9 @@ def load_caches():
 
 def save_caches(cache, owner):
     CACHE.write_text(json.dumps(strip_private_cache(cache), indent=2, ensure_ascii=False), encoding="utf-8")
-    OWNER_CACHE.write_text(json.dumps(owner, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp = OWNER_CACHE.with_name(OWNER_CACHE.name + ".tmp")  # atomiskt: aldrig en halv fil
+    tmp.write_text(json.dumps(owner, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, OWNER_CACHE)
 
 
 def build(state, cache, fetched_any, owner_cache=None):

@@ -219,12 +219,18 @@ def apply(raw, prop, today):
     return entry
 
 
+def rebuild(wf):
+    """Bygg state från state.json + marknadscache + ägarens cache (daily, notis)."""
+    cache, owner = wf.load_caches()
+    return wf.build(wf.read_json(wf.BASE, None), cache, False, owner)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import walter_fetch as wf
 
-    built = wf.build(wf.read_json(wf.BASE, None), wf.read_json(wf.CACHE, {}), False)
+    built = rebuild(wf)
     prop = propose(built)
     print("\nWALTER FÖRESLÅR\n" + prop["plain"])
     if not prop.get("ready") or not prop["needsApproval"]:
@@ -238,7 +244,7 @@ def main():
     raw = wf.read_json(wf.BASE, None)
     entry = apply(raw, prop, date.today().isoformat())
     wf.BASE.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    wf.write_js(wf.build(wf.read_json(wf.BASE, None), wf.read_json(wf.CACHE, {}), False))
+    wf.write_js(rebuild(wf))
     print(f"\nKlart. Journalpost {entry['date']}: {entry['plain']}\nSkrev data/state.json och data/state.js.")
 
 

@@ -12,7 +12,6 @@ reports/
 # Genereras
 data/state.js
 deploy/
-reports/
 __pycache__/
 .venv/
 graphify-out/

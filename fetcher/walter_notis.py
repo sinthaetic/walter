@@ -80,6 +80,8 @@ def main():
 
     when = datetime.now(TZ).strftime("%H:%M") if forced in LABEL else \
         next(f"{h:02d}:{mi:02d}" for (h, mi), v in SLOTS.items() if v == slot)
+    if not BASE.exists():
+        sys.exit("Hittar inte data/state.json – kör 'python fetcher/walter_vault.py las-upp' först.")
     cache, owner = load_caches()
     state = build(json.loads(BASE.read_text(encoding="utf-8")), json.loads(json.dumps(cache)), True, owner)
     text = text_for(state, slot, when)
