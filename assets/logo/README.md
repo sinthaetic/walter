@@ -13,3 +13,16 @@ Logofilerna ligger här:
 - Wordmark i en färg: grafit på ljust, vit på mörkt. Ingen regnbågs-gradient eller gradient-text.
 
 Är filerna PNG i stället för SVG: ändra bara `src` i `index.html`.
+
+## Skisser (steg 2, okt 2026)
+`skisser/` har fyra utkast, 64×64, grafit + teal. De används inte av sidan än.
+
+| Fil | Spår |
+|---|---|
+| `skisser/hexagon-w-a.svg` | Linjehexagon runt W |
+| `skisser/hexagon-w-b.svg` | Fylld hexagon, W utskuret |
+| `skisser/kretskort-w-a.svg` | W med lödpunkter och ledningar |
+| `skisser/kretskort-w-b.svg` | W i 45°-ledningar |
+
+Teal-punkten är Walters "lampa" och finns i alla fyra. Se ritytan "Logoskisser" i designskissen (länk i docs/ROADMAP.md).
+När en variant är vald: gör om den till walter-symbol/-full/-wordmark.svg (steg 7).
