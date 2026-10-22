@@ -10,3 +10,6 @@ reports/
 __pycache__/
 .venv/
 graphify-out/
+
+# Skisser från brainstorm
+.superpowers/
