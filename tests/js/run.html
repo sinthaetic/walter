@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<title>Walter JS-tester</title>
+</head>
+<body>
+<pre id="result">Kör…</pre>
+<script>
+// Minimal testlöpare. Testfiler anropar test(namn, fn) och eq(a, b); fn får vara async.
+const _tests = [];
+function test(name, fn) { _tests.push({ name, fn }); }
+function eq(a, b) {
+  if (JSON.stringify(a) !== JSON.stringify(b)) {
+    throw new Error("väntade " + JSON.stringify(b) + ", fick " + JSON.stringify(a));
+  }
+}
+async function rejects(promise, msg) {
+  try { await promise; } catch (e) {
+    if (msg !== undefined && e.message !== msg) throw new Error("fel meddelande: " + e.message);
+    return;
+  }
+  throw new Error("avvisades inte");
+}
+window.addEventListener("load", async () => {
+  const fails = [];
+  for (const t of _tests) {
+    try { await t.fn(); } catch (e) { fails.push("FAIL " + t.name + ": " + e.message); }
+  }
+  document.getElementById("result").textContent =
+    fails.length ? fails.join("\n") : "PASS " + _tests.length;
+});
+window.addEventListener("error", (e) => {
+  _tests.push({ name: "laddning " + (e.filename || "").split("/").pop(), fn() { throw new Error(e.message); } });
+});
+</script>
+<!-- Skript under test -->
+<script src="../../js/vault.js"></script>
+<!-- Testfiler: lägg till en rad per fil -->
+<script src="vault.test.js"></script>
+</body>
+</html>
