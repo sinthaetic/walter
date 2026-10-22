@@ -22,6 +22,12 @@ Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redig
 - `levels` i state.json: Level 2 låses upp vid +20 % marknadsvinst, Level 3 vid 500 000 kr där resten är marknadsvinst. Beloppen räknas från insättningarna, sparas aldrig fast.
   ETH/guld-villkoren ovan gäller först efter upplåsning (släckta innan).
 
+## W-Cipher (`cipher.html`)
+- Egen sida: `js/wcipher.js` (ren matte, inga DOM-anrop) + `js/cipher-app.js` (börser, graf, text) + `css/cipher.css` (nya designen).
+- Hämtar ljus direkt i webbläsaren från Binance/Coinbase/Kraken/Bybit/OKX, ritar med Lightweight Charts 5.0.0 (unpkg, med integrity-hash).
+- Samma parametrar finns i `tradingview/*.pine`. Ändras en parameter ska båda ändras.
+- W-Cipher ändrar ALDRIG Walters läge. Egen kod från öppna formler – kopiera inte VuManChu-kod.
+
 ## Data (bara gratis)
 yfinance (^IXIC ^GSPC ^DJI ^VIX), FRED DGS10, BGeometrics (MVRV-Z, SOPR), bykaranteli (ETF-flöden), CoinGecko. Inga dyra API:er.
 

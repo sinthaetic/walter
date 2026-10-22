@@ -18,9 +18,9 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | 2 | ✓ Logoskisser: hexagon-W och kretskorts-W, vald: "Inskriven" (klar 22 okt) | Opus |
 | 3 | ✓ Inställningar: valfri summa, sparmål, tidslinje. Tradelogg och rapporthistorik i skissen (klar 22 okt) | Sonnet |
 | 4 | ✓ Pro-läge: varje lampas värde, gräns, källa, tid, dagens priser (klar 22 okt) | Sonnet |
-| 5 | ✓ W-Cipher: VuManChu A/B inläst, parametrar föreslagna, grafvyn i skissen (klar 22 okt, parametrar väntar på ditt ja) | Opus |
+| 5 | ✓ W-Cipher: parametrar föreslagna, skiss klar, och en fungerande sida `cipher.html` med livedata från 5 börser + Pine Script för TradingView (klar 22 okt, parametrar väntar på ditt ja) | Opus |
 | 6 | ✓ K4-underlag i ny design (klar 22 okt) | Sonnet |
-| 7 | Bygg in designen i riktiga koden (index.html, css, js), inkl. nya logon från assets/logo/vald | Opus för plan, Sonnet för utförande |
+| 7 | Bygg in designen i riktiga koden (index.html, css, js), inkl. nya logon från assets/logo/vald. Länka W-CIPHER i menyn | Opus för plan, Sonnet för utförande |
 | 8 | Logikluckor: trade-motor för paper, buffert 7/6, Sharpe, Level 3 i procent | Opus |
 
 ## W-Cipher (steg 5, förslag)
@@ -30,7 +30,11 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - Pengaflöde (MFI-yta): 60 perioder, ×150, samma som VuManChu.
 - Trendband: EMA 5, 11, 15, 18, 21, 24, 28, 34 (VuManChu Cipher A, kontrolleras mot originalet i steg 7).
 - Bara vanliga divergenser, inga dolda. Stoch RSI av i V1.
-- Standard-tidsram: DAG (4 tim och vecka valbara).
+- Standard-tidsram: DAG (15 min, 1 tim, 4 tim och vecka valbara).
+- Två visningar: WALTER (lugn, bara starka signaler, text i vanliga ord) och CIPHER (som Market Cipher/VuManChu: köp/sälj/guld-prickar, grönt/rött pengaflöde, VWAP, Stoch RSI, divergenslinjer, KÖP/SÄLJ/BLOD i prisgrafen). Röd/grön i Cipher-läget är ett medvetet undantag från färgregeln.
+- Raden "Walter säger / Cipher säger" visar båda, så man kan köra hybrid på egen hand.
+- Livedata: Binance, Coinbase, Kraken, Bybit, OKX (öppna flöden, ingen nyckel), uppdateras var 15:e sekund. Aktier/index finns inte än (de saknar öppna flöden som funkar i webbläsaren).
+- TradingView: `tradingview/w-cipher.pine` (B) och `w-cipher-a.pine` (A). Inte testade inne i TradingView än.
 - W-Cipher ändrar aldrig läget. Den är Walters andra åsikt i text, inte en lampa.
 - Licens: originalet är märkt "© vumanchu" och bygger på LazyBears WaveTrend. Vi kopierar ingen kod, vi skriver egen kod från de öppna formlerna.
 
@@ -38,4 +42,4 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - Level 3 är i dag 500 000 kr fast belopp. Med valfri summa bör den bli procent. Beslutas i steg 8.
 - Vilka lampnivåer ger Avvaktar, Köper lite och Köper? Beslutas i steg 8.
 - Ska W-Cipher någonsin bli en lampa? Nu: nej.
-- Realtidsdata till W-Cipher: gratis källa (t.ex. Binance/Coinbase publika flöden) + TradingView Lightweight Charts.
+- W-Cipher för aktier/index (Nasdaq, S&P): kräver att hämtaren skriver ljus till en fil. Senare.
