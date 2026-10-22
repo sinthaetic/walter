@@ -6,7 +6,7 @@
 
 GitHub-cron går i UTC, så Actionen startar både sommar- och vintertidens UTC-tid.
 Skriptet räknar fram vilken svensk tid schemat gällde och skickar bara när den är
-08:13 eller 22:05 – den andra körningen hoppar över. Notisen sparas i cache.json
+08:13 eller 22:05 – den andra körningen hoppar över. Notisen sparas i owner-cache.json
 (visas överst på sidan) och skickas till Telegram om TELEGRAM_TOKEN och
 TELEGRAM_CHAT_ID finns.
 """
@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from walter_fetch import BASE, CACHE, HTTP, build, num, pct, read_json  # noqa: E402
+from walter_fetch import BASE, HTTP, build, load_caches, num, pct, save_caches  # noqa: E402
 
 TZ = ZoneInfo("Europe/Stockholm")
 SLOTS = {(8, 13): "morgon", (22, 5): "kvall"}
@@ -80,15 +80,15 @@ def main():
 
     when = datetime.now(TZ).strftime("%H:%M") if forced in LABEL else \
         next(f"{h:02d}:{mi:02d}" for (h, mi), v in SLOTS.items() if v == slot)
-    cache = read_json(CACHE, {})
-    state = build(read_json(BASE, None), json.loads(json.dumps(cache)), True)
+    cache, owner = load_caches()
+    state = build(json.loads(BASE.read_text(encoding="utf-8")), json.loads(json.dumps(cache)), True, owner)
     text = text_for(state, slot, when)
     print(text)
     if dry:
         return
 
-    cache["notis"] = {"slot": slot, "text": text, "at": datetime.now(TZ).isoformat(timespec="seconds")}
-    CACHE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+    owner["notis"] = {"slot": slot, "text": text, "at": datetime.now(TZ).isoformat(timespec="seconds")}
+    save_caches(cache, owner)
     telegram(text)
 
 

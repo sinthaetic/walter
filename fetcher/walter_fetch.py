@@ -24,6 +24,7 @@ import walter_paper as wp
 ROOT = Path(__file__).resolve().parent.parent
 BASE = ROOT / "data" / "state.json"
 CACHE = ROOT / "data" / "cache.json"
+OWNER_CACHE = ROOT / "data" / "owner-cache.json"  # ägarens dagsvärden och notis, aldrig i repot
 OUT = ROOT / "data" / "state.js"
 ENV = Path(__file__).resolve().parent / ".env"
 
@@ -334,7 +335,31 @@ def read_json(path, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
 
-def build(state, cache, fetched_any):
+PRIVATE_CACHE_KEYS = ("daily", "notis")
+
+
+def strip_private_cache(cache):
+    """Marknadscachen som får ligga öppet: utan ägarens dagsvärden och notis."""
+    return {k: v for k, v in cache.items() if k not in PRIVATE_CACHE_KEYS}
+
+
+def load_caches():
+    """(cache, owner_cache). Ligger daily/notis kvar i en gammal cache flyttas de till owner_cache."""
+    cache, owner = read_json(CACHE, {}), read_json(OWNER_CACHE, {})
+    for k in PRIVATE_CACHE_KEYS:
+        if k in cache:
+            old = cache[k]
+            owner[k] = {**old, **owner.get(k, {})} if k == "daily" else owner.get(k) or old
+    return strip_private_cache(cache), owner
+
+
+def save_caches(cache, owner):
+    CACHE.write_text(json.dumps(strip_private_cache(cache), indent=2, ensure_ascii=False), encoding="utf-8")
+    OWNER_CACHE.write_text(json.dumps(owner, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def build(state, cache, fetched_any, owner_cache=None):
+    owner_cache = owner_cache or {}
     m = state["market"]
     m.update(cache.get("market", {}))
 
@@ -362,13 +387,13 @@ def build(state, cache, fetched_any):
     # Trade-motorn: dagens värde, förslag och Sharpe. Handlar aldrig – förslaget godkänns med paper.bat.
     pf = state["portfolio"]
     pf["holdings"], pf["value"] = wp.valuation(pf, wp.prices_sek(m))
-    daily = cache.get("daily", {})
+    daily = owner_cache.get("daily", {})
     pf["peak"] = max([pf["peak"], pf["value"], *daily.values()])
     flows = {h["date"]: h["flow"] for h in pf.get("history", []) if h.get("flow")}
     pf["sharpe"] = wp.sharpe({**daily, today: pf["value"]}, flows, pf.get("firstTrade"))
     state["proposal"] = wp.propose(state)
-    if cache.get("notis"):
-        state["notis"] = cache["notis"]  # morgon/kväll-notisen från walter_notis.py
+    if owner_cache.get("notis"):
+        state["notis"] = owner_cache["notis"]  # morgon/kväll-notisen från walter_notis.py
     return state
 
 
@@ -392,7 +417,7 @@ def main():
     state = read_json(BASE, None)
     if state is None:
         sys.exit(f"Hittar inte {BASE}")
-    cache = read_json(CACHE, {})
+    cache, owner = load_caches()
     ok = 0
 
     if not args.offline:
@@ -412,13 +437,13 @@ def main():
             cache["market"] = {**cache.get("market", {}), **fresh}
             cache["sources"] = status  # vilka källor som svarade vid senaste hämtningen
             cache["fetchedAt"] = datetime.now().isoformat(timespec="seconds")
-            CACHE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+            save_caches(cache, owner)
 
-    state = build(state, cache, ok > 0)
+    state = build(state, cache, ok > 0, owner)
     write_js(state)
     if ok:  # dagens portföljvärde, för Sharpe (avkastning dag för dag)
-        cache.setdefault("daily", {})[date.today().isoformat()] = state["portfolio"]["value"]
-        CACHE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+        owner.setdefault("daily", {})[date.today().isoformat()] = state["portfolio"]["value"]
+        save_caches(cache, owner)
 
     s = state["lampScore"]
     print(f"\n{s['red']}/{s['total']} röda lampor ({'data' if s['source'] == 'data' else 'från journalen'}).")

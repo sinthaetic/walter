@@ -53,6 +53,11 @@ def decrypt(env, code):
         raise VaultError("Fel kod eller trasig fil") from None
 
 
+def merge_daily(a, b):
+    """Union av dagsvärden; vid samma datum vinner b."""
+    return {**a, **b}
+
+
 def new_code():
     return "-".join("".join(secrets.choice(ALPHABET) for _ in range(5)) for _ in range(6))
 

@@ -3,6 +3,12 @@
 fetcher/.env
 data/etf_raw.json
 
+# Ägarens data – bara krypterad (data/state.enc) i repot
+data/state.json
+data/owner-cache.json
+data/paper-journal-*.csv
+reports/
+
 # Genereras
 data/state.js
 deploy/
