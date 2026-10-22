@@ -55,7 +55,7 @@
       "us10yRisePp": 0.25,
       "dxyMaDays": 50,
       "etfDays": 5,
-      "mvrvZ": 7,
+      "mvrvZ": 3,
       "soprAvgDays": 7,
       "sopr": 1
     },
@@ -91,7 +91,7 @@
     { "id": "dxy",      "name": "Dollarindex",     "rule": "Över sitt 50-dagarssnitt",               "status": null, "value": null },
     { "id": "etf",      "name": "Bitcoin-fonder",  "rule": "Pengar ut senaste 5 handelsdagarna",     "status": null, "value": null },
     { "id": "cpi",      "name": "Inflation (KPI)", "rule": "Högre än väntat",                        "status": "red", "value": "3,7 % mot 3,6 %" },
-    { "id": "mvrv",     "name": "MVRV-Z",          "rule": "Överhettad värdering (över 7)",          "status": null, "value": null },
+    { "id": "mvrv",     "name": "MVRV-Z",          "rule": "Överhettad värdering (över 3)",          "status": null, "value": null },
     { "id": "sopr",     "name": "SOPR",            "rule": "Under 1,0 i snitt över 7 dagar",         "status": null, "value": null }
   ],
 

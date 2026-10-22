@@ -14,7 +14,7 @@ Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redig
 
 ## Lamporna (ändrade 22 okt 2026, se docs/ROADMAP.md)
 S&P 500 under 50d-snitt · BTC under 200d-snitt · BTC −10 % på 7 dagar · VIX över 20 · 10Y upp mer än 0,25 %-enheter på en månad ·
-Dollarindex över 50d-snitt · ETF-flöde negativt senaste 5 handelsdagarna · KPI högre än väntat · MVRV-Z över gränsen · SOPR 7d-snitt under 1.
+Dollarindex över 50d-snitt · ETF-flöde negativt senaste 5 handelsdagarna · KPI högre än väntat · MVRV-Z över 3,0 (satt från 4 års historik, se ROADMAP) · SOPR 7d-snitt under 1.
 Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 
 ## Regler (strategi)
@@ -36,7 +36,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - W-Cipher ändrar ALDRIG Walters läge. Egen kod från öppna formler – kopiera inte VuManChu-kod.
 
 ## Data (bara gratis)
-yfinance (^IXIC ^GSPC ^DJI ^VIX), FRED DGS10, BGeometrics (MVRV-Z, SOPR), bykaranteli (ETF-flöden), CoinGecko. Inga dyra API:er.
+yfinance (^IXIC ^GSPC ^VIX DX-Y.NYB), FRED DGS10, BGeometrics (MVRV-Z, SOPR), bykaranteli (ETF-flöden), CoinGecko. Inga dyra API:er.
 
 ## Design (ny riktning okt 2026 – se docs/ROADMAP.md)
 - Walter från Alien: Covenant: clean, städad, metodisk, alltid exakt info. Ljust tema som standard + knapp för mörkt.

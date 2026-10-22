@@ -42,7 +42,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 - Fel rättade: en upplåsningsregel för Level 2 (tidig ELLER normal väg), Sharpe borttaget tills det finns data, ETH-villkoret "SOPR < 1" bytt mot "högst 4 röda lampor", insättningar märkta med `flow`, paper-testet märkt `test`, gammal data blir "väntar".
 - Lamporna mäter trend och nivå i stället för enstaka dagar (se CLAUDE.md). Nasdaq och Dow borta, BTC-trend och BTC-vecka in.
 - Level 3: +50 % marknadsvinst i stället för 500 000 kr. Guld = skydd vid oro, får köpas även när Walter vilar.
-- MVRV-Z-gränsen: väntar på beslut efter att historiken visats (topp 3,35 i dec 2024 på 4 års data).
+- MVRV-Z-gränsen: 3,0 (beslut 22 okt). På 4 års data (okt 2022–okt 2026) var toppen 3,35 i dec 2024; 3,0 gav rött bara på topparna mars 2024 och nov 2024–jan 2025 (32 dagar). Gamla 7 nåddes aldrig.
 
 ## Öppna frågor
 - Vilka lampnivåer ger Avvaktar, Köper lite och Köper? Beslutas i steg 8.
