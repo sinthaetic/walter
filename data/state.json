@@ -16,6 +16,8 @@
     "value": 254600,
     "peak": 254600,
     "holdings": { "BTC": 0, "ETH": 0, "GOLD": 0, "CASH": 254600 },
+    "positions": {},
+    "firstTrade": null,
     "refBtc": 0.30447,
     "sharpe": null,
     "history": [
@@ -37,6 +39,9 @@
 
   "rules": {
     "parkeraAtRed": 7,
+    "wakeAtRed": 5,
+    "modes": { "buyAtRed": 2, "buyLittleAtRed": 4, "littleShare": 0.5 },
+    "paper": { "minTradePct": 2 },
     "maxInvested": 0.75,
     "minCash": 0.25,
     "caps": { "BTC": 0.35, "ETH": 0.20, "GOLD": 0.20 },

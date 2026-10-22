@@ -90,8 +90,8 @@
   const marketGain = pf.value - deposits;
   const marketPct = deposits > 0 ? (marketGain / deposits) * 100 : 0;
 
-  // Journalens läge → ordet användaren ser. Läget ändras bara via journalen.
-  // Vilka lampnivåer som ska ge Avvaktar / Köper lite / Köper beslutas i steg 8 – här översätts bara ordet.
+  // Journalens läge → ordet användaren ser. Läget ändras bara via journalen (paper.bat skriver posten).
+  // Lampnivåerna står i rules.modes / parkeraAtRed / wakeAtRed och räknas i fetcher/walter_paper.py.
   const MODES = {
     PARKERA: { word: "VILAR", acc: "red", quote: "Marknaden är orolig. Pengarna står i kontanter tills datan vänder." },
     AVVAKTAR: { word: "AVVAKTAR", acc: "blurple", quote: "Signalerna pekar åt olika håll. Jag rör ingenting förrän bilden klarnar." },
@@ -152,7 +152,7 @@
       <span><i class="r"></i>${nRed} röda</span>
       <span><i class="g"></i>${nGreen} gröna</span>
       <span><i class="w"></i>${nWait} väntar</span>
-      <span class="note">VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}</span>
+      <span class="note">${parked ? `VAKNAR VID ${S.rules.wakeAtRed}/${total}` : `VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}`}</span>
     </div>`;
 
   // ---------- Portfölj ----------
@@ -218,13 +218,13 @@
   const STATE_WORD = { red: "RISK", green: "LUGN", wait: "VÄNTAR" };
   const confirmed = S.lamps.filter((l) => l.status !== null).length;
   const fromData = S.lampScore.source === "data";
-  // Läget ändras bara via journalen – säg till om datan pekar åt andra hållet
-  const dataWantsPark = red >= S.rules.parkeraAtRed;
+  // Läget ändras bara via journalen – säg till om datan pekar åt ett annat läge (förslaget från trade-motorn)
+  const P = S.proposal || { ready: false, plain: "Kör hämtaren så räknar Walter ett förslag." };
   const lampNote = !fromData
     ? `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
-    : dataWantsPark === parked
+    : !P.ready || P.mode === S.mode
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
-      : `Datan (${day(S.lampScore.asOf)}) säger ${dataWantsPark ? "att Walter borde vila" : "att Walter inte längre behöver vila"}, men journalen säger ${MODE.word}. Läget ändras först när du skriver en journalpost.`;
+      : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}, men journalen säger ${MODE.word}. Läget ändras först när du godkänner förslaget.`;
   $("lamps").innerHTML = `
     <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
     <ul class="lamp-grid">
@@ -235,6 +235,24 @@
     </ul>
     <p class="lamp-note">${esc(lampNote)} <a href="#pro">Värdena bakom lamporna →</a></p>
     ${lampCountOk ? "" : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
+
+  // ---------- Walter föreslår (trade-motorn, fetcher/walter_paper.py) ----------
+  // Förslaget räknas vid varje hämtning men görs aldrig av sig självt: det godkänns med paper.bat.
+  const sh = pf.sharpe || {};
+  const sharpeTxt = sh.value != null ? nf(2).format(sh.value) : `dag ${sh.days || 0}/${sh.need || 30}`;
+  const pTrades = P.trades || [];
+  $("proposal").innerHTML = `
+    <h3>WALTER FÖRESLÅR</h3>
+    <div class="kv">
+      <div><span>LÄGE ENLIGT LAMPORNA</span><strong>${P.ready ? esc(modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
+      <div><span>RÖDA LAMPOR</span><strong>${P.ready ? `${P.red}/${total}` : "–"}</strong></div>
+      <div><span>SHARPE</span><strong title="Avkastning per risk, räknas efter 30 dagars handel. Insättningar räknas inte.">${sharpeTxt}</strong></div>
+    </div>
+    <p class="plain">${esc(P.plain)}</p>
+    ${pTrades.length ? `<ul class="conds trades">${pTrades.map((t) => `<li><b>${esc(t.side.toUpperCase())}</b><span>${esc(t.asset)} · ${nf(8).format(t.units)} st à ${kr(t.priceSek)}</span><span class="num">${kr2(t.sek)} · avgift ${kr2(t.feeSek)}</span></li>`).join("")}</ul>` : ""}
+    <p class="small" style="margin-top:12px">${P.needsApproval
+      ? "Inget händer förrän du godkänner. Dubbelklicka <b>paper.bat</b> och skriv JA – då skrivs affären, journalposten och K4-raden."
+      : "Inget att godkänna just nu."} Låtsaspengar (PAPER).</p>`;
 
   // ---------- Status + Uppdatera ----------
   // Webbläsaren kan bara hämta från källor som tillåter det (CORS): CoinGecko och valutakurser.

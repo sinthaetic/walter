@@ -202,6 +202,9 @@ details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 
 .section-title h2 { font-size: 24px; font-weight: 300; letter-spacing: .3em; }
 .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 20px; }
 .cards .wide { grid-column: 1 / -1; }
+.proposal { min-height: 230px; }
+.trades li { justify-content: space-between; }
+.trades li > span:first-of-type { flex: 1; }
 .panel h3 { font-size: 10px; font-weight: 400; letter-spacing: .42em; color: var(--muted); margin-bottom: 14px; }
 .kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .kv div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
