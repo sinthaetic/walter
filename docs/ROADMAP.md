@@ -5,6 +5,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 
 ## Beslut som är tagna
 - Lägen för användaren: Vilar / Avvaktar / Köper lite / Köper. Max 75 % investerat, aldrig "all in".
+- Autopiloten handlar sedan 23 okt (steg 10): fasta andelar, söndagskoll, 5 %-band. Lägena ovan är Walters väderrapport och ändrar inga affärer.
 - Design: clean Walter från Alien: Covenant. Ljust standard + mörkt läge. Se CLAUDE.md.
 - Startkapital: valfri summa, ingen fast skala (småsparare och miljonärer). Allt mäts i procent.
 - Logo: "Inskriven" hexagon-W (vald 22 okt). Filer i assets/logo/vald/.
@@ -23,7 +24,11 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | 7 | ✓ Designen inbyggd i riktiga koden: index.html med flikarna Översikt, Pro, Logg, K4, Inställningar + W-CIPHER i menyn, nya logon, ljust/mörkt, mobil. cipher.html publiceras nu också (klar 22 okt) | Opus |
 | 8 | ✓ Logikluckor: trade-motor för paper (`paper.bat`), lampnivåer för lägena, buffert (vilar vid 7, vaknar vid 5), Sharpe utan flows. Level 3 i procent (klart 22 okt) | Opus |
 | 9 | ✓ Walter som app: vem som helst väljer summa och börs (5 MiCA-börser med avgifter), allt sparas i webbläsaren, Walter handlar deras paper. Ägarens data krypterad (`state.enc`, `owner.enc`). Proof of concept före live mot börs (klar 23 okt) | Opus |
-| 10 | SOL och fler valutor: testa först historiken (lampor, trend, drawdown) för varje ny tillgång innan den får ett tak; sedan fler valutor än SEK | Opus |
+| 10 | ✓ Historiktestet (docs/BACKTEST.md) och autopiloten: fasta andelar 35/20/20 + minst 25 % kontant, koll på söndagar, 5 %-band. Lamporna är väderrapport och handlar inte, Levels låser inget. Gamla lamp-strategin finns kvar som `"strategy": "lamps"` (klar 23 okt) | Opus |
+| 11 | Månadssparande: fast insättning varje månad, autopiloten fördelar den på söndagen | Opus |
+| 12 | Kraken live för ägaren (bara ägaren, små belopp, samma autopilot) | Opus |
+| 13 | W-Cipher i historiktestet: hjälper den, eller är den bara en åsikt? | Opus |
+| 14 | ISK-läge (schablonskatt i stället för K4) och sedan SOL och fler valutor – historiken testas först för varje ny tillgång | Opus |
 
 ## W-Cipher (steg 5, förslag)
 - Grafen: Heikin-Ashi-ljus + trendband (Cipher A) överst, vågen + pengaflöde (Cipher B) under.

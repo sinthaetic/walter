@@ -178,23 +178,31 @@ Inom 5 % vinner den enklaste. Vinnaren är **fasta andelar**:
 Priset för det: nedgångar upp till 55 % (den långsamma Walter: 41–53 %). Det är under gränsen på 60 %, men det känns.
 Tvåa: den långsamma Walter med avrundning till närmaste, om lägena måste få handla.
 
-Regelvärden till del 4 (`state.json` → `rules`, och fälten i sim.py som gör samma sak):
+Regelvärden (infört i del 4, 23 okt: `state.json` → `rules`). Andelarna är `caps`, så det finns bara en källa:
 
 ```json
 {
   "rules": {
-    "strategy": "fixedMix",
+    "strategy": "autopilot",
+    "decision": {"weekday": "söndag", "bandPp": 5},
     "caps": {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2},
     "maxInvested": 0.75,
     "minCash": 0.25,
-    "paper": {"minTradePct": 2},
-    "decision": {"cadenceDays": 7, "weekday": "söndag", "bandPp": 5},
-    "lampsTrade": false,
-    "levelsGate": false
-  },
-  "simStrategy": {
-    "weights": {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2},
-    "rebalance": true, "cadence_days": 7, "band_pp": 5, "loss_credit": true
+    "paper": {"minTradePct": 2}
   }
 }
 ```
+Lamporna och Levels handlar inte i autopiloten. Den gamla strategin finns kvar med `"strategy": "lamps"`.
+
+## Autopiloten i Walter (del 4)
+Historiktestet kör nu Walters egen kod: `sim.autopilot()` anropar `walter_paper.propose`, samma som Walter live.
+`.venv\Scripts\python.exe -m backtest.run --quick` skriver jämförelsen överst (44 starter, Kraken-lik börs):
+
+| Alla 44 starter | Median | 10 % sämsta | Största nedgång | Affärer (median) |
+|---|---|---|---|---|
+| Autopiloten (live-koden) | 524 000 | 143 000 | 55 % | 64 |
+| Fast 35/20/20, varje vecka, 5 %-band (del 3b) | 510 000 | 142 000 | 55 % | 54 |
+
+Skillnaden: del 3b köpte bara om köpet (efter kontantgolvet) var större än bandet. Walter köper när andelen glidit mer än
+bandet och köpet är minst 2 % (minTradePct), också om kontanterna bara räcker en bit. Det ger 10 fler små köp, och
+10 % sämsta är i stort sett densamma. Samma platå som i del 3b.

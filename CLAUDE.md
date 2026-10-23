@@ -9,7 +9,7 @@ Frontend läser `data/market.js` (`window.WALTER_MARKET`, publik marknad) och, m
 - `data/cache.json` – senast hämtade marknadsvärden (publik, skrivs av hämtaren).
 - `data/owner-cache.json` – ägarens privata dagsvärden och notis (gitignorerad; publiceras bara krypterad).
 - `fetcher/walter_fetch.py` – hämtar, räknar lampor, bygger `state.js` (bara lokalt, ägarens hela bild) = state.json + cache, och `data/market.js` via `fetcher/walter_public.py` (publik, bara marknaden: lamps, mode, px, usdsek, eursek, rules, levels, version, `log` = dagsrader). `--offline` bygger bara om. `hamta.bat` = dubbelklick.
-- Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode ändras bara via journalpost – men Walter handlar själv i GitHub Actionen (`walter_paper.py --auto`) högst en gång per dag och skriver då journalposten med `auto: true`. Bara Actionen handlar själv, aldrig `hamta.bat`.
+- Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode (väderrapporten) ändras bara via journalpost – men Walter handlar själv i GitHub Actionen (`walter_paper.py --auto`) högst en gång per dag och skriver då journalposten med `auto: true`. Bara Actionen handlar själv, aldrig `hamta.bat`.
 - `fetcher/walter_paper.py` = trade-motorn. Hämtaren räknar förslaget (`state.proposal`), dagens värde och Sharpe i state.js men handlar aldrig.
   Actionen (`--auto`) skriver läge, `portfolio.positions`, kontanter, historik, journalpost och K4-rad in i state.json, låser state.enc och committar den till main (`[skip ci]`). `paper.bat` finns kvar för att se förslaget och handla manuellt (JA).
   Datorn hämtar Walters affärer själv: `walter_vault.sync_from_repo()` (git pull + las-upp, aldrig i Actionen) körs först i hämtaren, `paper.bat` och deploy.
@@ -23,12 +23,20 @@ S&P 500 under 50d-snitt · BTC under 200d-snitt · BTC −10 % på 7 dagar · VI
 Dollarindex över 50d-snitt · ETF-flöde negativt senaste 5 handelsdagarna · KPI högre än väntat · MVRV-Z över 3,0 (testad på 13 års historik, se ROADMAP) · SOPR 7d-snitt under 1.
 Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 
-## Regler (strategi)
+## Regler (strategi) – autopiloten sedan 23 okt 2026 (steg 10, docs/BACKTEST.md)
+- `rules.strategy`: `"autopilot"` (standard, även när fältet saknas) eller `"lamps"` (den gamla lamp-strategin, kvar för jämförelser).
+- Autopiloten: fasta andelar = `rules.caps` (BTC 35 %, ETH 20 %, guld/PAXG 20 %, resten kontant, minst `rules.minCash` 25 %).
+  Beslut bara på `rules.decision.weekday` (söndag, svenskt datum). Glidit en tillgång MER än `rules.decision.bandPp` (5) procentenheter
+  (minst minTradePct) från sin andel går den hela vägen tillbaka; sälj först, sedan köp. Annars rörs inget.
+  Första affären någonsin (`portfolio.firstTrade` saknas) får ske vilken dag som helst. Saknas tillgången på börsen: andel 0, kontant.
+  Saknas pris: den tillgången väntar. Samma kod i `walter_paper.propose`, `js/engine.js` och `backtest/sim.autopilot()` (paritetstest).
+- Lamporna och läget räknas och visas fortfarande ("Walters väderrapport", journalens `mode`), men i autopiloten ÄNDRAR DE INGA AFFÄRER
+  och Levels låser ingenting. Allt nedan om lägen, ETH-villkor, guldsignal och Levels gäller bara `"strategy": "lamps"`.
 - Läge från röda lampor (`rules.modes`): 0–2 = Köper (OFFENSIV, fulla tak), 3–4 = Köper lite (NORMAL, halva taken), 5–6 = Avvaktar (rör inget), 7+ = Vilar (PARKERA, säljer till kontant).
 - Buffert: från Vilar vaknar Walter först vid `rules.wakeAtRed` (5) eller färre röda. 6 röda = vilar kvar.
 - Avgift per affär = taker + slippage (`rules.withdrawalFees`). Affärer under `rules.paper.minTradePct` (2 %) av portföljen görs inte.
 - K4-omkostnad med genomsnittsmetoden (Skatteverkets regel), inte FIFO.
-- Level 1: BTC max 35 %, kontant minst 25 % alltid.
+- Level 1 (lamps): BTC max 35 %, kontant minst 25 % alltid.
 - Level 2 (ETH 20 %) låses upp av EN av vägarna i `rules.unlock`: tidig (15 dagar, +20 %, DD < 8 %, 7/10 gröna) eller normal (30 dagar, +10 %, DD < 12 %).
   Efter upplåsning köps ETH när BTC LONG + ETH/BTC över 30d MA + högst `rules.ethMaxRed` (4) röda lampor.
 - Level 3 (guld 20 %, PAXG/XAUT) låses upp vid +50 % marknadsvinst och DD < 12 % (`levels.3`). Guld är skyddet: köps när oron är hög
