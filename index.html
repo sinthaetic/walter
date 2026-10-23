@@ -91,7 +91,14 @@
     </form>
   </dialog>
 
-  <script src="data/state.js"></script>
+  <!-- Publik marknadsdata (hämtaren). state.js finns bara lokalt hos ägaren: saknas den händer inget. -->
+  <script src="data/market.js" onerror="void 0"></script>
+  <script src="data/state.js" onerror="void 0"></script>
+  <script src="js/vault.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/exchanges.js"></script>
+  <script src="js/user-state.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/boot.js"></script>
 </body>
 </html>

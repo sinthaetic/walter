@@ -3,7 +3,9 @@
 (function () {
   "use strict";
 
-  const S = window.WALTER_STATE;
+  // Startas av js/boot.js med ett WALTER_STATE-objekt: ägaren lokalt, ägaren med kod eller användaren.
+  // ctx = {who: "owner-local"|"owner"|"user", exchange, catchUpText, storageOk} (användarvyn läser den).
+  function start(S, ctx) {
   const $ = (id) => document.getElementById(id);
 
   // ---------- Lokal lagring (bara den här webbläsaren, try/catch om den är blockerad) ----------
@@ -1016,4 +1018,7 @@
   };
   window.addEventListener("hashchange", route);
   route();
+  }
+
+  window.WalterApp = { start };
 })();
