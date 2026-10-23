@@ -58,6 +58,8 @@ jobs:
 
       # state.enc -> state.json, och ägarens dagsvärden/notis från förra publiceringen -> owner-cache.json.
       # Utan secret hoppar steget över; då hittar "Ska vi hämta nu?" ingen state.json och inget publiceras.
+      # Går en publicerad owner.enc inte att låsa upp stoppas körningen (sla-ihop, och deploy kollar igen),
+      # så en kortare dagshistorik aldrig skriver över den publicerade. Ingen owner.enc än = första gången, ok.
       - name: Lås upp
         env:
           WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}

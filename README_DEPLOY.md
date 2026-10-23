@@ -104,11 +104,19 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
 - **Läckspärren** går igenom `deploy/` före varje publicering. Står `journal`, `portfolio`, `k4`,
   `capitalChange`, `daily`, `notis`, `proposal` eller `WALTER_OWNER_KEY` okrypterat i `deploy/data/`
   (utom i `owner.enc`), eller finns `state.js`, `reports/`, `.env`, `etf_raw.json` med, stoppas allt.
-- Saknas `WALTER_OWNER_KEY` lokalt publiceras sidan utan `owner.enc` (bara marknaden) och du får en varning.
-  Saknas den som Secret hoppar Actionen över hela körningen och sidan ligger kvar som den var.
+- **Utan kod lokalt:** saknas `WALTER_OWNER_KEY` i `fetcher/.env` publiceras sidan utan `owner.enc`
+  (bara marknaden) och du får en varning.
+- **Utan Secret i Actionen:** saknas `WALTER_OWNER_KEY` som Secret hämtar och publicerar Actionen
+  **ingenting**. Körningen blir grön med en varning, och sidan ligger kvar exakt som den var.
+- **Dagsvärdena tappas aldrig i tysthet.** Före varje publicering hämtas den publicerade `owner.enc` från
+  `gh-pages` och dess dagsvärden/notis slås ihop med dina (både lokalt och i Actionen). Går `gh-pages`
+  inte att nå, eller går `owner.enc` där inte att låsa upp, **stoppas publiceringen** med ett besked –
+  hellre ingen uppdatering än en kortare historik. Allra första gången (ingen `owner.enc` än) går bra.
 - Actionen använder bara `GITHUB_TOKEN` och dina Secrets. Den committar aldrig till `main`. Senaste
-  `cache.json` och `owner.enc` läses tillbaka från `gh-pages` vid varje körning, så dagsvärdena följer med.
-- Byter du kod: lägg den nya i `fetcher/.env` och i Secreten, kör `walter_vault.py las` och `walter deploy`.
-  Gamla dagsvärden i `owner.enc` går då förlorade (Actionen varnar och fortsätter).
+  `cache.json` läses tillbaka från `gh-pages` vid varje körning.
+- **Byter du kod:** lägg den nya i `fetcher/.env` och i Secreten och kör `walter_vault.py las`. Nästa
+  `walter deploy` stoppas, eftersom den publicerade `owner.enc` är låst med den gamla koden. Kör då en gång
+  `set WALTER_GLOM_GAMLA_DAGAR=1` och sedan `walter deploy` i samma fönster. Gamla dagsvärden försvinner,
+  och efter det fungerar Actionen igen med den nya koden.
 - GitHub stänger av schemalagda Actions efter 60 dagar utan commits i repot. Kör `walter deploy`
   då och då, eller tryck **Enable workflow** under Actions.

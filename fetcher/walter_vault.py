@@ -144,7 +144,7 @@ def main(argv):
         elif merge_owner_cache(argv[1], _need_key(None)):
             print("Slog ihop daily/notis från owner.enc i data/owner-cache.json")
         else:
-            print(f"VARNING: kunde inte låsa upp {argv[1]} (ny kod?) – fortsätter utan gamla dagsvärden.")
+            sys.exit(f"Kunde inte låsa upp {argv[1]} (ny kod?). Stoppar så att gamla dagsvärden inte tappas.")
     else:
         sys.exit("Använd: walter_vault.py ny-kod | las | las-upp | sla-ihop FIL")
 

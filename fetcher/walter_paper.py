@@ -18,6 +18,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import walter_vault  # noqa: E402
+
 ASSETS = ("BTC", "ETH", "GOLD")
 NAMES = {"BTC": "bitcoin", "ETH": "ethereum", "GOLD": "guld"}
 K4_NAMES = {"BTC": "Bitcoin (BTC)", "ETH": "Ethereum (ETH)", "GOLD": "Guld (PAXG)"}
@@ -245,7 +248,6 @@ def main():
     entry = apply(raw, prop, date.today().isoformat())
     wf.BASE.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     wf.write_js(rebuild(wf))
-    import walter_vault
     if walter_vault.owner_key():
         walter_vault.lock_state()  # state.enc är det som går till main
     else:

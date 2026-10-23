@@ -17,8 +17,10 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import webbrowser
 from datetime import datetime
+from fnmatch import fnmatch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,13 +28,18 @@ OUT = ROOT / "deploy"
 OWNER_ENC = ROOT / "data" / "owner.enc"
 ALLOW = ["index.html", "cipher.html", "css", "js", "assets", "data/market.js", "data/cache.json", "data/owner.enc"]
 # extra spärr om någon lägger något fel i en tillåten mapp
-BLOCK = {".env", "etf_raw.json", "state.json", "state.js", "owner-cache.json", "paper-journal-V2.1-FIXAD.csv"}
+BLOCK = {".env", "etf_raw.json", "state.json", "state.js", "owner-cache.json", "paper-journal-*.csv"}
 # ord som bara finns i ägarens data – får aldrig stå okrypterat i deploy/data/
 PRIVATE_WORDS = ["journal", "portfolio", "k4", "capitalChange", "daily", "notis", "proposal", "WALTER_OWNER_KEY"]
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from walter_fetch import load_env, warn  # noqa: E402
+import walter_fetch  # noqa: E402
 import walter_vault  # noqa: E402
+
+
+def blocked(name):
+    return any(fnmatch(name, b) for b in BLOCK)
 
 
 def build_state():
@@ -48,6 +55,47 @@ def build_owner_enc(state, owner_cache, code):
     """Ägarens hela bild (samma som state.js) + dagsvärden och notis, krypterad."""
     return walter_vault.encrypt({"state": state, "daily": owner_cache.get("daily") or {},
                                  "notis": owner_cache.get("notis")}, code)
+
+
+def fetch_published_owner_enc(repo, dst):
+    """Hämta data/owner.enc från gh-pages till dst. True = hämtad, False = finns inte än (första gången).
+    Går gh-pages inte att nå stoppas allt – annars kunde en kortare historik skriva över den publicerade."""
+    r = subprocess.run(["git", "ls-remote", "--exit-code", repo, "refs/heads/gh-pages"], capture_output=True)
+    if r.returncode == 2:
+        return False  # ingen gh-pages ännu
+    if r.returncode:
+        sys.exit("Stoppat: kunde inte nå gh-pages för att hämta publicerade owner.enc. Inget publicerat.")
+    with tempfile.TemporaryDirectory() as t:
+        subprocess.run(["git", "init", "-q"], cwd=t, check=True)
+        if subprocess.run(["git", "fetch", "-q", "--depth=1", repo, "gh-pages"], cwd=t, capture_output=True).returncode:
+            sys.exit("Stoppat: kunde inte hämta gh-pages (owner.enc). Inget publicerat.")
+        show = subprocess.run(["git", "show", "FETCH_HEAD:data/owner.enc"], cwd=t, capture_output=True)
+        if show.returncode:
+            return False  # gh-pages finns men utan owner.enc – inget att tappa
+        Path(dst).write_bytes(show.stdout)
+    return True
+
+
+def merge_published(code, enc_path):
+    """Lägg in dagsvärden/notis från publicerade owner.enc i owner-cache.json. Går den inte att låsa upp stoppas allt."""
+    if walter_vault.merge_owner_cache(enc_path, code, walter_fetch.OWNER_CACHE):
+        print("Slog ihop dagsvärden från publicerade owner.enc.")
+        return
+    if os.environ.get("WALTER_GLOM_GAMLA_DAGAR") == "1":
+        warn("Publicerade owner.enc gick inte att låsa upp – WALTER_GLOM_GAMLA_DAGAR=1, gamla dagsvärden tappas.")
+        return
+    sys.exit("Stoppat: publicerade owner.enc gick inte att låsa upp (ny kod?). Då skulle gamla dagsvärden "
+             "försvinna, så inget publiceras. Har du bytt kod med flit: kör en gång med WALTER_GLOM_GAMLA_DAGAR=1.")
+
+
+def publish_owner(code, repo):
+    """owner.enc till deploy: först publicerade dagsvärden in (så inget försvinner), sedan ny fil."""
+    if code and repo:
+        with tempfile.TemporaryDirectory() as t:
+            enc = Path(t) / "owner.enc"
+            if fetch_published_owner_enc(repo, enc):
+                merge_published(code, enc)
+    write_owner_enc(code)
 
 
 def write_owner_enc(code):
@@ -69,14 +117,14 @@ def leak_check(out_dir):
     bad = []
     for p in sorted(out_dir.rglob("*")):
         rel = p.relative_to(out_dir).as_posix()
-        if p.name in BLOCK or p.name == "reports":
+        if blocked(p.name) or p.name == "reports":
             bad.append(rel)
     data = out_dir / "data"
     for p in sorted(data.rglob("*")) if data.exists() else []:
         if not p.is_file() or p.relative_to(out_dir).as_posix() == "data/owner.enc":
             continue
         text = p.read_text(encoding="utf-8", errors="replace")
-        hits = [w for w in PRIVATE_WORDS + sorted(BLOCK) if w in text]
+        hits = [w for w in PRIVATE_WORDS + sorted(b.split("*")[0] for b in BLOCK) if w in text]
         if hits:
             bad.append(f"{p.relative_to(out_dir).as_posix()} ({', '.join(hits)})")
     return bad
@@ -93,7 +141,7 @@ def copy_site():
         dst = OUT / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
-            shutil.copytree(src, dst, ignore=lambda d, names: [n for n in names if n in BLOCK])
+            shutil.copytree(src, dst, ignore=lambda d, names: [n for n in names if blocked(n)])
         else:
             shutil.copy2(src, dst)
     (OUT / ".nojekyll").write_text("", encoding="utf-8")  # GitHub Pages: servera filerna som de är
@@ -117,7 +165,7 @@ def lock_if_changed(code):
     if enc.exists() and enc.stat().st_mtime > src.stat().st_mtime:
         sys.exit("state.enc är nyare än state.json och skiljer sig (eller fel kod) – vägrar skriva över. "
                  "Kör 'python fetcher/walter_vault.py las-upp' först, eller 'las' om state.json är rätt.")
-    walter_vault.lock_state(code)
+    walter_vault.lock_state(code, src, enc)
     print("Låste state.json -> state.enc")
 
 
@@ -156,18 +204,18 @@ def main():
     load_env()
     print("WALTER deploy …")
     code = walter_vault.owner_key()
+    repo = os.environ.get("WALTER_PAGES_REPO", "").strip()
+    if repo and not shutil.which("git"):
+        sys.exit("git saknas – installera Git for Windows eller använd Netlify Drop.")
     if code:
         lock_if_changed(code)
     build_state()
-    write_owner_enc(code)
+    publish_owner(code, repo)
     copy_site()
     files = sum(1 for p in OUT.rglob("*") if p.is_file())
     print(f"deploy/ klar ({files} filer). Sidan är publik för alla som har länken.")
 
-    repo = os.environ.get("WALTER_PAGES_REPO", "").strip()
     if repo:
-        if not shutil.which("git"):
-            sys.exit("git saknas – installera Git for Windows eller använd Netlify Drop.")
         push_pages(repo)
         push_source()
         return

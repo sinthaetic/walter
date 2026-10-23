@@ -1,14 +1,20 @@
 import json
 import sys
 import tempfile
+import io
+import os
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fetcher"))
 import walter_deploy as wd
 import walter_public as wpub
 import walter_vault as v
+import walter_auto
+import walter_fetch
 from tests.test_public import fixture_state
 
 
@@ -59,7 +65,8 @@ class LeakCheckTest(unittest.TestCase):
             self.assertEqual(hits.count("state.js"), 2)
 
     def test_leak_check_finds_blocked_names(self):
-        for name in (".env", "etf_raw.json", "state.json", "owner-cache.json", "paper-journal-V2.1-FIXAD.csv"):
+        for name in (".env", "etf_raw.json", "state.json", "owner-cache.json", "paper-journal-V2.1-FIXAD.csv",
+                     "paper-journal-V3.csv"):
             with site({f"assets/{name}": "x"}) as t:
                 self.assertTrue(wd.leak_check(Path(t)), name)
 
@@ -99,6 +106,139 @@ class MergeOwnerTest(unittest.TestCase):
             enc.write_text(json.dumps(v.encrypt({"daily": {"d1": 1}}, "k", iter=1000)), encoding="utf-8")
             self.assertFalse(v.merge_owner_cache(enc, "fel", oc))
             self.assertFalse(oc.exists())
+
+
+def enc_file(path, obj, code="k"):
+    Path(path).write_text(json.dumps(v.encrypt(obj, code, iter=1000)), encoding="utf-8")
+
+
+class PublishOwnerTest(unittest.TestCase):
+    """Lokal deploy: publicerade owner.enc slås ihop FÖRE ny skrivs, annars stopp. Inget nätverk."""
+
+    def setUp(self):
+        self.t = tempfile.TemporaryDirectory()
+        d = Path(self.t.name)
+        self.cache, self.out = d / "owner-cache.json", d / "out-owner.enc"
+        self.cache.write_text(json.dumps({"daily": {"d2": 20}}), encoding="utf-8")
+        self.patches = [mock.patch.object(walter_fetch, "OWNER_CACHE", self.cache),
+                        mock.patch.object(walter_fetch, "CACHE", d / "cache.json"),
+                        mock.patch.object(wd, "OWNER_ENC", self.out),
+                        mock.patch("walter_paper.rebuild", return_value={"mode": "PARKERA"})]
+        for x in self.patches:
+            x.start()
+
+    def tearDown(self):
+        for x in self.patches:
+            x.stop()
+        self.t.cleanup()
+
+    def fake_fetch(self, obj, code="k"):
+        def f(repo, dst):
+            if obj is None:
+                return False
+            enc_file(dst, obj, code)
+            return True
+        return mock.patch.object(wd, "fetch_published_owner_enc", side_effect=f)
+
+    def test_merges_published_days_before_write(self):
+        with self.fake_fetch({"state": {}, "daily": {"d1": 1, "d2": 2}, "notis": {"n": 1}}):
+            wd.publish_owner("k", "https://example.invalid/r.git")
+        got = v.decrypt(json.loads(self.out.read_text(encoding="utf-8")), "k")
+        self.assertEqual(got["daily"], {"d1": 1, "d2": 20})
+        self.assertEqual(got["notis"], {"n": 1})
+        self.assertEqual(got["state"], {"mode": "PARKERA"})
+
+    def test_first_run_without_published_owner_enc(self):
+        with self.fake_fetch(None):
+            wd.publish_owner("k", "https://example.invalid/r.git")
+        self.assertEqual(v.decrypt(json.loads(self.out.read_text(encoding="utf-8")), "k")["daily"], {"d2": 20})
+
+    def test_refuses_when_published_cannot_be_decrypted(self):
+        with self.fake_fetch({"daily": {"d1": 1}}, code="gammal"), mock.patch.dict(os.environ, {"WALTER_GLOM_GAMLA_DAGAR": ""}):
+            with self.assertRaises(SystemExit):
+                wd.publish_owner("k", "https://example.invalid/r.git")
+        self.assertFalse(self.out.exists())
+
+    def test_override_allows_new_code(self):
+        with self.fake_fetch({"daily": {"d1": 1}}, code="gammal"), \
+                mock.patch.dict(os.environ, {"WALTER_GLOM_GAMLA_DAGAR": "1"}), mock.patch.object(wd, "warn"):
+            wd.publish_owner("k", "https://example.invalid/r.git")
+        self.assertTrue(self.out.exists())
+
+    def test_no_repo_skips_fetch(self):
+        with mock.patch.object(wd, "fetch_published_owner_enc") as f:
+            wd.publish_owner("k", "")
+        f.assert_not_called()
+        self.assertTrue(self.out.exists())
+
+    def test_write_owner_enc_without_key_removes_and_warns(self):
+        self.out.write_text("gammal", encoding="utf-8")
+        with mock.patch.object(wd, "warn") as w:
+            wd.write_owner_enc(None)
+        self.assertFalse(self.out.exists())
+        self.assertIn("WALTER_OWNER_KEY", w.call_args[0][0])
+
+
+class LockIfChangedTest(unittest.TestCase):
+    def setUp(self):
+        self.t = tempfile.TemporaryDirectory()
+        d = Path(self.t.name)
+        self.src, self.enc = d / "state.json", d / "state.enc"
+        self.patches = [mock.patch.object(v, "STATE", self.src), mock.patch.object(v, "ENC", self.enc),
+                        mock.patch.object(v, "ITER", 1000)]
+        for x in self.patches:
+            x.start()
+
+    def tearDown(self):
+        for x in self.patches:
+            x.stop()
+        self.t.cleanup()
+
+    def test_noop_when_equal(self):
+        self.src.write_text('{"a": 1}', encoding="utf-8")
+        enc_file(self.enc, {"a": 1})
+        before = self.enc.read_text(encoding="utf-8")
+        wd.lock_if_changed("k")
+        self.assertEqual(self.enc.read_text(encoding="utf-8"), before)
+
+    def test_refuses_when_enc_newer_and_different(self):
+        self.src.write_text('{"a": 1}', encoding="utf-8")
+        enc_file(self.enc, {"a": 2})
+        os.utime(self.src, (1, 1))
+        before = self.enc.read_text(encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            wd.lock_if_changed("k")
+        self.assertEqual(self.enc.read_text(encoding="utf-8"), before)
+
+    def test_locks_when_json_newer(self):
+        enc_file(self.enc, {"a": 2})
+        os.utime(self.enc, (1, 1))
+        self.src.write_text('{"a": 1}', encoding="utf-8")
+        with redirect_stdout(io.StringIO()):
+            wd.lock_if_changed("k")
+        self.assertEqual(v.decrypt(json.loads(self.enc.read_text(encoding="utf-8")), "k"), {"a": 1})
+
+
+class CliAndGateTest(unittest.TestCase):
+    def test_sla_ihop_missing_file(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            v.main(["sla-ihop", str(Path(tempfile.gettempdir()) / "finns-inte-walter.enc")])
+        self.assertIn("inget att slå ihop", out.getvalue())
+
+    def test_gate_without_state_json_skips(self):
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            gh = d / "out.txt"
+            out = io.StringIO()
+            out.reconfigure = lambda **kw: None  # main() slår på utf-8 i terminalen
+            with mock.patch.object(walter_auto, "STATE", d / "state.json"), \
+                    mock.patch.object(walter_auto, "CACHE", d / "cache.json"), \
+                    mock.patch.object(sys, "argv", ["walter_auto.py"]), \
+                    mock.patch.dict(os.environ, {"GITHUB_OUTPUT": str(gh)}), redirect_stdout(out):
+                walter_auto.main()
+            self.assertEqual(gh.read_text(encoding="utf-8"), "run=false\n")
+            self.assertIn("ingen state.json", out.getvalue())
 
 
 if __name__ == "__main__":
