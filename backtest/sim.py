@@ -87,12 +87,14 @@ def hold_btc(share):
     return Strategy(name=f"Köp en gång: BTC {share * 100:.0f} %", weights={"BTC": share}, rebalance=False)
 
 
-def mix(weights, rebalance=True, name=None):
-    """Jämförelse med fasta andelar, utan lampor (alltid samma andelar, aldrig Vilar)."""
+def mix(weights, rebalance=True, name=None, cadence_days=1, band_pp=0):
+    """Jämförelse med fasta andelar, utan lampor (alltid samma andelar, aldrig Vilar).
+    cadence_days=7: ombalansera bara söndagar. band_pp=5: bara när en andel glidit mer än 5 % av portföljen."""
     if name is None:
         parts = "+".join(f"{a} {w * 100:.0f}" for a, w in weights.items())
         name = f"{'Ombalanserad' if rebalance else 'Köp en gång'}: {parts} %"
-    return Strategy(name=name, weights=dict(weights), rebalance=rebalance)
+    return Strategy(name=name, weights=dict(weights), rebalance=rebalance, cadence_days=cadence_days,
+                    band_pp=band_pp)
 
 
 @dataclass
@@ -462,8 +464,13 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
 
         # ---------- Beslut för i morgon ----------
         if strategy.weights is not None:
-            trades = mix_trades(strategy.weights, pf, px, total, fee, min_trade_pct * total,
-                                strategy.rebalance, bought)
+            # cadence_days / band_pp gäller även fasta andelar: ombalansera bara beslutsdagar, och bara när en
+            # tillgång glidit mer än max(minTradePct, band_pp) av portföljen (sedan hela vägen tillbaka till målet).
+            if strategy.cadence_days > 1 and date.fromisoformat(d).toordinal() % strategy.cadence_days and bought:
+                res.modes[d] = "FAST"
+                continue
+            trades = mix_trades(strategy.weights, pf, px, total, fee,
+                                max(min_trade_pct, strategy.band_pp / 100) * total, strategy.rebalance, bought)
             if trades:
                 pending = {"mode": "OFFENSIV", "red": 0, "trades": trades}
             res.modes[d] = "FAST"

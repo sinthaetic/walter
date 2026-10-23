@@ -280,6 +280,19 @@ class Del3Model(unittest.TestCase):
         once = sim.run(sim.mix({"BTC": 0.35}, rebalance=False), ds[0], ds[-1], FREE, series=series)
         self.assertEqual(once.n_trades, 2)  # köp + slutförsäljning
 
+    def test_mix_weekly_with_band(self):
+        """Del 3b: fasta andelar med beslut på söndagar och 5 %-band."""
+        ds = days("2021-01-04", 21)  # måndag; söndagar = ds[6], ds[13], ds[20]
+        # BTC +20 % dag 2 (35 % -> ca 39 %, under bandet), +100 % dag 9 (långt över bandet)
+        btc = {d: (100.0 if i < 2 else 120.0 if i < 9 else 240.0) for i, d in enumerate(ds)}
+        series = {"btc": btc, "usdsek": const(ds, 1.0)}
+        daily = sim.run(sim.mix({"BTC": 0.35}), ds[0], ds[-1], FREE, series=series)
+        slow = sim.run(sim.mix({"BTC": 0.35}, cadence_days=7, band_pp=5), ds[0], ds[-1], FREE, series=series)
+        dates = lambda r: [(t["date"], t["side"]) for t in r.trades if t["why"] == "walter"]  # noqa: E731
+        self.assertEqual(dates(daily), [(ds[1], "köp"), (ds[3], "sälj"), (ds[10], "sälj")])
+        # första köpet direkt, +20 % ligger inom bandet, sälj först dagen efter söndagen ds[13]
+        self.assertEqual(dates(slow), [(ds[1], "köp"), (ds[14], "sälj")])
+
     def test_buy_once_mix_waits_for_eth(self):
         ds = days("2021-01-01", 10)
         series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0), "gold": const(ds, 10.0),
