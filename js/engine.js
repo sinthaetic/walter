@@ -9,13 +9,18 @@
   const WORDS = { PARKERA: "Vilar", AVVAKTAR: "Avvaktar", NORMAL: "Köper lite", OFFENSIV: "Köper" };
   const LAMPS = 10;
 
-  // Pythons round(): närmaste decimal på det exakta talet, lika avstånd → jämn siffra.
+  // Pythons round(): närmaste decimal på flyttalets exakta värde, exakt lika avstånd → jämn siffra.
+  // toFixed räknar på det exakta värdet men väljer uppåt vid exakt lika; därför avgörs "exakt lika"
+  // från den långa decimalutvecklingen (0,015 är egentligen 0,01499… och är inget lika-fall).
   function round(x, d) {
     if (!isFinite(x)) return x;
-    const s = Math.abs(x), f = Math.pow(10, d), y = s * f, fl = Math.floor(y);
+    const s = Math.abs(x);
+    const [i, frac] = s.toFixed(Math.min(100, d + 40)).split(".");
     let r;
-    if (y - fl === 0.5 && (fl + 0.5) / f === s) r = (fl % 2 === 0 ? fl : fl + 1) / f;
-    else r = Number(s.toFixed(d));
+    if (/^50*$/.test(frac.slice(d))) {
+      const head = i + "." + frac.slice(0, d);
+      r = Number((i + frac.slice(0, d)).slice(-1)) % 2 === 0 ? Number(head) : Number(s.toFixed(d));
+    } else r = Number(s.toFixed(d));
     return x < 0 ? -r : r;
   }
   // Som num() i Python: "12 000", "1 234,56", minus som "−"
@@ -119,7 +124,7 @@
     }
     if (waiting.length) plain += ` Jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}.`;
     for (const a of wantedMissing) plain += ` ${cap(NAMES[a])} finns inte på din börs, så den delen ligger kvar som kontanter.`;
-    return { ready: true, red, mode, currentMode: current, trades, valueSek: round(total, 2), plain, missing };
+    return { ready: true, red, mode, currentMode: current, trades, valueSek: round(total, 2), plain, missing, waiting };
   }
 
   // ---------- Genomför ----------
@@ -165,7 +170,8 @@
     facts.push(`Kontant ${num(pf.holdings.CASH)} kr av ${num(pf.value)} kr`);
     const done = prop.trades.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
     const plain = (done.length ? `Jag ${done.join(" och ")}. ` : "") +
-      `${prop.red} av 10 lampor var röda, så läget är ${WORDS[prop.mode]}. ${num(pf.holdings.CASH)} kr ligger som kontanter.`;
+      `${prop.red} av 10 lampor var röda, så läget är ${WORDS[prop.mode]}. ${num(pf.holdings.CASH)} kr ligger som kontanter.` +
+      ((prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "");
     const entry = { date, mode: prop.mode, red: prop.red, plain, facts,
       trades: prop.trades.map((t) => ({ asset: t.asset, side: t.side, sek: t.sek })) };
     (user.journal || (user.journal = [])).unshift(entry);
@@ -180,6 +186,7 @@
     const value = valuation(pf, row.px || {}).total;
     const peak = Math.max(pf.peak || 0, value);
     const dd = peak > 0 ? (peak - value) / peak * 100 : 0;
+    // Kontrakt: varje insättning (även startbeloppet och påfyllningar) är en historikrad med `flow`.
     const flows = (pf.history || []).reduce((t, h) => t + (h.flow || 0), 0);
     const deposits = flows > 0 ? flows : pf.start;
     const gain = value - deposits, pct = deposits > 0 ? gain / deposits * 100 : 0;
@@ -203,12 +210,16 @@
   // en dag utan rad hittas aldrig på. En rad som inte är klar ger ingen affär och inget lägesbyte.
   function catchUp(user, log, rules, levels, exchange) {
     const events = [];
-    const rows = (log || []).filter((r) => r && typeof r.date === "string" && (!user.lastDay || r.date > user.lastDay))
-      .slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-    let prev = null;
-    for (const row of rows) {
-      if (row.date === prev) continue;
-      prev = row.date;
+    // En rad per datum (en klar rad vinner över en halvfärdig), bara efter lastDay och från startDate.
+    const byDate = {};
+    for (const r of log || []) {
+      if (!r || typeof r.date !== "string") continue;
+      if (user.lastDay && r.date <= user.lastDay) continue;
+      if (user.startDate && r.date < user.startDate) continue;
+      if (!byDate[r.date] || (r.ready && !byDate[r.date].ready)) byDate[r.date] = r;
+    }
+    for (const date of Object.keys(byDate).sort()) {
+      const row = byDate[date];
       user.lastDay = row.date;
       if (!row.ready) continue;
       const pf = user.portfolio;

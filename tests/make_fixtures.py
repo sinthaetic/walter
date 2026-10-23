@@ -17,6 +17,9 @@ import walter_vault  # noqa: E402
 
 
 def vault_sample():
+    """Skrivs bara om den saknas (ny salt varje gång annars, så att filen ändras i onödan)."""
+    if (FIX / "vault-sample.enc").exists():
+        return
     env = walter_vault.encrypt({"hej": "världen", "n": 1.5}, "TEST-KOD", iter=1000)
     (FIX / "vault-sample.enc").write_text(json.dumps(env), encoding="utf-8")
 
@@ -53,6 +56,7 @@ def engine_cases():
     cases = [  # namn, röda, läge, level, portfölj, vix, S&P under snitt, ETH/BTC över snitt
         ("offensiv_from_cash", 1, "AVVAKTAR", 1, _pf(100000), 15, False, False),
         ("normal_half_caps", 3, "AVVAKTAR", 1, _pf(100000), 15, False, False),
+        ("normal_cash_100000_20", 3, "AVVAKTAR", 1, _pf(100000.20), 15, False, False),  # mål 17 500,035
         ("normal_trims_btc", 3, "OFFENSIV", 1, _pf(65350, {"BTC": btc_full}), 15, False, False),
         ("avvaktar_keeps", 5, "NORMAL", 1, _pf(82000, {"BTC": (0.017, 17500)}), 15, False, False),
         ("parkera_sells_all", 7, "NORMAL", 1, _pf(82000, {"BTC": (0.017, 17500)}), 15, False, False),

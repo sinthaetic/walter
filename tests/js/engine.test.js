@@ -23,7 +23,7 @@ const newUser = (cash, start, extra) => Object.assign({ v: 1, startDate: "2026-1
     positions: {}, firstTrade: null, history: [{ date: "2026-09-30", value: start, cash: start, note: "start", flow: start }] },
   journal: [], trades: [] }, extra || {});
 
-const PARITY = ["offensiv_from_cash", "normal_half_caps", "normal_trims_btc", "avvaktar_keeps", "parkera_sells_all",
+const PARITY = ["offensiv_from_cash", "normal_half_caps", "normal_cash_100000_20", "normal_trims_btc", "avvaktar_keeps", "parkera_sells_all",
   "buffer_6_stays_parked", "buffer_5_wakes", "eth_level2", "gold_level3_parked"];
 for (const name of PARITY) {
   test("parity_" + name, async () => {
@@ -93,6 +93,8 @@ test("catchup_90_days", () => {
   const ms = performance.now() - t0;
   if (ms >= 200) throw new Error("tog " + ms + " ms");
   eq(r.user.lastDay, log[89].date);
+  eq(r.user.mode, "AVVAKTAR");  // dag 89: 5 röda efter 8 → vaknar till Avvaktar
+  eq(r.events.filter((e) => !/^Level/.test(e.plain)).length, 77);  // 6 lägesbyten per vecka + 5 sista dagarna
   if (r.user.portfolio.holdings.CASH < 0) throw new Error("negativa kontanter");
 });
 
@@ -121,4 +123,49 @@ test("summary_two_trades", () => {
   const r = E().catchUp(user, [row("2026-10-01", 1), row("2026-10-02", 7)], RULES, LEVELS, EX);
   eq(E().summary(r.events), "Medan du var borta gjorde jag 2 affärer: köpte bitcoin för 35 000 kr och sålde bitcoin för 34 790 kr.");
   eq(E().summary([]), "");
+});
+
+test("round_like_python", () => {
+  const R = E().round;
+  eq(R(0.015, 2), 0.01);      // egentligen 0,01499…
+  eq(R(0.005, 2), 0.01);      // egentligen 0,00500…1
+  eq(R(0.125, 2), 0.12);      // exakt lika → jämn
+  eq(R(0.375, 2), 0.38);
+  eq(R(2.675, 2), 2.67);
+  eq(R(17500.035, 2), 17500.03);
+  eq(R(1.23456789123, 8), 1.23456789);
+  eq(R(-0.125, 2), -0.12);
+  eq(R(2.5, 0), 2);
+  eq(R(3.5, 0), 4);
+});
+
+test("catchup_waits_for_missing_price", () => {
+  const user = newUser(82150, 100000);
+  user.portfolio.positions.BTC = { units: 0.017, costSek: 17500, since: "2026-10-01" };
+  user.portfolio.holdings.BTC = 17850;
+  user.portfolio.value = 100000;
+  const r = E().catchUp(user, [row("2026-10-03", 7, { px: { BTC: null, ETH: 38000, GOLD: 37000 } })], RULES, LEVELS, EX);
+  eq(r.user.trades.length, 0);
+  eq(r.user.portfolio.holdings.BTC, 17850);
+  eq(r.user.portfolio.positions.BTC.units, 0.017);
+  eq(r.user.mode, "PARKERA");
+  if (!r.events[0].plain.includes("väntar på pris")) throw new Error("plain: " + r.events[0].plain);
+});
+
+test("catchup_duplicate_date_prefers_ready", () => {
+  const user = newUser(100000, 100000);
+  const half = row("2026-10-01", 1, { ready: false, px: { BTC: null, ETH: null, GOLD: null } });
+  const r = E().catchUp(user, [row("2026-10-01", 1), half], RULES, LEVELS, EX);
+  eq(r.user.mode, "OFFENSIV");
+  eq(r.user.trades.length, 1);
+  const r2 = E().catchUp(newUser(100000, 100000), [half, row("2026-10-01", 1)], RULES, LEVELS, EX);
+  eq(r2.user.trades.length, 1);
+});
+
+test("catchup_ignores_rows_before_start", () => {
+  const user = newUser(100000, 100000, { lastDay: null });
+  const r = E().catchUp(user, [row("2026-09-28", 1), row("2026-10-01", 5)], RULES, LEVELS, EX);
+  eq(r.user.trades.length, 0);
+  eq(r.user.mode, "AVVAKTAR");
+  eq(r.user.lastDay, "2026-10-01");
 });
