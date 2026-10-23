@@ -110,8 +110,42 @@
       if (!window.WalterUser.save(user)) { msg.textContent = NO_STORAGE; return; }
       done(user);
     };
-    box.append(link, input, msg);
+    box.append(link, button("Har du en kod? Lås upp din Walter", "i-link", renderOwner), input, msg);
     return box;
+  }
+
+  // Ägaren på en ny enhet: lås upp med koden direkt, utan att först skapa en Walter.
+  // Samma upplåsning som Inställningar (WalterUser.unlockOwner). Stämmer koden laddas sidan om till ägarvyn.
+  function renderOwner() {
+    const body = root.querySelector(".i-body");
+    body.textContent = "";
+    body.appendChild(heading("Lås upp din Walter"));
+    const form = el("form", "i-field");
+    const label = el("label", "i-label", "Kod");
+    label.htmlFor = "intro-owner-code";
+    const input = el("input", "i-input");
+    input.id = "intro-owner-code"; input.type = "password"; input.autocomplete = "off"; input.spellcheck = false;
+    input.setAttribute("aria-describedby", "intro-owner-msg");
+    const msg = el("p", "i-hint", "Bara för ägaren. Koden sparas i den här webbläsaren först när den stämmer.");
+    msg.id = "intro-owner-msg";
+    msg.setAttribute("role", "status");
+    form.append(label, input, msg);
+    const row = el("div", "i-actions");
+    const ok = el("button", "i-btn", "Lås upp");
+    ok.type = "submit";
+    row.append(button("Tillbaka", "i-btn ghost", () => go(0)), ok);
+    form.appendChild(row);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (!input.value) return;
+      ok.disabled = true;
+      msg.textContent = "Provar koden …";
+      const res = await window.WalterUser.unlockOwner(input.value);
+      if (!res.ok) { msg.textContent = res.msg; ok.disabled = false; return; }
+      location.reload();
+    };
+    body.appendChild(form);
+    body.querySelector(".i-head").focus({ preventScroll: true });
   }
 
   function renderAmount(body) {
@@ -182,7 +216,9 @@
   function finish() {
     if (amount === null || exchangeId === null) return;
     const m = window.WALTER_MARKET;
-    const day = (m && m.now && m.now.date) || window.WalterUser.today();
+    // Startdagen är marknadens dag bara när datan är färsk – annars idag (och Walter väntar på färsk data).
+    const U = window.WalterUser, today = U.today();
+    const day = (m && m.now && m.now.date && U.isFresh(m.now, today)) ? m.now.date : today;
     const user = window.WalterUser.create(amount, exchangeId, day);
     window.WalterUser.firstMove(user, m); // Walter gör sitt första drag direkt (null = väntar på data)
     window.WalterUser.save(user); // false = lagring blockerad; varningen står redan ovanför knappen

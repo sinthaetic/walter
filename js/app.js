@@ -297,6 +297,7 @@
     </div>
     <p class="explain"><b>Sharpe:</b> Avkastning per risk. Visas efter 30 dagars handel.</p>
     ${isUser ? `
+    ${P.ready ? "" : `<p class="plain"><b>${esc(P.plain)}</b></p>`}
     <p class="plain">${lastDone ? `<b>Senast (${day(lastDone.date)}):</b> ${esc(lastDone.plain)}` : "Walter har inte gjort något än. Han räknar och handlar nästa gång marknadsdatan uppdateras."}</p>
     <p class="small" style="margin-top:12px">Walter handlar själv åt dig och skriver upp varje affär i loggen. Du behöver inte godkänna något. Låtsaspengar (PAPER).</p>` : `
     <p class="plain">${esc(P.plain)}</p>
@@ -842,7 +843,8 @@
 
     <div class="cards">
       <section class="panel" aria-label="Avgifter">
-        <h3>AVGIFTER</h3>
+        <h3>${isUser ? "AVGIFTER · BARA FÖR UTTAGSRÄKNAREN" : "AVGIFTER"}</h3>
+        ${isUser ? `<p class="plain" style="margin-bottom:12px">Fälten här ändrar bara uträkningen under Uttag. Walters affärer räknas alltid med ${esc(feeName)}s avgifter.</p>` : ""}
         <form id="settings-form">
           <div class="form-grid">
             ${[["takerPct", `${esc(feeName.toUpperCase())} TAKER FEE (%)`], ["slippagePct", "SLIPPAGE (%)"], ["sepaEur", "SEPA-UTTAG (€)"], ["fxPct", "VALUTAVÄXLING PÅ BANKEN (%)"]].map(([k, t]) => `
@@ -881,6 +883,10 @@
           <input type="file" id="import-file" accept=".json,application/json" hidden>
         </div>
         <p class="small msg" id="copy-msg" aria-live="polite"></p>
+        <div class="form-actions start" id="import-confirm" style="display:none">
+          <button type="button" class="btn btn-danger" id="import-ok">ERSÄTT</button>
+          <button type="button" class="btn" id="import-cancel">AVBRYT</button>
+        </div>
       </section>
       <section class="panel" aria-label="Börja om">
         <h3>BÖRJA OM</h3>
@@ -889,6 +895,13 @@
           <input id="reset-confirm" class="input" type="text" autocomplete="off" spellcheck="false" placeholder="BÖRJA OM" aria-label="Skriv BÖRJA OM för att bekräfta" style="margin-top:12px">
           <div class="form-actions"><button type="submit" class="btn btn-danger" id="reset-ok" disabled>BÖRJA OM</button></div>
         </form>
+      </section>` : ""}
+      ${who === "owner" ? `
+      <section class="panel" aria-label="Glöm koden">
+        <h3>DEN HÄR ENHETEN</h3>
+        <p class="plain">Koden är sparad i den här webbläsaren, därför ser du din Walter här.</p>
+        <div class="form-actions start"><button type="button" class="btn" id="btn-forget-owner">GLÖM KODEN PÅ DEN HÄR ENHETEN</button></div>
+        <p class="small msg" id="forget-msg" aria-live="polite"></p>
       </section>` : ""}
       ${isUser ? `
       <section class="panel" aria-label="Lås upp min Walter">
@@ -1126,8 +1139,23 @@
       fileInput.value = "";
       if (!f) return;
       let user;
-      try { user = U.importText(await f.text()); } catch (e) { copyMsg.textContent = "Det här är ingen Walter-kopia."; return; }
-      if (!U.save(user)) { copyMsg.textContent = "Din webbläsare låter mig inte spara kopian."; return; }
+      try { user = U.importText(await f.text()); } catch (e) {
+        pending = null; importConfirm.style.display = "none"; copyMsg.textContent = "Det här är ingen Walter-kopia."; return;
+      }
+      // Kopian ersätter Walter i den här webbläsaren – fråga först, så att ingen portfölj försvinner av misstag.
+      pending = user;
+      copyMsg.textContent = "Det här ersätter din nuvarande Walter.";
+      importConfirm.style.display = "";
+      $("import-cancel").focus();
+    });
+    const importConfirm = $("import-confirm");
+    let pending = null;
+    $("import-cancel").addEventListener("click", () => {
+      pending = null; importConfirm.style.display = "none"; copyMsg.textContent = "Inget ändrat.";
+    });
+    $("import-ok").addEventListener("click", () => {
+      if (!pending) return;
+      if (!U.save(pending)) { copyMsg.textContent = "Din webbläsare låter mig inte spara kopian."; return; }
       location.reload();
     });
 
@@ -1148,8 +1176,16 @@
     });
   }
 
+  // ---------- Glöm koden (bara ägaren i mobilen, inte lokalt med state.js) ----------
+  if (who === "owner") {
+    $("btn-forget-owner").addEventListener("click", () => {
+      if (!window.WalterUser.forgetOwner()) { $("forget-msg").textContent = "Din webbläsare låter mig inte ta bort koden."; return; }
+      location.reload();
+    });
+  }
+
   // ---------- Lås upp min Walter (bara användaren – ägaren är redan upplåst) ----------
-  // Som boot.js: bara en misslyckad dekryptering är "fel kod". Når jag inte filen kan koden vara rätt.
+  // Samma upplåsning som introt (WalterUser.unlockOwner): koden sparas bara när den stämmer.
   if (isUser) {
     const ownerMsg = $("owner-msg"), ownerOk = $("owner-ok");
     $("owner-form").addEventListener("submit", async (e) => {
@@ -1158,18 +1194,8 @@
       if (!code) return;
       ownerOk.disabled = true;
       ownerMsg.textContent = "Provar koden …";
-      let env = null;
-      try {
-        const res = await fetch("data/owner.enc", { cache: "no-store" });
-        if (res.ok) env = await res.json();
-      } catch (err) { env = null; }
-      if (!env) { ownerMsg.textContent = "Jag når inte ägarfilen just nu."; ownerOk.disabled = false; return; }
-      try { await window.WalterVault.decrypt(env, code); } catch (err) {
-        ownerMsg.textContent = "Koden stämde inte."; ownerOk.disabled = false; return;
-      }
-      try { window.localStorage.setItem("walter.ownerKey", code); } catch (err) {
-        ownerMsg.textContent = "Koden stämde, men din webbläsare låter mig inte spara den."; ownerOk.disabled = false; return;
-      }
+      const res = await window.WalterUser.unlockOwner(code);
+      if (!res.ok) { ownerMsg.textContent = res.msg; ownerOk.disabled = false; return; }
       location.reload();
     });
   }

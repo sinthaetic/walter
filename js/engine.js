@@ -218,10 +218,16 @@
       if (user.startDate && r.date < user.startDate) continue;
       if (!byDate[r.date] || (r.ready && !byDate[r.date].ready)) byDate[r.date] = r;
     }
+    // Loggens nyaste dag kan fortfarande bli klar (hämtaren skriver om dagens rad), så en halvfärdig
+    // nyaste rad flyttar aldrig lastDay – då spelas dagen upp när den väl är klar.
+    const newest = (log || []).reduce((m, r) => (r && typeof r.date === "string" && r.date > m ? r.date : m), "");
     for (const date of Object.keys(byDate).sort()) {
       const row = byDate[date];
+      if (!row.ready) {
+        if (row.date < newest) user.lastDay = row.date;
+        continue;
+      }
       user.lastDay = row.date;
-      if (!row.ready) continue;
       const pf = user.portfolio;
       const v = valuation(pf, row.px || {});
       Object.assign(pf.holdings, v.hold);

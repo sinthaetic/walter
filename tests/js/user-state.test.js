@@ -97,7 +97,7 @@ test("save_load_roundtrip", () => {
 test("toState_has_app_fields", () => {
   const u = WU().create(10000, "kraken", "2026-10-22");
   const before = JSON.stringify(u);
-  const S = WU().toState(u, fakeMarket());
+  const S = WU().toState(u, fakeMarket(), "2026-10-22");
   for (const k of ["version", "startDate", "updatedAt", "fetchedAt", "mode", "level", "levels", "portfolio", "journal",
     "lamps", "lampScore", "market", "rules", "k4", "proposal"]) {
     if (!(k in S)) throw new Error("saknar " + k);
@@ -187,7 +187,7 @@ test("first_move_on_creation_day", () => {
     const m = fakeMarket();
     window.WALTER_MARKET = m;
     const u = WU().create(100000, "kraken", "2026-10-22");
-    const entry = WU().firstMove(u, m);
+    const entry = WU().firstMove(u, m, "2026-10-22");
     if (!entry) throw new Error("inget första drag");
     eq(u.mode, "NORMAL"); // 3 röda → Köper lite
     eq(u.journal.length, 1);
@@ -204,7 +204,64 @@ test("first_move_on_creation_day", () => {
     // Utan klar data väntar Walter
     const m2 = fakeMarket(); m2.now.ready = false;
     const u2 = WU().create(100000, "kraken", "2026-10-22");
-    eq(WU().firstMove(u2, m2), null);
+    eq(WU().firstMove(u2, m2, "2026-10-22"), null);
     eq(u2.journal.length, 0);
   } finally { window.WALTER_MARKET = saved; }
+});
+
+// Gammal marknadsdata räknas aldrig som färsk: varken första draget eller förslaget
+test("stale_market_waits", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    // fetchedAt 2026-10-22, lampMaxAgeDays.default saknas → 4 dagar
+    eq(WU().isFresh(m.now, "2026-10-26"), true);
+    eq(WU().isFresh(m.now, "2026-10-27"), false);
+    m.now.rules.lampMaxAgeDays = { default: 1 };
+    eq(WU().isFresh(m.now, "2026-10-24"), false);
+    eq(WU().isFresh(Object.assign({}, m.now, { fetchedAt: null }), "2026-10-22"), false);
+    delete m.now.rules.lampMaxAgeDays;
+
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    eq(WU().firstMove(u, m, "2026-10-30"), null);
+    eq(u.journal.length, 0);
+    const S = WU().toState(u, m, "2026-10-30");
+    eq(S.proposal.ready, false);
+    eq(S.proposal.plain, "Walter väntar på färsk marknadsdata.");
+    // Färsk data samma dag: förslaget räknas
+    eq(WU().toState(u, m, "2026-10-22").proposal.ready, true);
+  } finally { window.WALTER_MARKET = saved; }
+});
+
+test("first_move_refuses_market_before_start", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-23");
+    eq(WU().firstMove(u, m, "2026-10-23"), null);
+    eq(u.journal.length, 0);
+    eq(u.portfolio.holdings.CASH, 100000);
+  } finally { window.WALTER_MARKET = saved; }
+});
+
+// Upplåsningen av ägarens Walter (introt och Inställningar använder samma funktion)
+test("unlock_owner_saves_key_only_on_success", async () => {
+  const env = await (await fetch("../fixtures/vault-sample.enc")).json();
+  const ok = async () => ({ ok: true, json: async () => env });
+  const store = {};
+  const fake = { setItem: (k, v) => { store[k] = v; }, getItem: (k) => store[k] || null, removeItem: (k) => { delete store[k]; } };
+  await withStorage({ value: fake }, async () => {
+    eq(await WU().unlockOwner("fel", ok), { ok: false, msg: "Koden stämde inte." });
+    eq("walter.ownerKey" in store, false);
+    eq(await WU().unlockOwner("TEST-KOD", async () => ({ ok: false })), { ok: false, msg: "Jag når inte ägarfilen just nu." });
+    eq(await WU().unlockOwner("TEST-KOD", async () => { throw new Error("nät"); }), { ok: false, msg: "Jag når inte ägarfilen just nu." });
+    eq("walter.ownerKey" in store, false);
+    eq(await WU().unlockOwner("TEST-KOD", ok), { ok: true, msg: "" });
+    eq(store["walter.ownerKey"], "TEST-KOD");
+  });
+  await withStorage({ get() { throw new Error("blockerad"); } }, async () => {
+    eq(await WU().unlockOwner("TEST-KOD", ok), { ok: false, msg: "Koden stämde, men din webbläsare låter mig inte spara den." });
+  });
 });

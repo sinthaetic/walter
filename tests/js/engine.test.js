@@ -67,7 +67,8 @@ test("catchup_skips_not_ready", () => {
   eq(r.events.length, 0);
   eq(r.user.mode, "AVVAKTAR");
   eq(r.user.portfolio.holdings.CASH, 100000);
-  eq(r.user.lastDay, "2026-10-01");
+  // Loggens nyaste dag är halvfärdig: den kan fortfarande bli klar, så lastDay står kvar
+  eq(r.user.lastDay, "2026-09-30");
 });
 
 test("catchup_gaps", () => {
@@ -168,4 +169,23 @@ test("catchup_ignores_rows_before_start", () => {
   eq(r.user.trades.length, 0);
   eq(r.user.mode, "AVVAKTAR");
   eq(r.user.lastDay, "2026-10-01");
+});
+
+// En halvfärdig rad får inte flytta lastDay förbi en dag som fortfarande kan bli klar
+test("catchup_not_ready_newest_day_replays_when_ready", () => {
+  const user = newUser(100000, 100000);
+  const half = row("2026-10-02", 1, { ready: false, px: { BTC: null, ETH: null, GOLD: null } });
+  E().catchUp(user, [row("2026-10-01", 5), half], RULES, LEVELS, EX);
+  eq(user.lastDay, "2026-10-01");
+  // Samma dag blir klar senare → den spelas upp
+  const r = E().catchUp(user, [row("2026-10-01", 5), row("2026-10-02", 1)], RULES, LEVELS, EX);
+  eq(r.user.lastDay, "2026-10-02");
+  eq(r.user.mode, "OFFENSIV");
+});
+
+test("catchup_old_not_ready_day_is_passed", () => {
+  const user = newUser(100000, 100000);
+  const half = row("2026-10-01", 1, { ready: false, px: { BTC: null, ETH: null, GOLD: null } });
+  const r = E().catchUp(user, [half, row("2026-10-02", 5)], RULES, LEVELS, EX);
+  eq(r.user.lastDay, "2026-10-02");
 });

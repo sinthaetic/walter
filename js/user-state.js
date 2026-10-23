@@ -5,6 +5,7 @@
   "use strict";
 
   const KEY = "walter.user";
+  const OWNER_KEY = "walter.ownerKey";
   const LAMPS = 10;
   const NOT_A_COPY = "Det här är ingen Walter-kopia";
 
@@ -88,14 +89,28 @@
     return u;
   }
 
+  // ---------- Färsk marknadsdata ----------
+  // Samma gräns som lamporna (rules.lampMaxAgeDays.default, annars 4 dagar), räknat mot webbläsarens datum.
+  // Okänt hämtdatum räknas som gammalt – gammal data får aldrig se färsk ut.
+  function isFresh(now, day) {
+    const fetched = now && typeof now.fetchedAt === "string" ? now.fetchedAt.slice(0, 10) : null;
+    if (!isDate(fetched) || !isDate(day)) return false;
+    const ages = (now.rules && now.rules.lampMaxAgeDays) || {};
+    const max = fin(ages.default) ? ages.default : 4;
+    const age = (Date.parse(day + "T00:00:00Z") - Date.parse(fetched + "T00:00:00Z")) / 86400000;
+    return age <= max;
+  }
+
   // ---------- Walters första drag ----------
   // En ny Walter handlar samma dag han skapas: dagens marknadsrad (market.now) räknas och genomförs direkt,
   // så att användaren ser Walters första drag. lastDay är oförändrad (loggens senaste dag), så dagen spelas
   // aldrig upp två gånger. Returnerar journalposten, eller null om något saknas (då väntar Walter).
-  function firstMove(user, market) {
+  function firstMove(user, market, day) {
     const now = market && market.now;
     const exchange = (root.WALTER_EXCHANGES || []).find((x) => x.id === user.exchangeId) || null;
     if (!now || !now.ready || !now.rules || !now.levels || !exchange || !isDate(now.date) || !root.WalterEngine) return null;
+    // Gammal marknadsdata, eller en marknadsdag före starten, är aldrig "dagens" drag.
+    if (!isFresh(now, day || today()) || now.date < user.startDate) return null;
     const prop = root.WalterEngine.propose(user, now, now.rules, exchange);
     if (!prop.ready) return null;
     const entry = root.WalterEngine.apply(user, prop, now.date);
@@ -104,9 +119,31 @@
     return entry;
   }
 
+  // ---------- Lås upp ägarens Walter ----------
+  // Delas av introt och Inställningar. Bara en misslyckad dekryptering är "fel kod" – når jag inte filen
+  // kan koden vara rätt. Koden sparas (walter.ownerKey) först när den har låst upp data/owner.enc.
+  async function unlockOwner(code, fetchFn) {
+    const get = fetchFn || ((u, o) => root.fetch(u, o));
+    let env = null;
+    try {
+      const res = await get("data/owner.enc", { cache: "no-store" });
+      if (res && res.ok) env = await res.json();
+    } catch (e) { env = null; }
+    if (!env) return { ok: false, msg: "Jag når inte ägarfilen just nu." };
+    try { await root.WalterVault.decrypt(env, code); } catch (e) { return { ok: false, msg: "Koden stämde inte." }; }
+    try { root.localStorage.setItem(OWNER_KEY, code); } catch (e) {
+      return { ok: false, msg: "Koden stämde, men din webbläsare låter mig inte spara den." };
+    }
+    return { ok: true, msg: "" };
+  }
+  // Ägaren glömmer koden på den här enheten
+  function forgetOwner() {
+    try { root.localStorage.removeItem(OWNER_KEY); return true; } catch (e) { return false; }
+  }
+
   // ---------- WALTER_STATE för appen ----------
   // Samma form som ägarens state.js. Allt kommer från användarens Walter + marknadsfilen; saknas något är det null.
-  function toState(user, market) {
+  function toState(user, market, browserDay) {
     const now = (market && market.now) || {};
     const day = now.date || user.lastDay;
     const usdsek = now.usdsek || null;
@@ -124,6 +161,9 @@
     } else if (!now.rules || !now.levels) {
       proposal = { ready: false, red: null, mode: user.mode, currentMode: user.mode, trades: [],
         valueSek: null, missing: [], plain: "Jag väntar på marknadsdata innan jag gör något." };
+    } else if (!isFresh(now, browserDay || today())) {
+      proposal = { ready: false, red: null, mode: user.mode, currentMode: user.mode, trades: [],
+        valueSek: null, missing: [], plain: "Walter väntar på färsk marknadsdata." };
     } else {
       proposal = root.WalterEngine.propose(copy(user), now, now.rules, exchange);
     }
@@ -158,5 +198,5 @@
     };
   }
 
-  root.WalterUser = { load, save, storageOk, create, firstMove, exportFile, importText, toState, today };
+  root.WalterUser = { load, save, storageOk, create, isFresh, firstMove, exportFile, importText, toState, today, unlockOwner, forgetOwner };
 })(typeof window !== "undefined" ? window : this);
