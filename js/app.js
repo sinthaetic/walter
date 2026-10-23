@@ -156,8 +156,13 @@
   $("status-line").textContent = "STATUS · " + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
   $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
     <h1 class="mode-name">${esc(MODE.word)}</h1>`;
-  $("quote").textContent = MODE.quote;
-  $("mode-explain").textContent = "Läget räknas från hur många av de tio lamporna som är röda: få röda och Walter köper, många röda och han vilar i kontanter.";
+  // Ägarens läge byts bara via journalen: säg rakt ut när lamporna redan pekar på något annat
+  const Pnow = S.proposal || {};
+  const pending = !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
+  $("quote").textContent = MODE.quote + (pending
+    ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter väntar på ditt JA i paper.bat.`
+    : "");
+  $("mode-explain").textContent = "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
 
   // ---------- Ringen: tio bågar, en per lampa ----------
   const lampState = (l) => (l.status === "red" ? "red" : l.status === "green" ? "green" : "wait");
@@ -173,13 +178,15 @@
       <svg viewBox="0 0 150 150" role="img" aria-label="Tio lampor: ${nRed} röda, ${nGreen} gröna, ${nWait} väntar på data">
         <circle class="base" cx="75" cy="75" r="72"/>${arcs}
       </svg>
-      <div class="ring-center" aria-hidden="true"><span class="num">${pad(red)}/${total}</span><span class="label">RÖDA</span></div>
+      <div class="ring-center" aria-hidden="true"><span class="num">${pad(red)}/${total}</span><span class="label">VARNINGAR</span></div>
     </div>
     <div class="legend">
-      <span><i class="r"></i>${nRed} röda</span>
-      <span><i class="g"></i>${nGreen} gröna</span>
+      <span><i class="r"></i>${nRed} röda = varning</span>
+      <span><i class="g"></i>${nGreen} gröna = lugnt</span>
       <span><i class="w"></i>${nWait} väntar</span>
-      <span class="note">${parked ? `VAKNAR VID ${S.rules.wakeAtRed}/${total}` : `VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}`}</span>
+      <span class="note">${parked
+        ? (red <= S.rules.wakeAtRed ? `LAMPORNA SÄGER VAKNA` : `VAKNAR VID ${S.rules.wakeAtRed}/${total}`)
+        : `VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}`}</span>
     </div>`;
 
   // ---------- Portfölj ----------
