@@ -125,8 +125,20 @@
   };
 
   // Taket på nuvarande level = summan av upplåsta tak (Level 1: 35 %, Level 3: 75 %)
-  const unlocked = { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
+  // Autopiloten (rules.strategy, standard sedan 23 okt 2026): fasta andelar, koll en dag i veckan.
+  // Lamporna och läget är bara Walters väderrapport, och Levels låser inget.
+  const AUTO = (S.rules.strategy || "autopilot") === "autopilot";
+  const unlocked = AUTO ? { BTC: true, ETH: true, GOLD: true } : { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
   const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
+  const capPct = (k) => nf(0).format(S.rules.caps[k] * 100);
+  const apDay = String((S.rules.decision && S.rules.decision.weekday) || "söndag").toLowerCase();
+  const apBand = S.rules.decision && S.rules.decision.bandPp != null ? S.rules.decision.bandPp : 5;
+  const E = window.WalterEngine;
+  const apNext = (S.proposal && S.proposal.nextCheck) || (E && S.updatedAt ? E.nextCheck(S.updatedAt, S.rules) : null);
+  const apNextText = apNext && E ? E.dayText(apNext) : null;
+  const autoLine = `Autopilot: ${capPct("BTC")} % bitcoin · ${capPct("ETH")} % ethereum · ${capPct("GOLD")} % guld · ` +
+    `${nf(0).format((1 - S.rules.caps.BTC - S.rules.caps.ETH - S.rules.caps.GOLD) * 100)} % kontant. ` +
+    `Jag justerar på ${apDay}ar om något glidit mer än ${apBand} %.`;
 
   // Rapporterna skickas 08:13 och 22:05 (se .github/workflows/walter-auto.yml)
   const nextReport = () => {
@@ -153,16 +165,21 @@
   // ================================================================
   // ÖVERSIKT
   // ================================================================
-  $("status-line").textContent = "STATUS · " + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
+  $("status-line").textContent = (AUTO ? "WALTERS VÄDERRAPPORT · " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
   $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
     <h1 class="mode-name">${esc(MODE.word)}</h1>`;
   // Ägarens läge byts via journalen, som Walter skriver själv i Actionen: säg rakt ut när lamporna redan pekar på något annat
   const Pnow = S.proposal || {};
-  const pending = !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
-  $("quote").textContent = MODE.quote + (pending
-    ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`
-    : "");
-  $("mode-explain").textContent = "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
+  const pending = !AUTO && !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
+  $("quote").classList.toggle("auto", AUTO);
+  $("quote").textContent = AUTO
+    ? autoLine + (apNextText ? ` Nästa koll ${apNextText}.` : "")
+    : MODE.quote + (pending
+      ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`
+      : "");
+  $("mode-explain").textContent = AUTO
+    ? "Lamporna visar vädret men handlar inte. Jag säljer det som stigit och köper det som fallit – få affärer, låga avgifter och lite skatt."
+    : "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
 
   // ---------- Ringen: tio bågar, en per lampa ----------
   const lampState = (l) => (l.status === "red" ? "red" : l.status === "green" ? "green" : "wait");
@@ -184,7 +201,7 @@
       <span><i class="r"></i>${nRed} röda = varning</span>
       <span><i class="g"></i>${nGreen} gröna = lugnt</span>
       <span><i class="w"></i>${nWait} väntar</span>
-      <span class="note">${parked
+      <span class="note">${AUTO ? "BARA VÄDER · HANDLAR INTE" : parked
         ? (red <= S.rules.wakeAtRed ? `LAMPORNA SÄGER VAKNA` : `VAKNAR VID ${S.rules.wakeAtRed}/${total}`)
         : `VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}`}</span>
     </div>`;
@@ -197,7 +214,7 @@
       <div class="stats">
         <div><span>AVKASTNING</span><strong title="Marknadsvinst över alla insättningar">${avk}</strong></div>
         <div><span>KONTANT</span><strong>${nf(0).format((1 - invested) * 100)} %</strong></div>
-        <div><span>INVESTERAT</span><strong title="Tak på Level ${S.level}">${nf(0).format(invested * 100)} / ${nf(0).format(levelCap * 100)} %</strong></div>
+        <div><span>INVESTERAT</span><strong title="${AUTO ? "Autopilotens mål" : `Tak på Level ${S.level}`}">${nf(0).format(invested * 100)} / ${nf(0).format(levelCap * 100)} %</strong></div>
       </div>
     </div>
     <div class="candles" id="candles"><span class="small">Hämtar bitcoin …</span></div>
@@ -271,6 +288,8 @@
     ? isUser
       ? `${confirmed} av ${total} lampor har data här. Walter väntar på resten innan han gör något.`
       : `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
+    : AUTO
+      ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}). Lamporna är väderrapporten – de ändrar inga affärer.`
     : !P.ready || P.mode === S.mode
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
       : isUser
@@ -297,12 +316,14 @@
   $("proposal").innerHTML = `
     <h3>WALTER GJORDE</h3>
     <div class="kv">
-      <div><span>LÄGE ENLIGT LAMPORNA</span><strong>${P.ready ? esc(modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
-      <div><span>RÖDA LAMPOR</span><strong>${P.ready ? `${P.red}/${total}` : "–"}</strong></div>
+      <div><span>${AUTO ? "VÄDERRAPPORT" : "LÄGE ENLIGT LAMPORNA"}</span><strong>${P.ready && P.mode ? esc(modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
+      ${AUTO
+        ? `<div><span>NÄSTA KOLL</span><strong>${apNextText ? esc(apNextText.toUpperCase()) : "–"}</strong></div>`
+        : `<div><span>RÖDA LAMPOR</span><strong>${P.ready ? `${P.red}/${total}` : "–"}</strong></div>`}
       <div><span>SHARPE</span><strong title="Avkastning per risk, räknas efter 30 dagars handel. Insättningar räknas inte.">${sharpeTxt}</strong></div>
     </div>
     <p class="explain"><b>Sharpe:</b> Avkastning per risk. Visas efter 30 dagars handel.</p>
-    ${P.ready ? "" : `<p class="plain"><b>${esc(P.plain)}</b></p>`}
+    ${AUTO && P.ready ? `<p class="plain"><b>${esc(P.plain)}</b></p>` : P.ready ? "" : `<p class="plain"><b>${esc(P.plain)}</b></p>`}
     <p class="plain">${lastDone ? `<b>Senast (${day(lastDone.date)}):</b> ${esc(lastDone.plain)}` : "Walter har inte gjort något än. Han räknar och handlar nästa gång marknadsdatan uppdateras."}</p>
     <p class="small" style="margin-top:12px">Walter handlar själv åt dig och skriver upp varje affär i loggen. Du behöver inte godkänna något. Låtsaspengar (PAPER).</p>`;
 
@@ -318,7 +339,7 @@
     <h3>STATUS</h3>
     <div class="kv">
       <div><span>SENAST HÄMTAD</span><strong id="status-time">${stamp(S.fetchedAt)}</strong></div>
-      <div><span>WALTER</span><strong>${esc(MODE.word)} · ${red}/${total}</strong></div>
+      <div><span>${AUTO ? "VÄDER" : "WALTER"}</span><strong>${esc(MODE.word)} · ${red}/${total}</strong></div>
       <div><span>MARKNADSVINST</span><strong class="${marketGain < 0 ? "down" : marketGain > 0 ? "up" : ""}">${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))}</strong></div>
     </div>
     ${S.notis && S.notis.text ? `<p class="plain">${esc(S.notis.text)}${notisOld ? ` <span class="small">(från ${day(S.notis.at)})</span>` : ""}</p>` : ""}
@@ -376,9 +397,9 @@
   // ---------- Fördelning ----------
   const share = (k) => (pf.value > 0 ? pf.holdings[k] / pf.value : 0);
   const rows = [
-    { k: "BTC", name: "Bitcoin", note: "Level 1", cap: S.rules.caps.BTC },
-    { k: "ETH", name: "Ethereum", note: "Level 2", cap: S.rules.caps.ETH },
-    { k: "GOLD", name: "Guld", note: "PAXG / XAUT · L3", cap: S.rules.caps.GOLD },
+    { k: "BTC", name: "Bitcoin", note: AUTO ? "mål" : "Level 1", cap: S.rules.caps.BTC },
+    { k: "ETH", name: "Ethereum", note: AUTO ? "mål" : "Level 2", cap: S.rules.caps.ETH },
+    { k: "GOLD", name: "Guld", note: AUTO ? "PAXG · mål" : "PAXG / XAUT · L3", cap: S.rules.caps.GOLD },
     { k: "CASH", name: "Kontant", note: "minst 25 %", cap: null }
   ];
   $("allocation").innerHTML = `
@@ -398,7 +419,9 @@
         </div>`;
       }).join("")}
     </div>
-    <p class="small" style="margin-top:16px">Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).</p>`;
+    <p class="small" style="margin-top:16px">${AUTO
+      ? `Investerat ${nf(0).format(invested * 100)} %. Strecket visar autopilotens mål (golv för kontanter). Inom ${apBand} procentenheter från målet rör jag ingenting.`
+      : `Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).`}</p>`;
 
   // ---------- Nivåer ----------
   // Upplåsning räknas ALLTID på marknadsvinst över insättningarna – insättningar låser aldrig upp.
@@ -454,7 +477,12 @@
       [`Oro: VIX över ${g.vixAbove} (nu ${m.vix.value != null ? nf(1).format(m.vix.value) : "?"}) eller S&P 500 under 50-dagarssnitt`, goldWanted]
     ] }
   ];
-  $("levels").innerHTML = `
+  $("unlock").hidden = AUTO;
+  if (AUTO) {
+    $("levels").innerHTML = `
+    <h3>NIVÅER</h3>
+    <p class="plain">Inte aktivt i autopiloten. Bitcoin, ethereum och guld köps från första dagen, i fasta andelar.</p>`;
+  } else $("levels").innerHTML = `
     <h3>NIVÅER</h3>
     <p class="explain">Walter får handla med fler tillgångar först när han har tjänat pengar på marknaden. Insättningar låser aldrig upp något.</p>
     ${levels.map((l) => `
@@ -465,7 +493,7 @@
       </div>`).join("")}`;
 
   // ---------- Vägen till Level 2 ----------
-  $("unlock").innerHTML = `
+  if (!AUTO) $("unlock").innerHTML = `
     <h3>VÄGEN TILL LEVEL 2</h3>
     <p class="small">En av vägarna räcker.</p>
     <p class="explain"><b>Drawdown:</b> Hur långt värdet har fallit från sin högsta punkt.</p>
@@ -936,7 +964,7 @@
     const yOf = (p) => Y0 - (p / gPct) * (Y0 - Y1);
     const pts = Array.from({ length: n + 1 }, (_, i) => { const f = i / n; return [X0 + f * (X1 - X0), yOf((Math.pow(1 + gPct / 100, f) - 1) * 100)]; });
     const d = pts.map((p, k) => (k ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
-    const marks = [[lv2Gain, "ETH"], [lv3 ? lv3.gainPct : null, "GULD"]].filter(([p]) => p != null && p <= gPct);
+    const marks = AUTO ? [] : [[lv2Gain, "ETH"], [lv3 ? lv3.gainPct : null, "GULD"]].filter(([p]) => p != null && p <= gPct);
     const when = (p) => { const mm = Math.round(frac(p) * months); return mm < 1 ? "direkt" : mm >= 12 ? nf(1).format(mm / 12) + " år" : mm + " mån"; };
     $("plan-chart").setAttribute("aria-label", `Kurva från ${kr(plan.start)} till ${kr(target)} på ${months} månader`);
     $("plan-chart").innerHTML = `
