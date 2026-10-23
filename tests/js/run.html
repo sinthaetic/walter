@@ -27,16 +27,23 @@ window.addEventListener("load", async () => {
   for (const t of _tests) {
     try { await t.fn(); } catch (e) { fails.push("FAIL " + t.name + ": " + e.message); }
   }
+  if (!_tests.length) fails.push("FAIL inga tester registrerades");
   document.getElementById("result").textContent =
     fails.length ? fails.join("\n") : "PASS " + _tests.length;
 });
 window.addEventListener("error", (e) => {
   _tests.push({ name: "laddning " + (e.filename || "").split("/").pop(), fn() { throw new Error(e.message); } });
 });
+// En fil som inte går att ladda (t.ex. 404) blir ett FAIL i stället för att tyst försvinna.
+function _missing(el) {
+  _tests.push({ name: "laddning " + el.getAttribute("src"), fn() { throw new Error("filen kunde inte laddas"); } });
+}
 </script>
-<!-- Skript under test -->
-<script src="../../js/vault.js"></script>
+<!-- Skript under test (onerror="_missing(this)" på varje rad) -->
+<script src="../../js/vault.js" onerror="_missing(this)"></script>
+<script src="../../js/engine.js" onerror="_missing(this)"></script>
 <!-- Testfiler: lägg till en rad per fil -->
-<script src="vault.test.js"></script>
+<script src="vault.test.js" onerror="_missing(this)"></script>
+<script src="engine.test.js" onerror="_missing(this)"></script>
 </body>
 </html>

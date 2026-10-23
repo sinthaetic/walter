@@ -1,0 +1,898 @@
+{
+ "rules": {
+  "parkeraAtRed": 7,
+  "wakeAtRed": 5,
+  "modes": {
+   "buyAtRed": 2,
+   "buyLittleAtRed": 4,
+   "littleShare": 0.5
+  },
+  "paper": {
+   "minTradePct": 2
+  },
+  "maxInvested": 0.75,
+  "minCash": 0.25,
+  "caps": {
+   "BTC": 0.35,
+   "ETH": 0.2,
+   "GOLD": 0.2
+  },
+  "unlock": {
+   "early": {
+    "days": 15,
+    "gainPct": 20,
+    "maxDd": 8,
+    "minGreen": 7
+   },
+   "normal": {
+    "days": 30,
+    "gainPct": 10,
+    "maxDd": 12
+   }
+  },
+  "ethMaxRed": 4,
+  "gold": {
+   "vixAbove": 20,
+   "spxBelowMa": true,
+   "allowedWhenParked": true
+  },
+  "withdrawalFees": {
+   "takerPct": 0.4,
+   "slippagePct": 0.2,
+   "sepaEur": 1,
+   "fxPct": 1
+  },
+  "lampThresholds": {
+   "spxMaDays": 50,
+   "btcMaDays": 200,
+   "btcWeekDropPct": -10,
+   "vixAbove": 20,
+   "us10yRisePp": 0.25,
+   "dxyMaDays": 50,
+   "etfDays": 5,
+   "mvrvZ": 3,
+   "soprAvgDays": 7,
+   "sopr": 1
+  },
+  "lampMaxAgeDays": {
+   "default": 4,
+   "etf": 6,
+   "mvrv": 10,
+   "sopr": 10,
+   "cpi": 35
+  }
+ },
+ "exchange": {
+  "id": "test",
+  "quote": "SEK",
+  "takerPct": 0.4,
+  "slippagePct": 0.2,
+  "fxPct": 1,
+  "assets": {
+   "BTC": true,
+   "ETH": true,
+   "GOLD": true
+  }
+ },
+ "cases": [
+  {
+   "name": "offensiv_from_cash",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 1,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "AVVAKTAR",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 100000,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 100000
+     },
+     "positions": {},
+     "firstTrade": null,
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "OFFENSIV",
+    "valueSek": 100000,
+    "trades": [
+     {
+      "asset": "BTC",
+      "side": "köp",
+      "units": 0.03313332,
+      "priceSek": 1050000.37,
+      "sek": 35000.0,
+      "feeSek": 210.0
+     }
+    ],
+    "portfolio": {
+     "start": 100000,
+     "value": 99790.0,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 34790.0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 65000.0
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.03313332,
+       "costSek": 35000.0,
+       "since": "2026-10-05"
+      }
+     },
+     "firstTrade": "2026-10-05",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99790.0,
+       "cash": 65000.0,
+       "note": "köp"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "normal_half_caps",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 3,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "AVVAKTAR",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 100000,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 100000
+     },
+     "positions": {},
+     "firstTrade": null,
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "NORMAL",
+    "valueSek": 100000,
+    "trades": [
+     {
+      "asset": "BTC",
+      "side": "köp",
+      "units": 0.01656666,
+      "priceSek": 1050000.37,
+      "sek": 17500.0,
+      "feeSek": 105.0
+     }
+    ],
+    "portfolio": {
+     "start": 100000,
+     "value": 99895.0,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 17395.0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 82500.0
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.01656666,
+       "costSek": 17500.0,
+       "since": "2026-10-05"
+      }
+     },
+     "firstTrade": "2026-10-05",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99895.0,
+       "cash": 82500.0,
+       "note": "köp"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "normal_trims_btc",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 3,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "OFFENSIV",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 100000.01,
+     "peak": 100000.01,
+     "holdings": {
+      "BTC": 34650.01,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 65350
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.033,
+       "costSek": 30000,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "NORMAL",
+    "valueSek": 100000.01,
+    "trades": [
+     {
+      "asset": "BTC",
+      "side": "sälj",
+      "units": 0.01633334,
+      "priceSek": 1050000.37,
+      "sek": 17150.01,
+      "feeSek": 102.9
+     }
+    ],
+    "portfolio": {
+     "start": 100000,
+     "value": 99897.11,
+     "peak": 100000.01,
+     "holdings": {
+      "BTC": 17500.0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 82397.11
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.01666666,
+       "costSek": 15151.51,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99897.11,
+       "cash": 82397.11,
+       "note": "sälj"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "avvaktar_keeps",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 5,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "NORMAL",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 99850.01,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 17850.01,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 82000
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.017,
+       "costSek": 17500,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "AVVAKTAR",
+    "valueSek": 99850.01,
+    "trades": [],
+    "portfolio": {
+     "start": 100000,
+     "value": 99850.01,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 17850.01,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 82000
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.017,
+       "costSek": 17500,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99850.01,
+       "cash": 82000,
+       "note": "läge"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "parkera_sells_all",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 7,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "NORMAL",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 99850.01,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 17850.01,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 82000
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.017,
+       "costSek": 17500,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "PARKERA",
+    "valueSek": 99850.01,
+    "trades": [
+     {
+      "asset": "BTC",
+      "side": "sälj",
+      "units": 0.017,
+      "priceSek": 1050000.37,
+      "sek": 17850.01,
+      "feeSek": 107.1
+     }
+    ],
+    "portfolio": {
+     "start": 100000,
+     "value": 99742.91,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0.0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 99742.91
+     },
+     "positions": {
+      "BTC": {
+       "units": 0,
+       "costSek": 0,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99742.91,
+       "cash": 99742.91,
+       "note": "sälj"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "buffer_6_stays_parked",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 6,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "PARKERA",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 100000,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 100000
+     },
+     "positions": {},
+     "firstTrade": null,
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "PARKERA",
+    "valueSek": 100000,
+    "trades": [],
+    "portfolio": {
+     "start": 100000,
+     "value": 100000,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 100000
+     },
+     "positions": {},
+     "firstTrade": null,
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 100000,
+       "cash": 100000,
+       "note": "läge"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "buffer_5_wakes",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 5,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "PARKERA",
+    "level": 1,
+    "portfolio": {
+     "start": 100000,
+     "value": 100000,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 100000
+     },
+     "positions": {},
+     "firstTrade": null,
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "AVVAKTAR",
+    "valueSek": 100000,
+    "trades": [],
+    "portfolio": {
+     "start": 100000,
+     "value": 100000,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 100000
+     },
+     "positions": {},
+     "firstTrade": null,
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 100000,
+       "cash": 100000,
+       "note": "läge"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "eth_level2",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 2,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": true,
+    "vix": 15,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "OFFENSIV",
+    "level": 2,
+    "portfolio": {
+     "start": 100000,
+     "value": 100000.01,
+     "peak": 100000.01,
+     "holdings": {
+      "BTC": 34650.01,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 65350
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.033,
+       "costSek": 30000,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "OFFENSIV",
+    "valueSek": 100000.01,
+    "trades": [
+     {
+      "asset": "ETH",
+      "side": "köp",
+      "units": 0.5215793,
+      "priceSek": 38115.01,
+      "sek": 20000.0,
+      "feeSek": 120.0
+     }
+    ],
+    "portfolio": {
+     "start": 100000,
+     "value": 99880.01,
+     "peak": 100000.01,
+     "holdings": {
+      "BTC": 34650.01,
+      "ETH": 19880.0,
+      "GOLD": 0,
+      "CASH": 45350.0
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.033,
+       "costSek": 30000,
+       "since": "2026-10-01"
+      },
+      "ETH": {
+       "units": 0.5215793,
+       "costSek": 20000.0,
+       "since": "2026-10-05"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99880.01,
+       "cash": 45350.0,
+       "note": "köp"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "gold_level3_parked",
+   "row": {
+    "date": "2026-10-05",
+    "ready": true,
+    "red": 8,
+    "px": {
+     "BTC": 1050000.37,
+     "ETH": 38115.013431,
+     "GOLD": 37000.5
+    },
+    "ethBtcAbove30dMa": false,
+    "vix": 25,
+    "spxBelowMa": false
+   },
+   "user": {
+    "mode": "PARKERA",
+    "level": 3,
+    "portfolio": {
+     "start": 100000,
+     "value": 99850.01,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 17850.01,
+      "ETH": 0,
+      "GOLD": 0,
+      "CASH": 82000
+     },
+     "positions": {
+      "BTC": {
+       "units": 0.017,
+       "costSek": 17500,
+       "since": "2026-10-01"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      }
+     ]
+    }
+   },
+   "expect": {
+    "mode": "PARKERA",
+    "valueSek": 99850.01,
+    "trades": [
+     {
+      "asset": "BTC",
+      "side": "sälj",
+      "units": 0.017,
+      "priceSek": 1050000.37,
+      "sek": 17850.01,
+      "feeSek": 107.1
+     },
+     {
+      "asset": "GOLD",
+      "side": "köp",
+      "units": 0.53648416,
+      "priceSek": 37000.5,
+      "sek": 19970.0,
+      "feeSek": 119.82
+     }
+    ],
+    "portfolio": {
+     "start": 100000,
+     "value": 99623.09,
+     "peak": 100000,
+     "holdings": {
+      "BTC": 0.0,
+      "ETH": 0,
+      "GOLD": 19850.18,
+      "CASH": 79772.91
+     },
+     "positions": {
+      "BTC": {
+       "units": 0,
+       "costSek": 0,
+       "since": "2026-10-01"
+      },
+      "GOLD": {
+       "units": 0.53648416,
+       "costSek": 19970.0,
+       "since": "2026-10-05"
+      }
+     },
+     "firstTrade": "2026-10-01",
+     "history": [
+      {
+       "date": "2026-10-01",
+       "value": 100000,
+       "cash": 100000,
+       "note": "start",
+       "flow": 100000
+      },
+      {
+       "date": "2026-10-05",
+       "value": 99623.09,
+       "cash": 79772.91,
+       "note": "köp/sälj"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
