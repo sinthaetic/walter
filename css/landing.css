@@ -140,7 +140,27 @@ html.landing-on, html.landing-on body { overflow: hidden; }
 }
 @media (max-height: 640px) and (max-width: 600px) { #landing .tag { font-size: 14px; line-height: 1.5; } #landing .logo { width: 72px; height: 72px; } }
 @media (max-height: 700px) { #landing .lab .readout { display: none; } }
-@media (max-height: 520px) { #landing .tag, #landing .status { display: none; } }
+/* Låga skärmar (liggande mobil, små laptops): tätare så att allt ryms i glaset */
+@media (max-height: 640px) and (min-width: 601px) {
+  #landing .pane { width: min(880px, calc(100% - 144px)); height: calc(100vh - 32px); height: calc(100dvh - 32px); max-height: 560px; }
+  #landing .content { padding: 20px 32px 8px; }
+  #landing .kicker { margin-bottom: 18px; }
+  #landing .logo { width: 76px; height: 76px; }
+  #landing .word { margin-top: 18px; font-size: clamp(34px, 5vw, 46px); }
+  #landing .tag { margin-top: 16px; font-size: 15px; line-height: 1.5; }
+  #landing .cta { margin-top: 22px; height: 48px; }
+  #landing .status { padding-bottom: 16px; }
+}
+@media (max-height: 520px) {
+  #landing .tag, #landing .status { display: none; }
+  #landing .pane { height: calc(100vh - 32px); height: calc(100dvh - 32px); }
+  #landing .content { padding: 16px 24px; }
+  #landing .kicker { margin-bottom: 14px; }
+  #landing .logo { width: 56px; height: 56px; }
+  #landing .word { margin-top: 14px; font-size: 34px; }
+  #landing .cta { margin-top: 18px; height: 46px; }
+  #landing .lab .ring { width: 260px; height: 260px; margin: -130px 0 0 -130px; }
+}
 
 /* Stilla sida: inga loopar, ingen toning, texten syns direkt */
 @media (prefers-reduced-motion: reduce) {

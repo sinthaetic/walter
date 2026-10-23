@@ -10,6 +10,8 @@
 
   let root = null, raf = 0, clockTimer = 0, glitchTimer = 0, glitchOff = 0, offResize = null;
 
+  const appParts = () => document.querySelectorAll("body > header, body > main, body > footer");
+
   function setText(el, lines) {
     el.textContent = "";
     lines.forEach((t, i) => { if (i) el.appendChild(document.createElement("br")); el.appendChild(document.createTextNode(t)); });
@@ -72,10 +74,14 @@
   }
 
   function show(market, onEnter) {
+    // Idempotent: en andra show() städar först bort timers, rAF och lyssnare från den förra
+    hide();
     root = document.getElementById("landing");
     if (!root) { if (onEnter) onEnter(); return; }
     const still = reduce();
     document.documentElement.classList.add("landing-on");
+    // Appen bakom landningen går inte att nå med tangentbord eller skärmläsare
+    appParts().forEach((el) => { el.inert = true; });
     root.hidden = false;
     root.classList.remove("leaving");
     fillLab(market);
@@ -115,16 +121,23 @@
       p: Math.random() * 6.28, s: 0.00012 + Math.random() * 0.00012, r: 0.45 + Math.random() * 0.3,
       c: ["--blob1", "--blob2", "--blob3", "--blob1", "--blob2"][i], a: [0.32, 0.3, 0.12, 0.22, 0.2][i]
     }));
-    const draw = (t) => {
+    // Färgerna läses en gång och på nytt när temat byts, inte varje bildruta
+    let colors = null;
+    const readColors = () => {
       const css = getComputedStyle(root);
+      colors = { bg: css.getPropertyValue("--bg-solid").trim() || "#D7E0E3", dark: isDark() };
+      ["--blob1", "--blob2", "--blob3"].forEach((k) => { colors[k] = css.getPropertyValue(k).trim(); });
+    };
+    readColors();
+    const draw = (t) => {
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = css.getPropertyValue("--bg-solid").trim() || "#D7E0E3";
+      ctx.fillStyle = colors.bg;
       ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = isDark() ? "lighter" : "source-over";
+      ctx.globalCompositeOperation = colors.dark ? "lighter" : "source-over";
       blobs.forEach((b, i) => {
         const x = W * (0.5 + 0.38 * Math.sin(t * b.s + b.p + i)), y = H * (0.5 + 0.34 * Math.cos(t * b.s * 1.3 + b.p * 2));
         const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(W, H) * b.r);
-        const rgb = css.getPropertyValue(b.c).trim();
+        const rgb = colors[b.c];
         g.addColorStop(0, `rgba(${rgb},${b.a})`); g.addColorStop(1, `rgba(${rgb},0)`);
         ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       });
@@ -150,6 +163,7 @@
       if (dark) document.documentElement.dataset.theme = "dark"; else delete document.documentElement.dataset.theme;
       try { localStorage.setItem("walterDark", dark ? "1" : "0"); } catch (e) { /* lagring blockerad */ }
       syncThemeMeta();
+      readColors();
       if (still) draw(0);
     };
 
@@ -173,8 +187,13 @@
     clearInterval(clockTimer); clearTimeout(glitchTimer); clearTimeout(glitchOff);
     if (offResize) { offResize(); offResize = null; }
     document.documentElement.classList.remove("landing-on");
+    appParts().forEach((p) => { p.inert = false; });
     const el = root || document.getElementById("landing");
     if (el) {
+      const pane = el.querySelector(".pane");
+      if (pane) { pane.onpointermove = null; pane.onpointerleave = null; }
+      const frost = el.querySelector(".frost");
+      if (frost) { frost.style.removeProperty("--mx"); frost.style.removeProperty("--my"); }
       el.hidden = true; el.classList.remove("leaving");
       const logo = el.querySelector(".logo");
       if (logo) logo.classList.remove("glitch");
