@@ -10,9 +10,12 @@
 
   // ---------- Lokal lagring (bara den här webbläsaren, try/catch om den är blockerad) ----------
   const store = {
-    get(k, def, area = localStorage) { try { const v = area.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } },
-    set(k, v, area = localStorage) { try { area.setItem(k, JSON.stringify(v)); } catch { /* lagring blockerad */ } }
+    // area = "localStorage" eller "sessionStorage"; slås upp inne i try, eftersom själva åtkomsten kan kasta
+    get(k, def, area = "localStorage") { try { const v = window[area].getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } },
+    set(k, v, area = "localStorage") { try { window[area].setItem(k, JSON.stringify(v)); } catch { /* lagring blockerad */ } }
   };
+  // Användarens plan och mål har egna nycklar, så att ägarens värden aldrig blandas in i en användares Walter.
+  const own = (k) => (ctx && ctx.who === "user" ? "walter.user." : "walter.") + k;
   const settings = store.get("walter.settings", {});
   // Startkapital kommer bara från state.json. Ett gammalt eget värde (från 500-kronorstiden) rensas bort.
   if ("startCapital" in settings) { delete settings.startCapital; store.set("walter.settings", settings); }
@@ -727,7 +730,7 @@
   const GOALS = [10, 20, 50, 100];
   const TIMES = [[6, "6 MÅN"], [12, "1 ÅR"], [36, "3 ÅR"], [60, "5 ÅR"]];
   const QUICK = [5000, 25000, 100000, deposits, 1000000].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
-  const plan = Object.assign({ start: deposits, goal: 1, time: 1 }, store.get("walter.plan", {}));
+  const plan = Object.assign({ start: deposits, goal: 1, time: 1 }, store.get(own("plan"), {}));
   if (!(plan.start > 0)) plan.start = deposits;
   if (!GOALS[plan.goal]) plan.goal = 1;
   if (!TIMES[plan.time]) plan.time = 1;
@@ -735,7 +738,7 @@
 
   const PURPOSES = { bil: ["Bil", "en bil"], husinsats: ["Husinsats", "en husinsats"], resa: ["Resa", "en resa"], rakningar: ["Räkningar", "räkningar"], buffert: ["Buffert", "en buffert"], annat: ["Annat", "ditt mål"] };
   const HORIZONS = { "1v": [7, "1 vecka"], "1m": [30, "1 månad"], "3m": [91, "3 månader"], "6m": [182, "6 månader"] };
-  const goal = Object.assign({ amount: 50000, purpose: "buffert", horizon: "1m" }, store.get("walter.goal", {}));
+  const goal = Object.assign({ amount: 50000, purpose: "buffert", horizon: "1m" }, store.get(own("goal"), {}));
   if (!HORIZONS[goal.horizon]) goal.horizon = "1m";
   if (!PURPOSES[goal.purpose]) goal.purpose = "buffert";
   if (!(goal.amount > 0)) goal.amount = 50000;
@@ -849,7 +852,7 @@
       <path class="curve" d="${d}" vector-effect="non-scaling-stroke"/>
       ${marks.map(([p]) => { const x = X0 + frac(p) * (X1 - X0), y = yOf(p); return `<line class="l2" x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${Y0}" vector-effect="non-scaling-stroke"/><circle class="l2dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`; }).join("")}`;
     $("plan-legend").innerHTML = `<span>START · ${kr(plan.start)}</span>${marks.map(([p, a]) => `<span class="l2t">${a} VID +${p} % · ${when(p)}</span>`).join("")}<span>MÅL +${gPct} % · ${kr(target)}</span>`;
-    store.set("walter.plan", plan);
+    store.set(own("plan"), plan);
   };
   $("plan-minus").addEventListener("click", () => { plan.start = Math.max(500, plan.start - stepOf(plan.start - 1)); renderPlan(); });
   $("plan-plus").addEventListener("click", () => { plan.start = Math.min(100000000, plan.start + stepOf(plan.start)); renderPlan(); });
@@ -947,7 +950,7 @@
     custom.value = goal.amount;
     $("goal-purpose").value = goal.purpose;
     document.querySelectorAll("#goal [data-h]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.h === goal.horizon)));
-    store.set("walter.goal", goal);
+    store.set(own("goal"), goal);
     renderGoal();
   };
   range.addEventListener("input", () => { goal.amount = +range.value; syncGoal(); });
@@ -973,7 +976,7 @@
   // ---------- PAPER / LIVE ----------
   // PAPER är standard. LIVE kräver "JA GÅ LIVE" och gäller bara den här fliken (sessionStorage).
   const LIVE_PHRASE = "JA GÅ LIVE";
-  let live = store.get("walter.live", false, sessionStorage) === true;
+  let live = store.get("walter.live", false, "sessionStorage") === true;
   const dlg = $("live-dialog"), confirmInput = $("live-confirm"), okBtn = $("live-ok");
   const renderLive = () => {
     $("btn-paper").setAttribute("aria-pressed", String(!live));
@@ -984,7 +987,7 @@
       ? "LIVE · RIKTIGA PENGAR · WALTER LÄGGER INGA ORDER SJÄLV"
       : "PAPER TRADING · INGA RIKTIGA PENGAR") + ` · V${S.version} · DATA PER ${day(S.updatedAt).toUpperCase()}`;
   };
-  $("btn-paper").addEventListener("click", () => { live = false; store.set("walter.live", false, sessionStorage); renderLive(); });
+  $("btn-paper").addEventListener("click", () => { live = false; store.set("walter.live", false, "sessionStorage"); renderLive(); });
   $("btn-live").addEventListener("click", () => {
     if (live) return;
     confirmInput.value = "";
@@ -996,7 +999,7 @@
   $("live-form").addEventListener("submit", (e) => {
     if (e.submitter && e.submitter.value === "live" && confirmInput.value.trim() === LIVE_PHRASE) {
       live = true;
-      store.set("walter.live", true, sessionStorage);
+      store.set("walter.live", true, "sessionStorage");
     }
     renderLive();
   });

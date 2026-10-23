@@ -5,15 +5,8 @@
   "use strict";
 
   const KEY = "walter.user";
-  const VERSION = "1.13";
   const LAMPS = 10;
   const NOT_A_COPY = "Det här är ingen Walter-kopia";
-  // Nivåerna som ägarens state.json har (levels). Marknadsfilen bär dem inte; har den dem vinner de.
-  const LEVELS = {
-    1: { asset: "BTC", name: "Bitcoin" },
-    2: { asset: "ETH", name: "Ethereum", description: "Låses upp när en av vägarna i rules.unlock är klar (tidig eller normal)" },
-    3: { asset: "GULD", name: "Guld", gainPct: 50, maxDd: 12, description: "+50 % marknadsvinst över alla insättningar, drawdown under 12 %" }
-  };
 
   const copy = (o) => JSON.parse(JSON.stringify(o));
   const pad = (n) => String(n).padStart(2, "0");
@@ -85,14 +78,15 @@
     const fx = usdsek && usdsek.value ? usdsek.value : null;
     const px = now.px || {};
     const exchange = (root.WALTER_EXCHANGES || []).find((x) => x.id === user.exchangeId) || null;
-    const levels = copy(now.levels || LEVELS);
-    levels[1] = Object.assign({}, levels[1], { unlocked: true, since: user.startDate });
+    // Nivåerna (och versionen) kommer från marknadsfilen. Saknas de väntar Walter, precis som utan regler.
+    const levels = copy(now.levels || {});
+    if (levels[1]) levels[1] = Object.assign({}, levels[1], { unlocked: true, since: user.startDate });
 
     let proposal;
     if (!exchange) {
       proposal = { ready: false, red: now.red == null ? null : now.red, mode: user.mode, currentMode: user.mode, trades: [],
         valueSek: null, missing: [], plain: "Jag hittar inte din börs i listan, så jag räknar inget förslag." };
-    } else if (!now.rules) {
+    } else if (!now.rules || !now.levels) {
       proposal = { ready: false, red: null, mode: user.mode, currentMode: user.mode, trades: [],
         valueSek: null, missing: [], plain: "Jag väntar på marknadsdata innan jag gör något." };
     } else {
@@ -101,7 +95,7 @@
     proposal.asOf = day;
 
     return {
-      version: VERSION,
+      version: now.version || null,
       startDate: user.startDate,
       updatedAt: day,
       fetchedAt: now.fetchedAt || null,
@@ -129,5 +123,5 @@
     };
   }
 
-  root.WalterUser = { load, save, storageOk, create, exportFile, importText, toState, today, LEVELS };
+  root.WalterUser = { load, save, storageOk, create, exportFile, importText, toState, today };
 })(typeof window !== "undefined" ? window : this);

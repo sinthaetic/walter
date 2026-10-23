@@ -16,7 +16,8 @@ function fakeMarket() {
   return {
     now: { date: "2026-10-22", fetchedAt: "2026-10-22T23:06:56", ready: true, red: 3, mode: "NORMAL", lamps, px,
       usdsek: { value: 10, asOf: "2026-10-22", source: "Riksbanken" }, eursek: { value: 11, asOf: "2026-10-22", source: "Riksbanken" },
-      ethBtcAbove30dMa: false, btcLong: true, vix: 19, spxBelowMa: true, rules },
+      ethBtcAbove30dMa: false, btcLong: true, vix: 19, spxBelowMa: true, rules, version: "9.99",
+      levels: { 1: { asset: "BTC", name: "Bitcoin" }, 2: { asset: "ETH", name: "Ethereum" }, 3: { asset: "GULD", name: "Guld", gainPct: 50, maxDd: 12 } } },
     log: [{ date: "2026-10-21", ready: true, red: 4, px }, { date: "2026-10-22", ready: true, red: 3, px }]
   };
 }
@@ -115,6 +116,11 @@ test("toState_has_app_fields", () => {
   eq(S.market.spx.belowMa, true);
   eq(S.market.btc.value, 80000);
   eq(S.market.usdsek.value, 10);
+  // Version och nivåer kommer från marknadsfilen, inte från en egen kopia
+  eq(S.version, "9.99");
+  eq(S.levels[3], { asset: "GULD", name: "Guld", gainPct: 50, maxDd: 12 });
+  eq(S.levels[1].since, "2026-10-22");
+  eq("LEVELS" in WU(), false);
   // Användarens Walter ändras aldrig av att visas
   eq(JSON.stringify(u), before);
 });
@@ -129,4 +135,12 @@ test("toState_waits_without_data", () => {
   eq(S.proposal.ready, false);
   eq(S.market.btc.value, null);
   eq(S.market.vix.value, null);
+});
+
+test("toState_waits_without_levels", () => {
+  const m = fakeMarket();
+  delete m.now.levels;
+  const S = WU().toState(WU().create(10000, "kraken", "2026-10-22"), m);
+  eq(S.proposal.ready, false);
+  eq(S.levels, {});
 });

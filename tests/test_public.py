@@ -16,7 +16,10 @@ def fixture_state(statuses=None):
     return {
         "journal": [{"x": 1}], "portfolio": {"value": 1}, "k4": [1], "capitalChange": {"manualTopUp": 1},
         "daily": {}, "notis": {"t": 1}, "proposal": {"p": 1},
-        "fetchedAt": "2026-10-22T08:00:00",
+        "fetchedAt": "2026-10-22T08:00:00", "version": "1.13",
+        "levels": {"1": {"asset": "BTC", "name": "Bitcoin", "unlocked": True, "since": "2026-10-21"},
+                   "2": {"asset": "ETH", "name": "Ethereum", "description": "text"},
+                   "3": {"asset": "GULD", "name": "Guld", "gainPct": 50, "maxDd": 12, "description": "text"}},
         "rules": {"parkeraAtRed": 7, "wakeAtRed": 5, "modes": {"buyAtRed": 2, "buyLittleAtRed": 4}},
         "lamps": [{"id": f"l{i}", "name": f"L{i}", "rule": "r", "status": s, "value": "v", "asOf": "2026-10-22"}
                   for i, s in enumerate(statuses)],
@@ -46,7 +49,8 @@ class PublicTest(unittest.TestCase):
     def test_snapshot_keys_and_values(self):
         s = wpub.snapshot(fixture_state())
         self.assertEqual(set(s), {"date", "fetchedAt", "ready", "red", "mode", "lamps", "px", "usdsek", "eursek",
-                                  "ethBtcAbove30dMa", "btcLong", "vix", "spxBelowMa", "rules"})
+                                  "ethBtcAbove30dMa", "btcLong", "vix", "spxBelowMa", "rules",
+                                  "levels", "version"})
         self.assertTrue(s["ready"])
         self.assertEqual(s["red"], 3)
         self.assertEqual(s["mode"], "NORMAL")
@@ -54,6 +58,20 @@ class PublicTest(unittest.TestCase):
         self.assertEqual(s["date"], "2026-10-22")
         self.assertTrue(s["btcLong"])
         self.assertEqual(s["vix"], 18.5)
+
+    def test_snapshot_levels_only_public_fields(self):
+        s = wpub.snapshot(fixture_state())
+        self.assertEqual(s["version"], "1.13")
+        self.assertEqual(s["levels"], {"1": {"asset": "BTC", "name": "Bitcoin"},
+                                       "2": {"asset": "ETH", "name": "Ethereum"},
+                                       "3": {"asset": "GULD", "name": "Guld", "gainPct": 50, "maxDd": 12}})
+        for lv in s["levels"].values():
+            self.assertFalse(set(lv) - {"asset", "name", "gainPct", "maxDd"})
+
+    def test_snapshot_without_levels_is_null(self):
+        st = fixture_state()
+        del st["levels"]
+        self.assertIsNone(wpub.snapshot(st)["levels"])
 
     def test_not_ready_gives_null_mode(self):
         st = fixture_state(["red"] * 2 + [None] + ["green"] * 7)

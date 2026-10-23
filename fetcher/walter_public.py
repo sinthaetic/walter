@@ -30,6 +30,16 @@ def _fresh_px(m, px, day, rules):
     return {k: v if (m.get(src[k]) or {}).get("asOf") == day else None for k, v in px.items()}
 
 
+LEVEL_KEYS = ("asset", "name", "gainPct", "maxDd")
+
+
+def _public_levels(levels):
+    """Bara nivåernas regler (vad som låses upp och kraven), aldrig ägarens datum eller texter."""
+    if not levels:
+        return None
+    return {k: {f: v[f] for f in LEVEL_KEYS if f in v} for k, v in levels.items()}
+
+
 def snapshot(state):
     m = state.get("market", {})
     lamps = [{k: l.get(k) for k in ("id", "name", "rule", "status", "value", "asOf")} for l in state["lamps"]]
@@ -54,6 +64,8 @@ def snapshot(state):
         "vix": _value(m, "vix"),
         "spxBelowMa": (m.get("spx") or {}).get("belowMa"),
         "rules": state["rules"],
+        "levels": _public_levels(state.get("levels")),
+        "version": state.get("version"),
     }
 
 

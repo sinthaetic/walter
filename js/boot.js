@@ -41,9 +41,9 @@
     const now = market.now;
     const exchange = exchangeOf(user.exchangeId);
     let catchUpText = "";
-    if (exchange && now.rules) {
-      const levels = now.levels || U.LEVELS;
-      const res = window.WalterEngine.catchUp(user, market.log || [], now.rules, levels, exchange);
+    // Utan regler eller nivåer räknas inget ikapp (Walter väntar, toState säger det i förslaget).
+    if (exchange && now.rules && now.levels) {
+      const res = window.WalterEngine.catchUp(user, market.log || [], now.rules, now.levels, exchange);
       catchUpText = window.WalterEngine.summary(res.events);
       U.save(user);
     }
@@ -71,14 +71,12 @@
         if (res.ok) env = await res.json();
       } catch (e) { env = null; }
       if (env) {
-        try {
-          const o = await window.WalterVault.decrypt(env, key);
-          start(Object.assign({}, o.state, o.notis ? { notis: o.notis } : {}), { who: "owner" });
-          return;
-        } catch (e) {
-          ls.del(OWNER_KEY);
-          note("Koden stämde inte. Du ser den vanliga appen.");
-        }
+        // Bara dekrypteringen avgör om koden stämmer – ett fel när appen ritas får aldrig ta bort en rätt kod.
+        let o = null;
+        try { o = await window.WalterVault.decrypt(env, key); } catch (e) { o = null; }
+        if (o) { start(Object.assign({}, o.state, o.notis ? { notis: o.notis } : {}), { who: "owner" }); return; }
+        ls.del(OWNER_KEY);
+        note("Koden stämde inte. Du ser den vanliga appen.");
       } else {
         // Nätet eller filen svarar inte: koden kan vara rätt, så den sparas kvar till nästa gång.
         note("Jag når inte ägarfilen just nu. Du ser den vanliga appen.");
@@ -89,5 +87,5 @@
     enter();
   }
 
-  boot();
+  boot().catch(() => placeholder("Något gick fel när Walter startade. Ladda om sidan."));
 })();
