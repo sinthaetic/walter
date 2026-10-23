@@ -1,0 +1,149 @@
+/* Landningssidan (steg 9): frostad glasruta, labbet bakom, rörlig dimma.
+   Skiss: .superpowers/brainstorm/landning-v3.html. Färger från css/walter.css (samma tema, data-theme på <html>).
+   Alla loopar är sömlösa: periodisk kurva som glider ett helt varv, periodiskt ljussvep, alternate på skannern.
+   Filmkornet och logons glitch hackar med flit. */
+
+#landing {
+  --l-glass: rgba(255, 255, 255, .34); --l-edge: rgba(255, 255, 255, .8);
+  --blob1: 120, 190, 200; --blob2: 170, 185, 215; --blob3: 255, 255, 255;
+  --lab-ink: rgba(20, 34, 42, .85);
+  --vig: rgba(40, 60, 70, .18); --vig-from: 50%;
+  position: fixed; inset: 0; z-index: 50; overflow: hidden;
+  background: var(--bg-solid); color: var(--ink);
+  font-family: "Jost", system-ui, sans-serif; font-weight: 300;
+  opacity: 1; transition: opacity .6s ease, background-color .8s;
+}
+:root[data-theme="dark"] #landing {
+  --l-glass: rgba(255, 255, 255, .055); --l-edge: rgba(255, 255, 255, .14);
+  --blob1: 23, 128, 141; --blob2: 60, 80, 140; --blob3: 111, 211, 222;
+  --lab-ink: rgba(232, 240, 242, .9);
+  --vig: rgba(0, 0, 0, .55); --vig-from: 45%;
+}
+#landing.leaving { opacity: 0; pointer-events: none; }
+html.landing-on, html.landing-on body { overflow: hidden; }
+
+/* Rörlig bakgrund */
+#landing canvas.fluid { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Labbet bakom rutan */
+#landing .lab { position: absolute; inset: 0; color: var(--lab-ink); pointer-events: none; }
+#landing .lab .lamps { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); display: flex; gap: 34px; }
+#landing .lab .lamps i { width: 22px; height: 22px; border-radius: 50%; flex: none; animation: l-breathe 4s ease-in-out infinite; }
+#landing .lab .lamps i.g { background: var(--green); box-shadow: 0 0 34px 10px var(--green); }
+#landing .lab .lamps i.r { background: var(--red); box-shadow: 0 0 34px 10px var(--red); }
+/* Väntar på data: dämpad, utan sken */
+#landing .lab .lamps i.w { background: var(--muted); opacity: .35; box-shadow: none; animation: none; }
+#landing .lab .lamps i:nth-child(2n) { animation-delay: -1.3s; }
+#landing .lab .lamps i:nth-child(3n) { animation-delay: -2.4s; }
+#landing .lab svg.chart { position: absolute; left: 12%; width: 76%; top: 46%; height: 26%; overflow: hidden; }
+/* Kurvan är periodisk (1000 enheter) och glider ett helt varv, så slutet möter början exakt */
+#landing .lab svg.chart path { fill: none; stroke: var(--teal); stroke-width: 5; filter: drop-shadow(0 0 10px var(--teal)); animation: l-glide 26s linear infinite; }
+#landing .lab .readout { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 15px; letter-spacing: .2em; line-height: 2; white-space: nowrap; }
+/* Avläsningarna ligger precis ovanför och under rutan (halva rutans höjd = min(280px, 41vh)), aldrig halvt under kanten */
+#landing .lab .r1, #landing .lab .r2 { bottom: calc(50% + min(280px, 41vh) + 14px); }
+#landing .lab .r3, #landing .lab .r4 { top: calc(50% + min(280px, 41vh) + 14px); }
+#landing .lab .r1, #landing .lab .r3 { left: 14%; }
+#landing .lab .r2, #landing .lab .r4 { right: 14%; text-align: right; }
+#landing .lab .ring { position: absolute; left: 50%; top: 58%; width: 420px; height: 420px; margin: -210px 0 0 -210px; border-radius: 50%; border: 1px solid var(--teal); opacity: .5; animation: l-ring 6s ease-in-out infinite; }
+#landing .lab .scan { position: absolute; left: 0; right: 0; top: 8%; height: 2px; background: linear-gradient(90deg, transparent, var(--teal), transparent); opacity: .7; animation: l-scan 14s ease-in-out infinite alternate; }
+
+/* Frostade rutan */
+#landing .stage { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; }
+#landing .pane { position: relative; width: min(880px, 100%); height: min(560px, 82vh); border-radius: 28px; display: flex; flex-direction: column; }
+#landing .frost {
+  position: absolute; inset: 0; border-radius: inherit; background: var(--l-glass); border: 1px solid var(--l-edge);
+  backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+  -webkit-mask-image: radial-gradient(circle at var(--mx, -999px) var(--my, -999px), rgba(0,0,0,.25) 0, rgba(0,0,0,.25) 48px, #000 150px);
+          mask-image: radial-gradient(circle at var(--mx, -999px) var(--my, -999px), rgba(0,0,0,.25) 0, rgba(0,0,0,.25) 48px, #000 150px);
+  box-shadow: 0 40px 120px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.18);
+}
+#landing .frost::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.10) 25%, transparent 50%, transparent 100%) 0 0 / 200% 100% repeat-x;
+  animation: l-sweep 22s linear infinite;
+}
+#landing .grain {
+  position: absolute; inset: -50%; pointer-events: none; opacity: .07; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: l-grain 1.2s steps(6) infinite;
+}
+#landing .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent var(--vig-from), var(--vig) 100%); }
+
+/* Innehållet: flex i stället för absolut statusrad, så inget kan överlappa */
+#landing .content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px 32px 12px; }
+#landing .kicker { font-family: "JetBrains Mono", monospace; font-size: clamp(9px, 2.4vw, 11px); letter-spacing: .4em; margin: 0 -.4em 30px 0; color: var(--muted); white-space: nowrap; }
+#landing .kicker b { color: var(--teal); font-weight: 400; }
+
+/* Logo med glitch */
+#landing .logo { position: relative; width: 108px; height: 108px; flex: none; }
+#landing .logo svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#landing .logo .g1, #landing .logo .g2 { opacity: 0; }
+#landing .logo.glitch .g1 { opacity: .9; animation: l-g1 .42s steps(2) both; }
+#landing .logo.glitch .g2 { opacity: .9; animation: l-g2 .42s steps(2) both; }
+#landing .logo.glitch .main { animation: l-gm .42s steps(3) both; }
+#landing .logo .g1 path { stroke: var(--teal); }
+#landing .logo .g2 path { stroke: var(--red); }
+#landing .logo .main path { stroke: var(--ink); }
+#landing .logo circle { fill: var(--teal); }
+#landing .logo circle.dot { animation: l-breathe 3.2s ease-in-out infinite; transform-origin: 32px 5.5px; }
+
+#landing .word { margin: 30px -.62em 0 0; font-size: clamp(34px, 6vw, 58px); font-weight: 300; letter-spacing: .62em; line-height: 1; white-space: nowrap; }
+#landing .word span { display: inline-block; opacity: 0; filter: blur(8px); animation: l-letter 1.4s cubic-bezier(.2,.7,.2,1) forwards; }
+#landing .tag { margin: 26px 0 0; font-size: 17px; line-height: 1.6; color: var(--soft); max-width: 30em; }
+#landing .cta {
+  margin-top: 38px; display: inline-flex; align-items: center; gap: 14px; height: 54px; padding: 0 30px 0 30px; border-radius: 27px; flex: none;
+  border: 1px solid var(--teal); color: var(--ink); font: inherit; font-size: 12px; font-weight: 400; letter-spacing: .42em; background: transparent; cursor: pointer;
+  transition: box-shadow .4s, background .4s;
+}
+#landing .cta:hover { background: color-mix(in srgb, var(--teal) 14%, transparent); box-shadow: 0 0 40px 0 color-mix(in srgb, var(--teal) 40%, transparent); }
+#landing .cta i { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 10px var(--teal); animation: l-breathe 3.2s ease-in-out infinite; }
+#landing .status { position: relative; flex: none; display: flex; justify-content: space-between; gap: 12px; padding: 0 28px 22px; font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .28em; color: var(--muted); white-space: nowrap; }
+
+/* Ljust/mörkt-knappen, samma runda glasknapp som i appen */
+#landing .l-theme {
+  position: absolute; z-index: 2; top: 20px; right: 20px; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--l-edge); background: var(--l-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  color: var(--ink); cursor: pointer; transition: box-shadow .4s; padding: 0;
+}
+#landing .l-theme:hover { box-shadow: 0 0 24px color-mix(in srgb, var(--teal) 35%, transparent); }
+#landing .l-theme svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+#landing .l-theme .sun, :root[data-theme="dark"] #landing .l-theme .moon { display: none; }
+:root[data-theme="dark"] #landing .l-theme .sun { display: block; }
+
+@keyframes l-breathe { 50% { opacity: .55; } }
+@keyframes l-glide { from { transform: translateX(0); } to { transform: translateX(-1000px); } }
+@keyframes l-ring { 50% { transform: scale(1.06); opacity: .25; } }
+@keyframes l-scan { from { top: 8%; } to { top: 92%; } }
+@keyframes l-sweep { from { background-position: 0 0; } to { background-position: -200% 0; } }
+@keyframes l-grain { 0% { transform: translate(0,0); } 20% { transform: translate(-3%,2%); } 40% { transform: translate(2%,-3%); } 60% { transform: translate(-2%,-1%); } 80% { transform: translate(3%,3%); } 100% { transform: translate(0,0); } }
+@keyframes l-letter { to { opacity: 1; filter: blur(0); } }
+@keyframes l-g1 { 0% { transform: translate(-5px,0); clip-path: inset(10% 0 55% 0); } 50% { transform: translate(4px,1px); clip-path: inset(60% 0 10% 0); } 100% { transform: translate(-2px,0); clip-path: inset(35% 0 40% 0); } }
+@keyframes l-g2 { 0% { transform: translate(5px,0); clip-path: inset(50% 0 20% 0); } 50% { transform: translate(-4px,-1px); clip-path: inset(5% 0 70% 0); } 100% { transform: translate(2px,0); clip-path: inset(70% 0 5% 0); } }
+@keyframes l-gm { 0% { transform: translate(2px,0) skewX(-6deg); opacity: .6; } 50% { transform: translate(-1px,0); opacity: 1; } 100% { transform: none; } }
+
+@media (max-width: 600px) {
+  #landing .lab .lamps { gap: 14px; }
+  #landing .lab .lamps i { width: 18px; height: 18px; }
+  /* Rutan täcker nästan hela skärmen: avläsningarna skulle synas genom torkad fläck rakt i texten */
+  #landing .lab .readout { display: none; }
+  #landing .lab .ring { width: 300px; height: 300px; margin: -150px 0 0 -150px; }
+  #landing .status { flex-direction: column; gap: 6px; align-items: center; }
+  #landing .content { padding: 24px 20px 12px; }
+  #landing .kicker { margin-bottom: 22px; }
+  #landing .logo { width: 88px; height: 88px; }
+  #landing .word { margin-top: 24px; }
+  #landing .tag { font-size: 15px; margin-top: 20px; }
+  #landing .cta { margin-top: 28px; }
+  #landing .kicker .long { display: none; }
+  #landing .pane { height: min(620px, 88vh); }
+  #landing .l-theme { top: 12px; right: 12px; width: 44px; height: 44px; }
+}
+@media (max-height: 640px) and (max-width: 600px) { #landing .tag { font-size: 14px; line-height: 1.5; } #landing .logo { width: 72px; height: 72px; } }
+@media (max-height: 700px) { #landing .lab .readout { display: none; } }
+@media (max-height: 520px) { #landing .tag, #landing .status { display: none; } }
+
+/* Stilla sida: inga loopar, ingen toning, texten syns direkt */
+@media (prefers-reduced-motion: reduce) {
+  #landing, #landing *, #landing *::before, #landing *::after { animation: none !important; transition: none !important; }
+  #landing .word span { opacity: 1; filter: none; }
+}

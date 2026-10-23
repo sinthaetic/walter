@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/walter.css">
+  <link rel="stylesheet" href="css/landing.css">
   <!-- Samma nyckel som W-Cipher, så mörkt läge följer med mellan sidorna -->
   <script>try { if (localStorage.getItem("walterDark") === "1") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
 </head>
@@ -19,6 +20,44 @@
     <div class="halo-wrap"><div class="halo"></div></div>
     <i class="beam"></i>
   </div>
+
+  <!-- Landningssidan (js/landing.js). Visas av boot.js när man inte gått in i den här fliken. -->
+  <section id="landing" aria-label="WALTER, välkommen" hidden>
+    <canvas class="fluid" aria-hidden="true"></canvas>
+    <div class="lab" aria-hidden="true">
+      <div class="scan"></div>
+      <div class="readout r1"></div>
+      <div class="readout r2"></div>
+      <div class="lamps"></div>
+      <div class="ring"></div>
+      <svg class="chart" viewBox="0 0 1000 200" preserveAspectRatio="none"><path/></svg>
+      <div class="readout r3"></div>
+      <div class="readout r4"></div>
+    </div>
+    <div class="stage">
+      <div class="pane">
+        <div class="frost"></div>
+        <div class="content">
+          <p class="kicker">LABB 01<span class="long"> · STRATEG · FÖRVALTARE</span> · <b>PAPER</b></p>
+          <div class="logo">
+            <svg class="g1" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <svg class="g2" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <svg class="main" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" cx="32" cy="5.5" r="2.7"/></svg>
+          </div>
+          <h1 class="word" aria-label="WALTER">WALTER</h1>
+          <p class="tag">Walter läser marknaden varje dag och förvaltar åt dig. Lugnt, metodiskt, alltid exakt. Han börjar med låtsaspengar, tills du är redo.</p>
+          <button type="button" class="cta"><i aria-hidden="true"></i>GÅ IN</button>
+        </div>
+        <div class="status"><span>SYSTEM · ONLINE</span><span class="num" id="landing-clock">--:--:--</span><span id="landing-signals">LÄSER 10 SIGNALER</span></div>
+      </div>
+    </div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <button type="button" class="l-theme" aria-label="Byt till mörkt läge">
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+    </button>
+  </section>
 
   <header class="top">
     <!-- Logo: "Inskriven" hexagon-W (assets/logo/vald). Ordet skrivs som text i Jost. -->
@@ -99,6 +138,7 @@
   <script src="js/exchanges.js"></script>
   <script src="js/user-state.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/landing.js"></script>
   <script src="js/boot.js"></script>
 </body>
 </html>
