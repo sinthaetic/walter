@@ -1,8 +1,13 @@
 # Historiktestet – vad som blir kvar på banken
 
-23 okt 2026. Steg 10 del 3. Allt kan köras om: `.venv\Scripts\python.exe -m backtest.run` (ca 4 minuter).
+23 okt 2026. Steg 10 del 3 och 3b. Allt kan köras om: `.venv\Scripts\python.exe -m backtest.run` (ca 4 minuter)
+och `.venv\Scripts\python.exe -m backtest.plateau` (del 3b, ca 2 minuter).
 
-## Kort svar
+> **Del 3b ändrade rekommendationen.** Den långsamma Walter höll inte när vi skakade på inställningarna.
+> Nu rekommenderas fasta andelar 35 % BTC + 20 % ETH + 20 % guld, ombalanserat en gång i veckan med 5 %-band.
+> Se "Hur säkert är det?" och "Rekommendationen" längst ner.
+
+## Kort svar (del 3)
 - **Dagens Walter handlar alldeles för ofta.** Han byter läge ungefär 45 gånger per år, för att en enda lampa blinkar.
   Avgifterna äter upp vinsten. 100 000 kr 2014 blev **228 000 kr** på banken, och 100 000 kr 2020 blev **93 000 kr**.
 - **Att nästan aldrig byta vinner.** Samma Walter med lägena kvar, men långsam (beslut en gång i veckan, snittet av
@@ -115,47 +120,81 @@ Dagens Walter betalade mer i avgifter (405 000 kr) än han tjänade. Den långsa
 - **Framtiden är inte historien.** BTC gick från ca 750 dollar (jan 2014) till ca 81 000 (okt 2026). Det händer inte igen på samma sätt.
 - Det här är inte finansiell rådgivning. Walter är ett papperstest.
 
-## Rekommendationen
-Behåll lägena (Vilar / Avvaktar / Köper lite / Köper), max 75 % investerat och minst 25 % kontant, men gör Walter långsam:
-1. Beslut **en gång i veckan** (söndag), genomförs på måndagen.
-2. Räkna röda lampor som **snittet av de senaste 60 dagarna**, avrundat till närmaste heltal.
-3. Byt läge först när **samma nya läge föreslagits 7 veckor i rad**.
-4. Gör inte små justeringar: handla en tillgång bara om affären är **större än 5 % av portföljen** (att sälja allt görs alltid).
-5. Taken: **BTC 50 %, ETH 15 %, guld 10 %** (tillsammans 75 %). Levels är kvar: ETH efter Level 2, guld efter Level 3.
-6. **ETH följer läget** som BTC, ingen ETH/BTC-snittregel. **Guld ligger kvar på sitt tak** när Level 3 är nått, även när Walter vilar.
+## Hur säkert är det? (del 3b)
+Vi skakade på inställningarna i stället för att leta efter den högsta siffran. Varje inställning startades varje
+kvartal 2014–2024 (44 starter). "10 % sämsta" = nivån där bara var tionde start gick sämre. Det är det viktigaste måttet,
+för det skyddar den som har otur med startdagen.
 
-Vill du ha den högsta siffran 2020–idag och klarar en större nedgång: samma regler med bara BTC 75 % (595 000 kr, nedgång 49 %).
-Men det är en satsning på en enda tillgång.
+**Den långsamma Walter (tak 50/15/10, snitt 60 dagar, 7 veckor, 5 %):** grannarna ligger nära (snitt 45 eller 90 dagar,
+5 eller 9 veckor, 2 eller 5 %), alla inom 15 %. Men **avrundningen** fäller den:
 
-Regelvärden till del 4 (`state.json` → `rules`, och nya brytare som sim.py redan har):
+| Långsam Walter | Median | 10 % sämsta | Största nedgång |
+|---|---|---|---|
+| Avrundning till närmaste | 539 000 | 145 000 | 41 % |
+| Avrundning uppåt | 305 000 | 138 000 | 41 % |
+| Avrundning nedåt | 598 000 | 122 000 | 53 % |
+| Grannar (snitt 45/90, 5/9 veckor, 2 %) | 488 000–569 000 | 135 000–148 000 | 39–44 % |
+
+Avrundningen spelar roll även live, eftersom snittet av 60 dagars lampor nästan aldrig blir ett heltal.
+
+**Utan toppen i december 2017** (bara starter från 2018, 28 stycken) försvinner Walters försprång:
+
+| Starter 2018 och senare | Median | 10 % sämsta |
+|---|---|---|
+| Långsam Walter (närmaste / uppåt) | 195 000 / 178 000 | 126 000 / 111 000 |
+| Fast 35/20/20, varje vecka, 5 %-band | 202 000 | 128 000 |
+| Fast 35/20/20, varje dag, 2 % | 202 000 | 127 000 |
+| Walter i dag | 92 000 | 80 000 |
+
+**Den fasta mixen står på en riktig platå.** Varje dag, vecka eller månad × band 2, 5 eller 10 %: medianen blev
+452 000–578 000, 10 % sämsta 140 000–151 000, och 200 000–206 000 för starter från 2018. Den har inga lamp-inställningar
+som kan vara tur.
+
+| Alla 44 starter | Median | 10 % sämsta | Största nedgång | Affärer (median) |
+|---|---|---|---|---|
+| **Fast 35/20/20, varje vecka, 5 %-band** | **510 000** | **142 000** | 55 % | 54 |
+| Fast 35/20/20, varje dag, 2 % | 452 000 | 140 000 | 59 % | 259 |
+| Fast 35/20/20 med Levels kvar | 474 000 | 132 000 | 54 % | 54 |
+| Ombalanserad BTC 35 % | 226 000 | 124 000 | 39 % | 193 |
+| Långsam Walter (sämsta avrundning) | 305 000 | 138 000 | 53 % | 59 |
+| Långsam Walter, tak 75/0/0 (närmaste) | 665 000 | 160 000 | 65 % med nedåt | 31 |
+| Walter i dag | 96 000 | 83 000 | 44 % | 661 |
+
+Taken är ingen platå: mer BTC gav nästan alltid mer pengar (35/20/20 → 75/0/0: medianen 446 000 → 665 000) och större
+nedgång. Det beskriver bara att BTC steg, inte ett skäl till att det fortsätter.
+
+**Hur säkert:** ganska säkert att den fasta veckomixen är minst lika bra som alla långsamma Walter-varianter vi
+testade. Hur mycket bättre vet vi inte. Alla bra kandidater hamnar på ungefär 1,4 gånger pengarna för de 10 % sämsta,
+och historiken är en enda lång kryptouppgång.
+
+## Rekommendationen (del 3b)
+Regeln: bäst för de 10 % sämsta starterna, sedan medianen, bland dem med största nedgång högst 60 % (i alla avrundningar).
+Inom 5 % vinner den enklaste. Vinnaren är **fasta andelar**:
+1. **BTC 35 %, ETH 20 %, guld 20 %** (75 % investerat, minst 25 % kontant), från första dagen.
+2. Titta **en gång i veckan** (söndag). Genomför på måndagen.
+3. Handla bara en tillgång som glidit **mer än 5 % av portföljen** från sitt mål. Gå då hela vägen tillbaka till målet.
+4. Lamporna och läget visas fortfarande, men de **handlar inte**. Levels låser inte längre ETH och guld.
+
+Priset för det: nedgångar upp till 55 % (den långsamma Walter: 41–53 %). Det är under gränsen på 60 %, men det känns.
+Tvåa: den långsamma Walter med avrundning till närmaste, om lägena måste få handla.
+
+Regelvärden till del 4 (`state.json` → `rules`, och fälten i sim.py som gör samma sak):
 
 ```json
 {
   "rules": {
-    "caps": {"BTC": 0.5, "ETH": 0.15, "GOLD": 0.1},
+    "strategy": "fixedMix",
+    "caps": {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2},
     "maxInvested": 0.75,
     "minCash": 0.25,
-    "modes": {"buyAtRed": 2, "buyLittleAtRed": 4, "littleShare": 0.5},
-    "parkeraAtRed": 7,
-    "wakeAtRed": 5,
-    "ethMaxRed": 4,
     "paper": {"minTradePct": 2},
-    "decision": {
-      "cadenceDays": 7,
-      "weekday": "söndag",
-      "smoothDays": 60,
-      "confirmDecisions": 7,
-      "bandPp": 5,
-      "rounding": "nearest"
-    },
-    "eth": {"timing": false},
-    "gold": {"always": true, "allowedWhenParked": true}
+    "decision": {"cadenceDays": 7, "weekday": "söndag", "bandPp": 5},
+    "lampsTrade": false,
+    "levelsGate": false
   },
-  "levels": {"3": {"asset": "GULD", "gainPct": 50, "maxDd": 12}},
   "simStrategy": {
-    "rounding": "nearest", "loss_credit": true, "cadence_days": 7, "smooth_days": 60, "confirm_days": 7,
-    "band_pp": 5, "eth_fixed": true, "gold_always": true, "no_levels": false,
-    "rules.caps": {"BTC": 0.5, "ETH": 0.15, "GOLD": 0.1}
+    "weights": {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2},
+    "rebalance": true, "cadence_days": 7, "band_pp": 5, "loss_credit": true
   }
 }
 ```
