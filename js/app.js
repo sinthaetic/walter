@@ -103,7 +103,7 @@
   const marketGain = pf.value - deposits;
   const marketPct = deposits > 0 ? (marketGain / deposits) * 100 : 0;
 
-  // Journalens läge → ordet användaren ser. Läget ändras bara via journalen (paper.bat skriver posten).
+  // Journalens läge → ordet användaren ser. Läget ändras bara via journalen (Walter skriver posten själv).
   // Lampnivåerna står i rules.modes / parkeraAtRed / wakeAtRed och räknas i fetcher/walter_paper.py.
   const MODES = {
     PARKERA: { word: "VILAR", acc: "red", quote: "Marknaden är orolig. Pengarna står i kontanter tills datan vänder." },
@@ -156,11 +156,11 @@
   $("status-line").textContent = "STATUS · " + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
   $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
     <h1 class="mode-name">${esc(MODE.word)}</h1>`;
-  // Ägarens läge byts bara via journalen: säg rakt ut när lamporna redan pekar på något annat
+  // Ägarens läge byts via journalen, som Walter skriver själv i Actionen: säg rakt ut när lamporna redan pekar på något annat
   const Pnow = S.proposal || {};
   const pending = !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
   $("quote").textContent = MODE.quote + (pending
-    ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter väntar på ditt JA i paper.bat.`
+    ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa hämtning.`
     : "");
   $("mode-explain").textContent = "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
 
@@ -275,7 +275,7 @@
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
       : isUser
         ? `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge själv nästa gång han räknar.`
-        : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}, men journalen säger ${MODE.word}. Läget ändras först när du godkänner förslaget.`;
+        : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge vid nästa hämtning.`;
   $("lamps").innerHTML = `
     <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
     <ul class="lamp-grid">
@@ -288,30 +288,23 @@
     <p class="lamp-note">${esc(lampNote)} <a href="#pro">Värdena bakom lamporna →</a></p>
     ${lampCountOk ? "" : isUser ? `<p class="warn small">Marknadsfilen har ${S.lamps.length} lampor. Walter räknar alltid med 10.</p>` : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
 
-  // ---------- Walter föreslår (trade-motorn, fetcher/walter_paper.py) ----------
-  // Förslaget räknas vid varje hämtning men görs aldrig av sig självt: det godkänns med paper.bat.
+  // ---------- Walter gjorde (trade-motorn, fetcher/walter_paper.py) ----------
+  // Walter handlar själv: användarens i webbläsaren (boot.js), ägarens i GitHub Actionen (walter_paper.py --auto).
   const sh = pf.sharpe || {};
   const sharpeTxt = sh.value != null ? nf(2).format(sh.value) : `dag ${sh.days || 0}/${sh.need || 30}`;
-  const pTrades = P.trades || [];
-  // Användaren: Walter handlar själv (boot.js räknar ikapp), så rutan säger vad han gjorde, inget att godkänna.
+  // Rutan säger vad Walter gjorde, inget att godkänna – samma för ägaren och användaren.
   const lastDone = S.journal[0];
   $("proposal").innerHTML = `
-    <h3>${isUser ? "WALTER GJORDE" : "WALTER FÖRESLÅR"}</h3>
+    <h3>WALTER GJORDE</h3>
     <div class="kv">
       <div><span>LÄGE ENLIGT LAMPORNA</span><strong>${P.ready ? esc(modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
       <div><span>RÖDA LAMPOR</span><strong>${P.ready ? `${P.red}/${total}` : "–"}</strong></div>
       <div><span>SHARPE</span><strong title="Avkastning per risk, räknas efter 30 dagars handel. Insättningar räknas inte.">${sharpeTxt}</strong></div>
     </div>
     <p class="explain"><b>Sharpe:</b> Avkastning per risk. Visas efter 30 dagars handel.</p>
-    ${isUser ? `
     ${P.ready ? "" : `<p class="plain"><b>${esc(P.plain)}</b></p>`}
     <p class="plain">${lastDone ? `<b>Senast (${day(lastDone.date)}):</b> ${esc(lastDone.plain)}` : "Walter har inte gjort något än. Han räknar och handlar nästa gång marknadsdatan uppdateras."}</p>
-    <p class="small" style="margin-top:12px">Walter handlar själv åt dig och skriver upp varje affär i loggen. Du behöver inte godkänna något. Låtsaspengar (PAPER).</p>` : `
-    <p class="plain">${esc(P.plain)}</p>
-    ${pTrades.length ? `<ul class="conds trades">${pTrades.map((t) => `<li><b>${esc(t.side.toUpperCase())}</b><span>${esc(t.asset)} · ${nf(8).format(t.units)} st à ${kr(t.priceSek)}</span><span class="num">${kr2(t.sek)} · avgift ${kr2(t.feeSek)}</span></li>`).join("")}</ul>` : ""}
-    <p class="small" style="margin-top:12px">${P.needsApproval
-      ? "Inget händer förrän du godkänner. Dubbelklicka <b>paper.bat</b> och skriv JA – då skrivs affären, journalposten och K4-raden."
-      : "Inget att godkänna just nu."} Låtsaspengar (PAPER).</p>`}`;
+    <p class="small" style="margin-top:12px">Walter handlar själv åt dig och skriver upp varje affär i loggen. Du behöver inte godkänna något. Låtsaspengar (PAPER).</p>`;
 
   // ---------- Status + Uppdatera ----------
   // Webbläsaren kan bara hämta från källor som tillåter det (CORS): CoinGecko och valutakurser.

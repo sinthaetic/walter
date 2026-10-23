@@ -22,7 +22,7 @@ on:
     paths: ["data/state.enc", "index.html", "cipher.html", "css/**", "js/**", "assets/**", "fetcher/**"]
 
 permissions:
-  contents: write               # bara för att pusha gh-pages med GITHUB_TOKEN
+  contents: write               # pusha gh-pages, och state.enc till main när Walter handlar (GITHUB_TOKEN)
 
 concurrency:
   group: walter-auto
@@ -84,6 +84,35 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
         run: python fetcher/walter_fetch.py
+
+      # Walter handlar själv, högst en gång per dag (walter_paper.py --auto skriver journalposten med "auto": true).
+      # Före notis och deploy, så att notisen och publicerade owner.enc redan har affären.
+      # Affären sparas som state.enc på main innan något publiceras. Går pushen inte (inte ens efter en
+      # pull --rebase) blir steget rött och resten hoppas över – en affär som inte sparats publiceras aldrig.
+      # [skip ci]: pushen ska inte starta en ny körning (push.paths innehåller data/state.enc).
+      # Bara på main, så att en manuell körning på en annan gren aldrig pushar den grenen till main.
+      - name: Walter handlar själv
+        if: steps.gate.outputs.run == 'true' && github.ref == 'refs/heads/main'
+        env:
+          WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
+        run: |
+          if [ -z "$WALTER_OWNER_KEY" ]; then
+            echo "Ingen WALTER_OWNER_KEY – Walter handlar inte."
+            exit 0
+          fi
+          python fetcher/walter_paper.py --auto
+          if git diff --quiet -- data/state.enc; then
+            echo "Ingen affär i dag att spara."
+            exit 0
+          fi
+          git add data/state.enc
+          git -c user.name=WALTER -c user.email=walter@localhost commit -q -m "Walter handlade $(date +%Y-%m-%d) [skip ci]"
+          if ! git push -q origin HEAD:main; then
+            echo "main har rört sig – hämtar och försöker en gång till."
+            git -c user.name=WALTER -c user.email=walter@localhost pull -q --rebase origin main
+            git push -q origin HEAD:main
+          fi
+          echo "Sparade Walters affär i data/state.enc på main."
 
       - name: Notis morgon/kväll
         if: steps.gate.outputs.run == 'true'

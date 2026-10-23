@@ -395,7 +395,7 @@ def build(state, cache, fetched_any, owner_cache=None):
         m["asOf"] = cache.get("fetchedAt", today)[:10]
         state["updatedAt"] = max(state["updatedAt"], m["asOf"])
         state["fetchedAt"] = cache.get("fetchedAt")
-    # Trade-motorn: dagens värde, förslag och Sharpe. Handlar aldrig – förslaget godkänns med paper.bat.
+    # Trade-motorn: dagens värde, förslag och Sharpe. Handlar aldrig här – Walter handlar själv i Actionen (walter_paper.py --auto).
     pf = state["portfolio"]
     pf["holdings"], pf["value"] = wp.valuation(pf, wp.prices_sek(m))
     daily = owner_cache.get("daily", {})
@@ -425,6 +425,9 @@ def main():
     ap.add_argument("--offline", action="store_true", help="hämta inget, bygg bara om state.js")
     args = ap.parse_args()
 
+    if not args.offline:  # --offline körs av walter deploy, som redan har hämtat main
+        import walter_vault
+        walter_vault.sync_from_repo()  # Walter kan ha handlat i Actionen – hämta state.enc från main först
     state = read_json(BASE, None)
     if state is None:
         sys.exit(f"Hittar inte {BASE}")
@@ -465,7 +468,7 @@ def main():
     p = state["proposal"]
     print(f"WALTER föreslår: {p['plain']}")
     if p.get("needsApproval"):
-        print("Dubbelklicka paper.bat för att godkänna.")
+        print("Walter handlar själv i GitHub Actionen vid nästa körning (eller dubbelklicka paper.bat).")
     if not args.offline:
         print(f"{ok}/{len(SOURCES)} källor svarade.")
     print(f"Skrev {OUT} och {MARKET_OUT}")

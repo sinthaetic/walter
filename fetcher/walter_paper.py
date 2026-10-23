@@ -1,11 +1,13 @@
 """WALTER trade-motor för paper.
 
-  python fetcher/walter_paper.py        visa Walters förslag och godkänn det (skriv JA)
+  python fetcher/walter_paper.py        visa Walters förslag och handla manuellt (skriv JA)
   paper.bat                            samma sak, dubbelklick
+  python fetcher/walter_paper.py --auto Walter handlar själv (bara GitHub Actionen), ingen fråga
 
 Hämtaren (walter_fetch.py) räknar förslaget vid varje hämtning och lägger det i state.js, men handlar aldrig.
-Först när du godkänner här skrivs affärerna in i data/state.json: läge, positioner, kontanter,
-historik, journalpost och K4-rad för varje försäljning. Läget ändras alltså fortfarande bara via journalen.
+Walter handlar själv i Actionen (--auto) högst en gång per dag och skriver journalposten med "auto": true.
+Varje affär skrivs in i data/state.json: läge, positioner, kontanter, historik, journalpost och K4-rad
+för varje försäljning. Läget ändras alltså fortfarande bara via journalen.
 
 Läge från röda lampor (rules): 0–buyAtRed = Köper, upp till buyLittleAtRed = Köper lite, sedan Avvaktar,
 parkeraAtRed+ = Vilar. Buffert: från Vilar vaknar Walter först vid wakeAtRed eller färre röda.
@@ -228,11 +230,45 @@ def rebuild(wf):
     return wf.build(wf.read_json(wf.BASE, None), cache, False, owner)
 
 
+def auto(wf, today=None, say=lambda s: None):
+    """Walter handlar själv (bara i GitHub Actionen, steget "Walter handlar själv").
+    Högst en automatisk handel per dag: är journal[0] redan dagens och automatisk görs inget.
+    Skriver state.json, låser state.enc och bygger om state.js. Returnerar journalposten eller None."""
+    today = today or date.today().isoformat()
+    raw = wf.read_json(wf.BASE, None)
+    if raw is None:
+        say("Hittar inte data/state.json – Walter handlar inte.")
+        return None
+    last = (raw.get("journal") or [None])[0] or {}
+    if last.get("date") == today and last.get("auto"):
+        say(f"Walter har redan handlat själv i dag ({today}).")
+        return None
+    prop = propose(rebuild(wf))
+    if not prop.get("ready") or not prop.get("needsApproval"):
+        say("Walter handlar inte: " + prop.get("plain", "inget förslag."))
+        return None
+    code = walter_vault.owner_key()
+    if not code:  # utan kod kan state.enc inte sparas – då vore affären borta vid nästa körning
+        say("WALTER_OWNER_KEY saknas – Walter handlar inte (affären skulle inte kunna sparas).")
+        return None
+    entry = apply(raw, prop, today)
+    entry["auto"] = True
+    walter_vault._write_atomic(wf.BASE, json.dumps(raw, indent=2, ensure_ascii=False) + "\n")
+    walter_vault.lock_state(code, wf.BASE, walter_vault.ENC)
+    wf.write_js(rebuild(wf))
+    say(f"Walter handlade själv: {entry['plain']}")
+    return entry
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import walter_fetch as wf
 
+    if "--auto" in sys.argv[1:]:
+        auto(wf, say=print)
+        return
+    walter_vault.sync_from_repo()  # Walter kan ha handlat i Actionen – hämta det först
     built = rebuild(wf)
     prop = propose(built)
     print("\nWALTER FÖRESLÅR\n" + prop["plain"])

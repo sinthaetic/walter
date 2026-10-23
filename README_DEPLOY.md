@@ -97,7 +97,10 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
   Är `state.enc` nyare än din `state.json` vägrar `walter deploy` skriva över den – lås upp först.
 - **Paper-affär:** efter JA i `paper.bat` låses `state.json` direkt till `state.enc`.
 - `walter hamta` och `walter visa dashboard` fungerar som förut, lokalt.
-- Lägesbyten görs fortfarande bara via journalen. Actionen ändrar aldrig `mode`.
+- **Walter handlar själv:** Actionen låter Walter handla högst en gång per dag (journalpost med `"auto": true`)
+  och committar då `data/state.enc` till `main` (som WALTER, `[skip ci]`). Datorn hämtar det automatiskt:
+  `walter hamta`, `paper.bat` och `walter deploy` kör först `git pull` och låser upp den nya `state.enc`
+  (har du egna, nyare ändringar i `state.json` säger Walter det och använder dina).
 
 ## Säkerhet
 
@@ -119,7 +122,7 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
   `gh-pages` och dess dagsvärden/notis slås ihop med dina (både lokalt och i Actionen). Går `gh-pages`
   inte att nå, eller går `owner.enc` där inte att låsa upp, **stoppas publiceringen** med ett besked –
   hellre ingen uppdatering än en kortare historik. Allra första gången (ingen `owner.enc` än) går bra.
-- Actionen använder bara `GITHUB_TOKEN` och dina Secrets. Den committar aldrig till `main`. Senaste
+- Actionen använder bara `GITHUB_TOKEN` och dina Secrets. Den committar till `main` bara `data/state.enc`, när Walter handlat. Senaste
   `cache.json` läses tillbaka från `gh-pages` vid varje körning.
 - **Byter du kod:** lägg den nya i `fetcher/.env` och i Secreten och kör `walter_vault.py las`. Nästa
   `walter deploy` stoppas, eftersom den publicerade `owner.enc` är låst med den gamla koden. Kör då en gång

@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from walter_fetch import BASE, HTTP, build, load_caches, num, pct, save_caches  # noqa: E402
+from walter_paper import WORDS  # noqa: E402
 
 TZ = ZoneInfo("Europe/Stockholm")
 SLOTS = {(8, 13): "morgon", (22, 5): "kvall"}
@@ -36,7 +37,19 @@ def slot_from_schedule(cron):
     return SLOTS.get((local.hour, local.minute))
 
 
-def text_for(state, slot, when):
+def auto_sentence(state, today):
+    """En mening om vad Walter gjorde själv i dag (journalpost med "auto": true), annars tom."""
+    e = (state.get("journal") or [None])[0] or {}
+    if e.get("date") != today or not e.get("auto"):
+        return ""
+    plain = e.get("plain", "")
+    if plain.startswith("WALTER "):  # "WALTER köpte bitcoin för 100 kr. 3 av 10 …"
+        return f" Walter {plain[len('WALTER '):].split('. ')[0].rstrip('.')} i dag, helt själv."
+    return f" Walter bytte själv läge till {WORDS.get(e.get('mode'), e.get('mode'))} i dag."
+
+
+def text_for(state, slot, when, today=None):
+    today = today or datetime.now(TZ).date().isoformat()
     pf, m = state["portfolio"], state["market"]
     value, cash = pf["value"], pf["holdings"]["CASH"]
     money = f"Cash {num(cash)} kr vilar" if cash >= value else f"Cash {num(cash)} kr, {num(value - cash)} kr investerat"
@@ -49,7 +62,8 @@ def text_for(state, slot, when):
         btc_txt = f"BTC ${num(btc['value'])}"
     s = state["lampScore"]
     return (f"{LABEL[slot]} {when}: {money}, {btc_txt}, totalt {num(value)} kr. "
-            f"{s['red']}/{s['total']} lampor röda. Walter håller {state['mode']}.")
+            f"{s['red']}/{s['total']} lampor röda. Walter håller {state['mode']}."
+            + auto_sentence(state, today))
 
 
 def telegram(text):

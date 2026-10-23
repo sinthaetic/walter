@@ -1,0 +1,226 @@
+"""Ägarens Walter handlar själv (walter_paper.auto), datorn hämtar affärerna (walter_vault.sync_from_repo),
+och notisen säger vad han gjorde. Bara temp-filer – rör aldrig data/."""
+import io
+import json
+import os
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "fetcher"))
+import walter_fetch as wf
+import walter_notis as wn
+import walter_paper as wpaper
+import walter_vault as v
+
+KEY = "TEST-KOD"
+TODAY = "2026-10-23"
+
+
+def raw_state():
+    return {"mode": "AVVAKTAR", "updatedAt": "2026-10-22", "journal": [{"date": "2026-10-22", "plain": "gammal"}],
+            "rules": {}, "k4": [],
+            "portfolio": {"holdings": {"CASH": 1000.0, "BTC": 0, "ETH": 0, "GOLD": 0}, "positions": {},
+                          "peak": 1000.0, "value": 1000.0, "history": []}}
+
+
+def proposal(ready=True):
+    if not ready:
+        return {"asOf": TODAY, "ready": False, "plain": "Walter väntar på data."}
+    return {"asOf": TODAY, "ready": True, "red": 3, "mode": "NORMAL", "currentMode": "AVVAKTAR",
+            "trades": [{"asset": "BTC", "side": "köp", "units": 0.001, "priceSek": 100000.0,
+                        "sek": 100.0, "feeSek": 0.5}],
+            "valueSek": 1000.0, "plain": "Walter vill köpa bitcoin för 100 kr.", "needsApproval": True}
+
+
+class AutoTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        d = Path(self.tmp.name)
+        self.state, self.enc = d / "state.json", d / "state.enc"
+        self.state.write_text(json.dumps(raw_state()), encoding="utf-8")
+        self.built = []
+        self.patches = [patch.object(wf, "BASE", self.state), patch.object(v, "ENC", self.enc),
+                        patch.object(v, "STATE", self.state),
+                        patch.object(v, "owner_key", lambda: KEY),
+                        patch.object(wpaper, "rebuild", lambda w: {"built": True}),
+                        patch.object(wf, "write_js", lambda s: self.built.append(s))]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.tmp.cleanup()
+
+    def run_auto(self, prop):
+        with patch.object(wpaper, "propose", lambda s: prop):
+            return wpaper.auto(wf, today=TODAY)
+
+    def test_trades_and_marks_auto_and_locks(self):
+        entry = self.run_auto(proposal())
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry["auto"])
+        raw = json.loads(self.state.read_text(encoding="utf-8"))
+        self.assertEqual(raw["mode"], "NORMAL")
+        self.assertEqual(raw["journal"][0]["date"], TODAY)
+        self.assertTrue(raw["journal"][0]["auto"])
+        self.assertEqual(raw["portfolio"]["positions"]["BTC"]["units"], 0.001)
+        self.assertEqual(v.decrypt(json.loads(self.enc.read_text(encoding="utf-8")), KEY), raw)
+        self.assertEqual(len(self.built), 1)  # state.js byggdes om
+
+    def test_only_once_per_day(self):
+        self.assertIsNotNone(self.run_auto(proposal()))
+        self.assertIsNone(self.run_auto(proposal()))
+        raw = json.loads(self.state.read_text(encoding="utf-8"))
+        self.assertEqual([j["date"] for j in raw["journal"]], [TODAY, "2026-10-22"])
+
+    def test_manual_entry_today_does_not_block(self):
+        raw = raw_state()
+        raw["journal"].insert(0, {"date": TODAY, "plain": "manuell"})
+        self.state.write_text(json.dumps(raw), encoding="utf-8")
+        self.assertIsNotNone(self.run_auto(proposal()))
+
+    def test_not_ready_does_nothing(self):
+        before = self.state.read_text(encoding="utf-8")
+        self.assertIsNone(self.run_auto(proposal(ready=False)))
+        self.assertEqual(self.state.read_text(encoding="utf-8"), before)
+        self.assertFalse(self.enc.exists())
+
+    def test_nothing_to_approve_does_nothing(self):
+        p = proposal()
+        p.update(trades=[], mode="AVVAKTAR", needsApproval=False)
+        self.assertIsNone(self.run_auto(p))
+        self.assertFalse(self.enc.exists())
+
+    def test_no_key_does_not_trade(self):
+        before = self.state.read_text(encoding="utf-8")
+        with patch.object(v, "owner_key", lambda: None):
+            self.assertIsNone(self.run_auto(proposal()))
+        self.assertEqual(self.state.read_text(encoding="utf-8"), before)
+
+
+class SyncTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / ".git").mkdir()
+        self.state, self.enc = self.root / "state.json", self.root / "state.enc"
+        self.calls = []
+        self.p_key = patch.object(v, "owner_key", lambda: KEY)
+        self.p_key.start()
+        self.p_env = patch.dict(os.environ, {}, clear=False)
+        self.p_env.start()
+        os.environ.pop("GITHUB_ACTIONS", None)
+
+    def tearDown(self):
+        self.p_env.stop()
+        self.p_key.stop()
+        self.tmp.cleanup()
+
+    def put(self, path, obj, mtime, enc=False):
+        text = json.dumps(v.encrypt(obj, KEY, iter=1000)) if enc else json.dumps(obj)
+        path.write_text(text, encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+
+    def fake_run(self, pulled=None):
+        def run(cmd, **kw):
+            self.calls.append(cmd)
+            if pulled is not None:  # "git pull" kom med en ny state.enc
+                self.put(self.enc, pulled, 5000, enc=True)
+
+            class R:
+                returncode = 0
+            return R()
+        return run
+
+    def sync(self, run):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            res = v.sync_from_repo(root=self.root, state=self.state, enc=self.enc, run=run)
+        return res, out.getvalue()
+
+    def local(self):
+        return json.loads(self.state.read_text(encoding="utf-8"))
+
+    def test_unlocks_when_enc_newer_and_different(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 2}, 2000, enc=True)
+        res, _ = self.sync(self.fake_run())
+        self.assertEqual(res, "unlocked")
+        self.assertEqual(self.local(), {"a": 2})
+        self.assertEqual(self.calls[0][:3], ["git", "pull", "--ff-only"])
+
+    def test_unlocks_what_pull_brought(self):
+        # efter förra las-upp är state.json nyare än state.enc men lika – det är inga lokala ändringar
+        self.put(self.enc, {"a": 1}, 1000, enc=True)
+        self.put(self.state, {"a": 1}, 2000)
+        res, _ = self.sync(self.fake_run(pulled={"a": 2, "auto": True}))
+        self.assertEqual(res, "unlocked")
+        self.assertEqual(self.local(), {"a": 2, "auto": True})
+
+    def test_keeps_newer_local_changes(self):
+        self.put(self.enc, {"a": 1}, 1000, enc=True)
+        self.put(self.state, {"a": 3}, 3000)
+        res, out = self.sync(self.fake_run(pulled={"a": 2}))
+        self.assertEqual(res, "local")
+        self.assertEqual(self.local(), {"a": 3})
+        self.assertIn("nyare", out)
+
+    def test_same_content_does_nothing(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 1}, 2000, enc=True)
+        before = self.state.stat().st_mtime
+        res, _ = self.sync(self.fake_run())
+        self.assertEqual(res, "same")
+        self.assertEqual(self.state.stat().st_mtime, before)
+
+    def test_does_nothing_in_github_actions(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 2}, 2000, enc=True)
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            res, _ = self.sync(self.fake_run())
+        self.assertIsNone(res)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.local(), {"a": 1})
+
+    def test_quiet_when_git_missing(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 2}, 2000, enc=True)
+
+        def boom(cmd, **kw):
+            raise FileNotFoundError("git")
+        res, _ = self.sync(boom)
+        self.assertEqual(res, "unlocked")  # offline/ingen git: jobbar med det som finns
+
+
+class NotisAutoTest(unittest.TestCase):
+    def state(self, journal):
+        return {"portfolio": {"value": 1000, "holdings": {"CASH": 900}}, "market": {"btc": {"value": None}},
+                "lampScore": {"red": 3, "total": 10}, "mode": "NORMAL", "journal": journal}
+
+    def test_mentions_todays_auto_trade(self):
+        j = [{"date": TODAY, "auto": True, "mode": "NORMAL",
+              "plain": "WALTER köpte bitcoin för 100 kr. 3 av 10 lampor var röda, så läget är Köper lite. 900 kr ligger som kontanter."}]
+        text = wn.text_for(self.state(j), "kvall", "22:05", today=TODAY)
+        self.assertIn("Walter köpte bitcoin för 100 kr", text)
+
+    def test_mentions_auto_mode_change(self):
+        j = [{"date": TODAY, "auto": True, "mode": "NORMAL",
+              "plain": "3 av 10 lampor var röda, så läget är Köper lite. 900 kr ligger som kontanter."}]
+        text = wn.text_for(self.state(j), "morgon", "08:13", today=TODAY)
+        self.assertIn("Walter bytte själv läge till Köper lite", text)
+
+    def test_quiet_without_auto_today(self):
+        old = [{"date": "2026-10-22", "auto": True, "mode": "NORMAL", "plain": "WALTER köpte bitcoin för 100 kr."}]
+        manual = [{"date": TODAY, "mode": "NORMAL", "plain": "WALTER köpte bitcoin för 100 kr."}]
+        for j in (old, manual, []):
+            self.assertNotIn("Walter köpte", wn.text_for(self.state(j), "kvall", "22:05", today=TODAY))
+
+
+if __name__ == "__main__":
+    unittest.main()

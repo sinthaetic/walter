@@ -273,6 +273,7 @@ def main():
     os.system("")  # tom sträng, bara för att slå på färger (ANSI) i Windows-terminalen
     load_env()
     print("WALTER deploy …")
+    walter_vault.sync_from_repo()  # före lock_if_changed: Walters egna affärer från Actionen först
     code = walter_vault.owner_key()
     repo = os.environ.get("WALTER_PAGES_REPO", "").strip()
     if repo and not shutil.which("git"):
