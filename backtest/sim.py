@@ -55,21 +55,44 @@ _SUGGEST = wp.suggest_mode  # originalet (hysteresis_mode byter tillfälligt ut 
 
 @dataclass
 class Strategy:
-    """Regler + varianter. Alla varianter är av som standard (= dagens Walter)."""
+    """Regler + varianter. Alla varianter är av som standard (= dagens Walter, med närmaste avrundning och
+    skattereduktion för förlustår, som är modellrättningar och inte regeländringar)."""
     name: str = "Walter i dag"
     rules: dict = None
     levels: dict = None
+    # Modellen
+    rounding: str = "nearest"       # röda av 10 från andelen: "nearest" (2,5 -> 3) | "up" (försiktigt) | "down"
+    loss_credit: bool = True        # förlustår: skattereduktion för underskottet (på bankkontot, egen rad)
+    # Varianter (av = 0/False)
     hysteresis: bool = False        # buffert för alla lägen: till ett lugnare läge krävs 1 lampa till under gränsen
     band_pp: float = 0              # handla bara en tillgång om affären är större än N procentenheter (helsälj alltid)
     no_partial_sells: bool = False  # sälj bara när målet är 0 (aldrig minska mellan Köper/Köper lite/Avvaktar)
-    gold_days: int = 0              # guldsignalen måste hålla N dagar i rad (0 = av)
+    gold_days: int = 0              # guldsignalen måste hålla N dagar i rad för att KÖPA (0 = av)
+    gold_confirm_days: int = 0      # guldsignalen byter (på eller av) först när den nya hållit N dagar i rad
+    gold_always: bool = False       # ingen guldtajming: guld ligger på sitt tak hela tiden (när Level 3 nåtts)
     no_gold: bool = False
     no_levels: bool = False         # allt upplåst från dag 1
-    hold_btc: float = None          # jämförelse: köp BTC för denna andel dag 1 och behåll (ingen ombalansering)
+    confirm_days: int = 0           # ett nytt läge måste föreslås N dagar i rad innan Walter byter
+    smooth_days: int = 0            # röda = snittet av de senaste N dagarnas poäng (före avrundning)
+    cadence_days: int = 1           # beslut bara var N:e dag (7 = en gång i veckan, på söndagar)
+    eth_ma_days: int = 30           # ETH köps när ETH/BTC ligger över sitt N-dagarssnitt
+    eth_band_pct: float = 0         # ... och byter först när kvoten gått N % förbi snittet (på eller av)
+    eth_fixed: bool = False         # ingen ETH/BTC-tajming: ETH följer läget som BTC (när ETH är upplåst)
+    # Jämförelser utan lampor: fasta andelar {"BTC": 0.35, ...}
+    weights: dict = None
+    rebalance: bool = True          # True: tillbaka till andelarna när de glidit mer än minTradePct; False: köp en gång
 
 
 def hold_btc(share):
-    return Strategy(name=f"Behåll BTC {share * 100:.0f} %", hold_btc=share)
+    return Strategy(name=f"Köp en gång: BTC {share * 100:.0f} %", weights={"BTC": share}, rebalance=False)
+
+
+def mix(weights, rebalance=True, name=None):
+    """Jämförelse med fasta andelar, utan lampor (alltid samma andelar, aldrig Vilar)."""
+    if name is None:
+        parts = "+".join(f"{a} {w * 100:.0f}" for a, w in weights.items())
+        name = f"{'Ombalanserad' if rebalance else 'Köp en gång'}: {parts} %"
+    return Strategy(name=name, weights=dict(weights), rebalance=rebalance)
 
 
 @dataclass
@@ -84,12 +107,17 @@ class Result:
     fees_sek: float = 0.0                           # handel + växling + SEPA
     taxes: dict = field(default_factory=dict)      # år -> betald skatt SEK
     level_days: dict = field(default_factory=dict)  # level -> första dagen
-    final_sek: float = 0.0
+    final_sek: float = 0.0                          # på banken, inklusive skattereduktionen (credit_sek)
     start_sek: float = 0.0
+    credits: dict = field(default_factory=dict)    # år -> skattereduktion för förlustår, SEK
 
     @property
     def tax_sek(self):
         return sum(self.taxes.values())
+
+    @property
+    def credit_sek(self):
+        return sum(self.credits.values())
 
     @property
     def n_trades(self):
@@ -165,9 +193,55 @@ def level_for(value, peak, deposits, days, red, rules, levels):
     return 2 if gain > 0 and (early or normal) else 1
 
 
-def red_count(score_value):
-    """Andel röda × 10, avrundat UPPÅT (2 av 6 -> 3,3 -> 4 = försiktigt). Liten marginal mot flyttalsfel."""
-    return math.ceil(round(score_value, 6))
+def red_count(score_value, rounding="up"):
+    """Andel röda × 10 till ett heltal. "up": 2 av 6 -> 3,3 -> 4 (försiktigt), "nearest": -> 3 (2,5 -> 3),
+    "down": -> 3. Liten marginal mot flyttalsfel."""
+    v = round(score_value, 6)
+    if rounding == "nearest":
+        return math.floor(v + 0.5)
+    if rounding == "down":
+        return math.floor(v)
+    return math.ceil(v)
+
+
+class Confirm:
+    """Ett nytt värde gäller först när det setts N dagar i rad (N <= 1: direkt)."""
+
+    def __init__(self, days, value=None):
+        self.days, self.value, self.cand, self.n = days, value, None, 0
+
+    def __call__(self, want):
+        if want == self.value:
+            self.cand, self.n = None, 0
+        else:
+            self.n = self.n + 1 if want == self.cand else 1
+            self.cand = want
+            if self.n >= self.days:
+                self.value, self.cand, self.n = want, None, 0
+        return self.value
+
+
+def mix_trades(weights, pf, px, total, fee, min_trade, rebalance, bought):
+    """Affärer mot fasta andelar. rebalance=False: varje tillgång köps en gång (när priset först finns)."""
+    hold, _ = wp.valuation(pf, px)
+    cash_free = hold["CASH"] - (1 - sum(weights.values())) * total if rebalance else hold["CASH"]
+    trades = []
+    for a, w in weights.items():
+        if rebalance and px[a] and hold[a] > w * total + min_trade:
+            units = (hold[a] - w * total) / px[a]
+            trades.append({"asset": a, "side": "sälj", "units": units, "priceSek": px[a],
+                           "sek": units * px[a], "feeSek": units * px[a] * fee})
+            cash_free += units * px[a] * (1 - fee)
+    for a, w in weights.items():
+        if not px[a] or (not rebalance and a in bought):
+            continue
+        sek = min(w * total - hold[a], cash_free)
+        if sek > min_trade:
+            trades.append({"asset": a, "side": "köp", "units": sek * (1 - fee) / px[a], "priceSek": px[a],
+                           "sek": sek, "feeSek": sek * fee})
+            cash_free -= sek
+            bought.add(a)
+    return trades
 
 
 def filter_trades(prop, pf, total, rules, fee, band_pp=0, no_partial_sells=False):
@@ -225,13 +299,18 @@ class _Market:
             self._ratio[d] = e / b if b and e else None
         return self._ratio[d]
 
-    def eth_above_ma(self, d, days):
-        """ETH/BTC över sitt 30-dagarssnitt (som hämtaren). None om historiken är kortare."""
+    def eth_ma(self, d, days):
+        """ETH/BTC-snittet över N dagar t.o.m. d. None om historiken är kortare."""
         o = date.fromisoformat(d).toordinal()
         vals = [self.ratio(date.fromordinal(o - i).isoformat()) for i in range(days)]
         if any(v is None for v in vals):
             return None
-        return vals[0] > sum(vals) / len(vals)
+        return sum(vals) / len(vals)
+
+    def eth_above_ma(self, d, days):
+        """ETH/BTC över sitt 30-dagarssnitt (som hämtaren). None om historiken är kortare."""
+        ma = self.eth_ma(d, days)
+        return None if ma is None else self.ratio(d) > ma
 
     def build(self, d, lamps=None):
         """Marknadsdelen av en state, som walter_fetch bygger den – men bara data <= d."""
@@ -253,7 +332,8 @@ class _Market:
         return wp.prices_sek(self.build(d))
 
 
-def run(strategy, start, end, exchange, start_sek=100000, series=None):
+def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cache=None):
+    """lamp_cache: valfri dict som delas mellan körningar på SAMMA serier (snabbare); nyckel = dag + gränser."""
     if series is None:
         from backtest import data
         series = data.load_all()
@@ -262,6 +342,7 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None):
                                    slippagePct=exchange.slippage_pct)
     if strategy.no_gold:
         rules["caps"]["GOLD"] = 0
+    tkey = repr(sorted(rules["lampThresholds"].items())) + repr(sorted((rules.get("lampMaxAgeDays") or {}).items()))
     levels = strategy.levels or DEFAULT_LEVELS
     fee = exchange.trade_fee
     mk = _Market(series, exchange)
@@ -284,6 +365,12 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None):
     paid = set()
     pending = None
     gold_streak = 0
+    gold_sig = Confirm(strategy.gold_confirm_days, False)
+    mode_ok = Confirm(strategy.confirm_days, raw["mode"])
+    eth_on = False
+    scores = []
+    bought = set()
+    min_trade_pct = rules["paper"]["minTradePct"] / 100
     red = 0
     last_year = int(days[0][:4])
 
@@ -342,6 +429,8 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None):
         tax = book.tax(year)
         paid.add(year)
         if tax <= 0:
+            if strategy.loss_credit and book.credit(year) > 0:
+                res.credits[year] = book.credit(year)
             return
         rate = mk.rate(d)
         need = exchange.quote_for_sek(tax, rate)
@@ -372,18 +461,28 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None):
             break
 
         # ---------- Beslut för i morgon ----------
-        if strategy.hold_btc is not None:
-            if i == 0:
-                pending = {"mode": "OFFENSIV", "red": 0, "trades": [
-                    {"asset": "BTC", "side": "köp", "units": 0, "sek": round(strategy.hold_btc * total, 2)}]}
-            res.modes[d] = "BEHÅLL"
+        if strategy.weights is not None:
+            trades = mix_trades(strategy.weights, pf, px, total, fee, min_trade_pct * total,
+                                strategy.rebalance, bought)
+            if trades:
+                pending = {"mode": "OFFENSIV", "red": 0, "trades": trades}
+            res.modes[d] = "FAST"
             continue
-        lamps = bl.lamps_on(d, series, rules["lampThresholds"], rules.get("lampMaxAgeDays"))
+        key = (d, tkey)
+        lamps = lamp_cache.get(key) if lamp_cache is not None else None
+        if lamps is None:
+            lamps = bl.lamps_on(d, series, rules["lampThresholds"], rules.get("lampMaxAgeDays"))
+            if lamp_cache is not None:
+                lamp_cache[key] = lamps
         s, _n = bl.score(lamps)
         if s is None:
             res.modes[d] = raw["mode"]
             continue
-        red = red_count(s)
+        if strategy.smooth_days:
+            scores.append(s)
+            last = scores[-strategy.smooth_days:]
+            s = sum(last) / len(last)
+        red = red_count(s, strategy.rounding)
         if not strategy.no_levels:
             lv_value = total + tax_out_q
             lv_peak = max(lv_peak, lv_value)
@@ -392,16 +491,43 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None):
             if lv > raw["level"]:
                 raw["level"] = lv
                 res.level_days.setdefault(lv, d)
+        if strategy.cadence_days > 1 and date.fromisoformat(d).toordinal() % strategy.cadence_days:
+            res.modes[d] = raw["mode"]  # ingen beslutsdag
+            continue
         m = mk.build(d, lamps)
+        if rules["gold"].get("spxBelowMa", True) is False:
+            m = dict(m, spx={"belowMa": False})  # guld bara på VIX (spx.belowMa används bara till guldet)
+        g_on = strategy.gold_always or wp.gold_wanted(m, rules["gold"])
         if strategy.gold_days:
-            gold_streak = gold_streak + 1 if wp.gold_wanted(m, rules["gold"]) else 0
-            if gold_streak < strategy.gold_days:
-                m = dict(m, vix={"value": None}, spx={"belowMa": False})
+            gold_streak = gold_streak + 1 if g_on else 0
+            g_on = g_on and gold_streak >= strategy.gold_days
+        if strategy.gold_confirm_days:
+            g_on = gold_sig(g_on)
+        if not g_on:
+            m = dict(m, vix={"value": None}, spx={"belowMa": False})
+        elif strategy.gold_confirm_days or strategy.gold_always:
+            m = dict(m, spx={"belowMa": True})
+        ratio = m["ethBtc"]["value"]
+        if strategy.eth_fixed:
+            m["ethBtcAbove30dMa"] = True if ratio else None
+        elif ratio and (strategy.eth_ma_days != 30 or strategy.eth_band_pct):
+            ma = mk.eth_ma(d, strategy.eth_ma_days)
+            if ma is None:
+                m["ethBtcAbove30dMa"] = None
+            else:
+                b = strategy.eth_band_pct / 100
+                if ratio > ma * (1 + b):
+                    eth_on = True
+                elif ratio < ma * (1 - b) or (not b and ratio <= ma):
+                    eth_on = False
+                m["ethBtcAbove30dMa"] = eth_on
         state = dict(raw, market=m, lampScore={"source": "data", "red": red})
-        if strategy.hysteresis:
-            with _patched(wp, "suggest_mode", hysteresis_mode):
-                prop = wp.propose(state)
-        else:
+        suggest = hysteresis_mode if strategy.hysteresis else _SUGGEST
+        if strategy.confirm_days:
+            mode_ok.value = raw["mode"]
+            chosen = mode_ok(suggest(red, raw["mode"], rules))
+            suggest = lambda *_a, _c=chosen, **_k: _c  # noqa: E731
+        with _patched(wp, "suggest_mode", suggest):
             prop = wp.propose(state)
         if strategy.band_pp or strategy.no_partial_sells:
             prop = filter_trades(prop, pf, total, rules, fee, strategy.band_pp, strategy.no_partial_sells)
@@ -422,10 +548,12 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None):
         if t > 0:
             res.taxes[yy] = t
             tax_left += t
+        elif strategy.loss_credit and book.credit(yy) > 0:
+            res.credits[yy] = book.credit(yy)
         paid.add(yy)
     rate = mk.rate(d)
     bank, wfee = exchange.withdraw(pf["holdings"]["CASH"], rate)
     res.fees_sek += wfee
-    res.final_sek = bank - tax_left
+    res.final_sek = bank - tax_left + res.credit_sek
     res.book, res.raw = book, raw  # för tester och felsökning
     return res

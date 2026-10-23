@@ -92,11 +92,11 @@ def lamps_on(day, series, thresholds, max_age=None):
     vis = _visible(series, "us10y", day)
     def f_10y():
         ks, n, s = vis
-        last_d = _ord(ks[n - 1])
-        older = [i for i in range(n) if last_d - _ord(ks[i]) >= 30]  # som month_ago: senaste värdet >= 30 d äldre
-        if not older:
+        cut = date.fromordinal(_ord(ks[n - 1]) - 30).isoformat()  # som month_ago: senaste värdet >= 30 d äldre
+        j = bisect_right(ks, cut, 0, n) - 1
+        if j < 0:
             return None
-        return red(s[ks[n - 1]] - s[ks[older[-1]]] > t["us10yRisePp"])
+        return red(s[ks[n - 1]] - s[ks[j]] > t["us10yRisePp"])
     put("us10y", vis, f_10y)
 
     vis = _visible(series, "dxy", day)

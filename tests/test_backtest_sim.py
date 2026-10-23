@@ -217,5 +217,205 @@ class Sim(unittest.TestCase):
             self.assertEqual(res.taxes, {2021: res.book.tax(2021)})
 
 
+class Del3Model(unittest.TestCase):
+    """Steg 10 del 3: avrundning, skattereduktion för förlustår, ärliga jämförelser."""
+
+    def test_rounding(self):
+        self.assertEqual([sim.red_count(2 / 8 * 10, r) for r in ("up", "nearest", "down")], [3, 3, 2])
+        self.assertEqual([sim.red_count(2 / 7 * 10, r) for r in ("up", "nearest", "down")], [3, 3, 2])
+        self.assertEqual([sim.red_count(1 / 7 * 10, r) for r in ("up", "nearest", "down")], [2, 1, 1])
+        self.assertEqual(sim.red_count(3.0, "up"), 3)  # flyttalsmarginal: 3,0000001 räknas som 3
+        self.assertEqual(sim.Strategy().rounding, "nearest")
+
+    def test_rounding_in_sim(self):
+        ds = days("2021-01-01", 4)
+        series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0)}
+
+        def seven(day, series, thresholds, max_age=None):  # 1 röd av 7 lampor = 1,43 av 10
+            return {i: (None if i in ("cpi", "sopr", "etf") else ("red" if i == "vix" else "green"))
+                    for i in RED_ORDER}
+        with mock.patch.object(bl, "lamps_on", seven):
+            up = sim.run(sim.Strategy(rounding="up"), ds[0], ds[-1], FREE, series=series)
+            near = sim.run(sim.Strategy(), ds[0], ds[-1], FREE, series=series)
+        self.assertEqual(up.modes[ds[0]], "OFFENSIV")    # 2 -> Köper
+        self.assertEqual(near.modes[ds[0]], "OFFENSIV")  # 1 -> Köper
+        self.assertEqual(up.raw["journal"][-1]["red"], 2)
+        self.assertEqual(near.raw["journal"][-1]["red"], 1)
+
+    def test_tax_credit_math(self):
+        b = TaxBook()
+        b.buy("BTC", 1, 1000)
+        b.sell("2022-05-01", "BTC", 1, 500)               # −500 -> underskott 0,7 × 500 = 350
+        self.assertEqual(b.tax(2022), 0)
+        self.assertAlmostEqual(b.credit(2022), 0.3 * 350)
+        b.buy("BTC", 1, 400000)
+        b.sell("2023-05-01", "BTC", 1, 100000)            # −300 000 -> underskott 210 000
+        self.assertAlmostEqual(b.credit(2023), 0.3 * 100000 + 0.21 * 110000)
+        self.assertEqual(b.credit(2024), 0)
+
+    def loss_run(self, credit):
+        ds = days("2021-12-01", 40)
+        btc = {d: (100.0 if d < "2021-12-10" else 50.0) for d in ds}
+        series = {"btc": btc, "usdsek": const(ds, 1.0)}
+        rules = copy.deepcopy(sim.DEFAULT_RULES)
+        rules["minCash"], rules["caps"]["BTC"] = 0, 1.0
+        return run(sim.Strategy(rules=rules, loss_credit=credit), {ds[0]: 0, "2021-12-15": 8}, series, ds)
+
+    def test_tax_credit_in_sim(self):
+        on, off = self.loss_run(True), self.loss_run(False)
+        self.assertAlmostEqual(on.credits[2021], 0.3 * 0.7 * 50000, delta=1)  # sålt för 50 000 under omkostnad
+        self.assertEqual(off.credits, {})
+        self.assertAlmostEqual(on.final_sek - off.final_sek, on.credit_sek, delta=0.01)
+        self.assertAlmostEqual(off.final_sek, 50000, delta=1)
+
+    def test_rebalanced_mix(self):
+        ds = days("2021-01-01", 8)
+        btc = {d: (100.0 if d <= ds[2] else 200.0) for d in ds}
+        series = {"btc": btc, "usdsek": const(ds, 1.0)}
+        res = sim.run(sim.mix({"BTC": 0.35}), ds[0], ds[-1], FREE, series=series)
+        t = res.trades
+        self.assertEqual([(x["date"], x["side"]) for x in t[:2]], [(ds[1], "köp"), (ds[4], "sälj")])
+        # efter fördubbling: 70 000 BTC av 135 000 -> sälj ner till 35 % av 135 000
+        self.assertAlmostEqual(t[1]["sek"], 70000 - 0.35 * 135000, delta=1)
+        once = sim.run(sim.mix({"BTC": 0.35}, rebalance=False), ds[0], ds[-1], FREE, series=series)
+        self.assertEqual(once.n_trades, 2)  # köp + slutförsäljning
+
+    def test_buy_once_mix_waits_for_eth(self):
+        ds = days("2021-01-01", 10)
+        series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0), "gold": const(ds, 10.0),
+                  "eth": {d: 5.0 for d in ds[4:]}}
+        res = sim.run(sim.mix({"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2}, rebalance=False), ds[0], ds[-1], FREE,
+                      series=series)
+        buys = [(t["date"], t["asset"]) for t in res.trades if t["side"] == "köp"]
+        self.assertEqual(buys, [(ds[1], "BTC"), (ds[1], "GOLD"), (ds[5], "ETH")])
+        self.assertTrue(sim.mix({"BTC": 0.35}).name.startswith("Ombalanserad"))
+        self.assertTrue(sim.hold_btc(0.35).name.startswith("Köp en gång"))
+
+
+class Del3Variants(unittest.TestCase):
+    """Steg 10 del 3: varianter mot fram-och-tillbaka-handel."""
+
+    def setUp(self):
+        self.ds = days("2021-01-04", 30)  # 2021-01-04 är en måndag
+        self.series = {"btc": const(self.ds, 100.0), "usdsek": const(self.ds, 1.0)}
+
+    def test_confirm(self):
+        c = sim.Confirm(3, "A")
+        self.assertEqual([c(x) for x in "BBABBB"], ["A", "A", "A", "A", "A", "B"])
+        self.assertEqual(sim.Confirm(1, "A")("B"), "B")
+
+    def test_confirm_days(self):
+        ds = self.ds
+        script = {ds[0]: 0, ds[5]: 3, ds[6]: 0, ds[10]: 3}  # en dags blink, sedan riktig ändring
+        base = run(sim.Strategy(), script, self.series, ds)
+        slow = run(sim.Strategy(confirm_days=3), script, self.series, ds)
+        self.assertEqual(base.modes[ds[5]], "NORMAL")
+        self.assertEqual(slow.modes[ds[0]], "AVVAKTAR")   # Köper först dag 3
+        self.assertEqual(slow.modes[ds[2]], "OFFENSIV")
+        self.assertEqual(slow.modes[ds[5]], "OFFENSIV")   # blinken ignoreras
+        self.assertEqual(slow.modes[ds[11]], "OFFENSIV")
+        self.assertEqual(slow.modes[ds[12]], "NORMAL")
+        self.assertLess(len(walter_trades(slow)), len(walter_trades(base)))
+
+    def test_smooth_days(self):
+        ds = self.ds
+        script = {ds[0]: 0, ds[5]: 6, ds[6]: 0}
+        base = run(sim.Strategy(), script, self.series, ds)
+        smooth = run(sim.Strategy(smooth_days=5), script, self.series, ds)
+        self.assertEqual(base.modes[ds[5]], "AVVAKTAR")
+        self.assertEqual(smooth.modes[ds[5]], "OFFENSIV")  # snitt 6/5 = 1,2 -> 1
+
+    def test_cadence_weekly(self):
+        ds = self.ds
+        script = {d: (0 if i % 2 else 3) for i, d in enumerate(ds)}
+        res = run(sim.Strategy(cadence_days=7), script, self.series, ds)
+        deciders = {t["date"] for t in walter_trades(res)}
+        prev = {b: a for a, b in zip(ds, ds[1:])}
+        for d in deciders:
+            self.assertEqual(date.fromisoformat(prev[d]).weekday(), 6)  # beslut på söndagar
+        self.assertGreater(len(deciders), 1)
+
+    def eth_series(self, ratios):
+        hist = days("2020-10-01", len(ratios))
+        return hist, {"btc": const(hist, 100.0), "usdsek": const(hist, 1.0),
+                      "eth": {d: 100.0 * r for d, r in zip(hist, ratios)}}
+
+    def test_eth_band(self):
+        # ETH/BTC: 0,05 länge, sedan +2 % (över snittet men inom ett 5 %-band), sedan +10 %
+        ratios = [0.05] * 120 + [0.051] * 10 + [0.055] * 10
+        hist, series = self.eth_series(ratios)
+        ds = hist[100:]
+        base = run(sim.Strategy(no_levels=True), {ds[0]: 0}, series, ds)
+        band = run(sim.Strategy(no_levels=True, eth_band_pct=5), {ds[0]: 0}, series, ds)
+        b0 = walter_trades(base, "ETH", "köp")[0]["date"]
+        k0 = walter_trades(band, "ETH", "köp")[0]["date"]
+        self.assertEqual(b0, hist[121])
+        self.assertEqual(k0, hist[131])
+
+    def test_eth_ma_days_and_fixed(self):
+        ratios = [0.05 + 0.0001 * i for i in range(60)] + [0.055] * 60  # stiger, sedan platt
+        hist, series = self.eth_series(ratios)
+        ds = hist[40:]
+        m30 = run(sim.Strategy(no_levels=True), {ds[0]: 0}, series, ds)
+        m200 = run(sim.Strategy(no_levels=True, eth_ma_days=200), {ds[0]: 0}, series, ds)
+        fixed = run(sim.Strategy(no_levels=True, eth_fixed=True), {ds[0]: 0}, series, ds)
+        self.assertTrue(walter_trades(m30, "ETH", "sälj"))          # platt kvot -> under 30d-snittet -> sälj
+        self.assertEqual(walter_trades(m200, "ETH"), [])            # för kort historik för 200 dagar
+        self.assertEqual(len(walter_trades(fixed, "ETH")), 1)       # köp och behåll
+        self.assertEqual(walter_trades(fixed, "ETH")[0]["date"], ds[1])
+
+    def test_gold_confirm_days(self):
+        ds = self.ds
+        vix = {d: (25.0 if ds[3] <= d <= ds[12] or d == ds[15] else 15.0) for d in ds}
+        series = dict(self.series, gold=const(ds, 2000.0), vix=vix)
+        base = run(sim.Strategy(no_levels=True), {ds[0]: 0}, series, ds)
+        slow = run(sim.Strategy(no_levels=True, gold_confirm_days=3), {ds[0]: 0}, series, ds)
+        self.assertEqual(len(walter_trades(base, "GOLD")), 4)  # två köp och två sälj
+        self.assertEqual([(t["date"], t["side"]) for t in walter_trades(slow, "GOLD")],
+                         [(ds[6], "köp"), (ds[19], "sälj")])  # på efter 3 dagar; av först efter 3 lugna i rad
+
+    def test_gold_always(self):
+        ds = self.ds
+        series = dict(self.series, gold=const(ds, 2000.0), vix=const(ds, 15.0))
+        base = run(sim.Strategy(no_levels=True), {ds[0]: 0, ds[5]: 8}, series, ds)
+        always = run(sim.Strategy(no_levels=True, gold_always=True), {ds[0]: 0, ds[5]: 8}, series, ds)
+        self.assertEqual(walter_trades(base, "GOLD"), [])
+        self.assertEqual([(t["date"], t["side"]) for t in walter_trades(always, "GOLD")], [(ds[1], "köp")])
+        self.assertEqual(always.modes[ds[6]], "PARKERA")  # guldet ligger kvar även när Walter vilar
+
+    def test_gold_vix_only(self):
+        ds = self.ds
+        series = dict(self.series, gold=const(ds, 2000.0), vix=const(ds, 15.0))
+        rules = copy.deepcopy(sim.DEFAULT_RULES)
+        rules["gold"]["spxBelowMa"] = False
+
+        def spx_red(day, series, thresholds, max_age=None):
+            return {i: ("red" if i == "spx" else "green") for i in RED_ORDER}
+        with mock.patch.object(bl, "lamps_on", spx_red):
+            base = sim.run(sim.Strategy(no_levels=True), ds[0], ds[-1], FREE, series=series)
+            vix_only = sim.run(sim.Strategy(no_levels=True, rules=rules), ds[0], ds[-1], FREE, series=series)
+        self.assertTrue(walter_trades(base, "GOLD"))
+        self.assertEqual(walter_trades(vix_only, "GOLD"), [])
+
+    def test_caps_variant(self):
+        rules = copy.deepcopy(sim.DEFAULT_RULES)
+        rules["caps"] = {"BTC": 0.75, "ETH": 0, "GOLD": 0}
+        res = run(sim.Strategy(rules=rules), {self.ds[0]: 0}, self.series, self.ds)
+        self.assertAlmostEqual(walter_trades(res, "BTC", "köp")[0]["sek"], 75000, delta=1)
+
+    def test_lamp_cache_same_result(self):
+        ds = self.ds
+        script = {d: (0 if i % 3 else 5) for i, d in enumerate(ds)}
+        cache = {}
+        a = run(sim.Strategy(), script, self.series, ds)
+        with mock.patch.object(bl, "lamps_on", lamps_script(script)):
+            b = sim.run(sim.Strategy(), ds[0], ds[-1], FREE, series=self.series, lamp_cache=cache)
+        with mock.patch.object(bl, "lamps_on", side_effect=AssertionError("ska läsas från cachen")):
+            c = sim.run(sim.Strategy(), ds[0], ds[-1], FREE, series=self.series, lamp_cache=cache)
+        self.assertEqual(a.final_sek, b.final_sek)
+        self.assertEqual(b.final_sek, c.final_sek)
+        self.assertEqual(len(cache), len(ds) - 1)
+
+
 if __name__ == "__main__":
     unittest.main()

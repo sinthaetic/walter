@@ -7,13 +7,17 @@ TaxBook: Skatteverkets regler för krypto (PAXG räknas likadant, som "annan til
 - Genomsnittsmetoden per tillgång. Köpavgiften ingår i omkostnaden, säljavgiften minskar försäljningspriset.
 - Vinst/förlust räknas vid varje försäljning, i SEK (dagens kurs).
 - Per kalenderår: skattepliktigt = vinster − 0,7 × förluster, skatt = 30 % × max(0, skattepliktigt).
-  Förenkling: i verkligheten får 70 % av en NETTOFÖRLUST dras mot annan kapitalinkomst (skattereduktion).
-  Testet ignorerar det – ett förlustår ger 0 kr skatt och inget förs vidare eller dras någon annanstans.
+- Är skattepliktigt NEGATIVT (nettoförlust) blir det underskott av kapital: skattereduktion 30 % av underskottet
+  upp till 100 000 kr och 21 % av resten (credit). Den minskar ägarens skatt på annat (lön/annan kapitalinkomst),
+  så pengarna hamnar på bankkontot, inte på börsen. Antagande: ägaren har så mycket annan skatt att dra av mot.
+  Inget förs vidare till nästa år (så funkar det för privatpersoner).
 """
 from dataclasses import dataclass
 
 TAX_RATE = 0.30
 LOSS_DEDUCTIBLE = 0.70
+DEFICIT_CAP = 100000     # underskott av kapital: 30 % upp till hit, 21 % över
+DEFICIT_RATE_ABOVE = 0.21
 
 
 @dataclass(frozen=True)
@@ -99,3 +103,8 @@ class TaxBook:
 
     def tax(self, year):
         return TAX_RATE * max(0.0, self.taxable(year))
+
+    def credit(self, year):
+        """Skattereduktion för underskott av kapital (förlustår), SEK. 0 om året gick plus."""
+        deficit = max(0.0, -self.taxable(year))
+        return TAX_RATE * min(deficit, DEFICIT_CAP) + DEFICIT_RATE_ABOVE * max(0.0, deficit - DEFICIT_CAP)
