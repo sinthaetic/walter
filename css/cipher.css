@@ -36,7 +36,7 @@
 * { box-sizing: border-box; }
 html { background: var(--bg-solid); }
 body {
-  margin: 0; min-height: 100vh; background: var(--bg); background-attachment: fixed;
+  margin: 0; min-height: 100vh; background: var(--bg-solid);
   color: var(--ink); font-family: "Jost", system-ui, sans-serif; font-weight: 300;
   overflow-x: hidden;
 }
@@ -46,10 +46,14 @@ a { color: var(--teal); }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
-.fog { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
-.fog i { position: absolute; border-radius: 50%; filter: blur(110px); animation: fog 22s ease-in-out infinite; }
-.fog i:first-child { width: 900px; height: 560px; left: -260px; top: 360px; background: var(--fog); }
-.fog i:last-child { width: 800px; height: 520px; right: -200px; bottom: -180px; background: var(--fog2); animation-direction: reverse; }
+/* Gradienter i stället för filter: blur – samma skäl som i walter.css (Safari på iPhone) */
+.fog { position: fixed; inset: 0; pointer-events: none; z-index: 0; background: var(--bg); }
+.fog i { position: absolute; border-radius: 50%; animation: fog 22s ease-in-out infinite; }
+.fog i:first-child { width: 1120px; height: 780px; left: -370px; top: 250px; background: radial-gradient(closest-side, var(--fog), transparent); }
+.fog i:last-child { width: 1020px; height: 740px; right: -310px; bottom: -290px; background: radial-gradient(closest-side, var(--fog2), transparent); animation-direction: reverse; }
+@media (hover: none), (pointer: coarse) {
+  .fog i { animation: none; }
+}
 @keyframes fog { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(40px, -30px) scale(1.12); } }
 @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .fog i, .live i { animation: none !important; } }
@@ -175,4 +179,9 @@ h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-h
   .chart { height: 480px; }
   .panel-head em { display: none; }
   .panel-head { height: auto; flex-wrap: wrap; gap: 4px 16px; }
+}
+
+/* Pekskärmar: lättare glas (sist i filen så att det vinner över reglerna ovan) */
+@media (hover: none), (pointer: coarse) {
+  .panel, .nav, .seg, .round, .field input, .field select { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 }

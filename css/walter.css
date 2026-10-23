@@ -30,7 +30,7 @@
 * { box-sizing: border-box; }
 html { background: var(--bg-solid); scroll-behavior: smooth; }
 body {
-  margin: 0; min-height: 100vh; background: var(--bg); background-attachment: fixed;
+  margin: 0; min-height: 100vh; background: var(--bg-solid);
   color: var(--ink); font-family: "Jost", system-ui, sans-serif; font-weight: 300;
   overflow-x: hidden; -webkit-font-smoothing: antialiased;
 }
@@ -43,16 +43,23 @@ button, input, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 
 /* ---------- Bakgrund: dimma, ljusring, ljussvep ---------- */
-.bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-.bg .fog { position: absolute; border-radius: 50%; filter: blur(110px); animation: fog 20s ease-in-out infinite; }
-.bg .fog1 { width: 900px; height: 560px; left: -260px; top: 360px; background: var(--fog); }
-.bg .fog2 { width: 800px; height: 520px; right: -200px; bottom: -180px; background: var(--fog2); animation-duration: 26s; animation-direction: reverse; }
+/* Mjuka kanter med gradienter i stället för filter: blur – blur som rör sig under frostat glas
+   tvingar Safari (iPhone) att räkna om varje panels sudd varje bildruta. */
+.bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; background: var(--bg); }
+.bg .fog { position: absolute; border-radius: 50%; animation: fog 20s ease-in-out infinite; }
+.bg .fog1 { width: 1120px; height: 780px; left: -370px; top: 250px; background: radial-gradient(closest-side, var(--fog), transparent); }
+.bg .fog2 { width: 1020px; height: 740px; right: -310px; bottom: -290px; background: radial-gradient(closest-side, var(--fog2), transparent); animation-duration: 26s; animation-direction: reverse; }
 .bg .halo-wrap { position: absolute; width: 620px; height: 620px; left: 12%; top: 120px; animation: drift 14s ease-in-out infinite; }
-.bg .halo { width: 100%; height: 100%; border-radius: 50%; border: 34px solid var(--halo); filter: blur(28px); animation: halo 9s ease-in-out infinite; }
+.bg .halo { width: 100%; height: 100%; border-radius: 50%; background: radial-gradient(closest-side, transparent 72%, var(--halo) 86%, transparent 100%); animation: halo 9s ease-in-out infinite; }
 .bg .beam {
-  position: absolute; left: 50%; top: -500px; margin-left: -90px; width: 180px; height: 1900px; filter: blur(30px);
+  position: absolute; left: 50%; top: -500px; margin-left: -90px; width: 180px; height: 1900px;
   background: linear-gradient(90deg, transparent 0%, var(--beam) 50%, transparent 100%);
   animation: beam 20s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+/* Pekskärmar: stilla bakgrund och lättare glas, så att mobilen orkar scrolla */
+@media (hover: none), (pointer: coarse) {
+  .bg .fog, .bg .halo-wrap, .bg .halo, .bg .beam { animation: none; }
+  .bg .beam { display: none; }
 }
 @keyframes fog { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(40px, -30px) scale(1.12); } }
 @keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(18px, -14px); } }
@@ -103,6 +110,9 @@ body.is-live .brand .sub { color: var(--red); }
   background: var(--glass); border: 1px solid var(--glass-edge);
   backdrop-filter: blur(24px) saturate(140%); -webkit-backdrop-filter: blur(24px) saturate(140%);
   border-radius: 26px; padding: 22px 28px; min-width: 0;
+}
+@media (hover: none), (pointer: coarse) {
+  .panel, .nav, .seg, .round { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 }
 .label, .panel-head { font-size: 10px; font-weight: 400; letter-spacing: .42em; color: var(--muted); }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 20px; }

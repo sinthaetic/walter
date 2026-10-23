@@ -143,15 +143,20 @@
       });
       ctx.globalCompositeOperation = "source-over";
     };
+    // Pekskärmar: fläckarna rör sig så långsamt att 15 bilder/s och lägre upplösning ser likadant ut,
+    // men frostade glaset ovanpå behöver då räknas om fyra gånger mer sällan (Safari på iPhone).
+    const touch = window.matchMedia && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    const scale = touch ? 0.25 : 0.5, every = touch ? 66 : 0;
+    let last = -1e9;
     const loop = (t) => {
       if (tx > -900) {
         cx += (tx - cx) * 0.08; cy += (ty - cy) * 0.08;
         frost.style.setProperty("--mx", cx + "px"); frost.style.setProperty("--my", cy + "px");
       }
-      draw(t);
+      if (t - last >= every) { draw(t); last = t; }
       raf = requestAnimationFrame(loop);
     };
-    const size = () => { W = cv.width = Math.max(1, Math.round(window.innerWidth * 0.5)); H = cv.height = Math.max(1, Math.round(window.innerHeight * 0.5)); if (still) draw(0); };
+    const size = () => { W = cv.width = Math.max(1, Math.round(window.innerWidth * scale)); H = cv.height = Math.max(1, Math.round(window.innerHeight * scale)); if (still) draw(0); };
     size();
     window.addEventListener("resize", size);
     offResize = () => window.removeEventListener("resize", size);

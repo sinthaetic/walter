@@ -223,3 +223,9 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
 @media (prefers-reduced-motion: reduce) {
   #intro, #intro *, #intro *::before, #intro *::after { animation: none !important; transition: none !important; }
 }
+
+/* Pekskärmar: lättare glas så att Safari på iPhone orkar (sist i filen så att det vinner) */
+@media (hover: none), (pointer: coarse) {
+  #landing .frost, #intro .frost { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  #landing .l-theme, #intro .l-theme { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+}
