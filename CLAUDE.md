@@ -1,7 +1,7 @@
 # WALTER paper trading tracker V2.0
 
 Statisk frontend (HTML/CSS/JS, ingen build). Öppna `index.html` direkt i webbläsaren.
-Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redigera den aldrig för hand.
+Frontend läser `data/market.js` (`window.WALTER_MARKET`, publik marknad) och, med ägarens kod, `data/owner.enc` (krypterad). `data/state.js` (`window.WALTER_STATE`) finns bara lokalt hos ägaren och publiceras aldrig. Båda .js-filerna GENERERAS – redigera dem aldrig för hand.
 
 ## Data-flöde
 - `data/state.json` – handredigerad (ägaren): journal, portfölj, mode, level, regler, KPI-lampan. Hämtaren skriver aldrig hit. Går ALDRIG till GitHub okrypterad (gitignorerad).

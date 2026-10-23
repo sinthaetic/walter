@@ -8,8 +8,10 @@ Läckspärren (leak_check) stoppar publiceringen om ägarens data hittas okrypte
 Är WALTER_PAGES_REPO satt i fetcher/.env (t.ex. https://github.com/NAMN/walter.git)
 pushas deploy/ till grenen gh-pages och sidan hamnar på https://NAMN.github.io/walter/.
 Annars öppnas Netlify Drop, där deploy-mappen dras in för att få en https-länk.
-Är mappen ett git-repo skickas även data/state.enc (låst state.json) till main, så att
-GitHub Actionen (walter-auto.yml) bygger med samma journal nästa gång den hämtar.
+Är mappen ett git-repo och main utcheckad skickas även data/state.enc (låst state.json) till main
+(HEAD:main), så att GitHub Actionen (walter-auto.yml) bygger med samma journal nästa gång den hämtar.
+Före bygget slås publicerade cache.json (gh-pages) ihop med den lokala, så att loggdagar som
+Actionen lagt till aldrig försvinner. Med WALTER_PAGES_REPO men utan WALTER_OWNER_KEY publiceras inget.
 """
 
 import json
@@ -57,23 +59,70 @@ def build_owner_enc(state, owner_cache, code):
                                  "notis": owner_cache.get("notis")}, code)
 
 
-def fetch_published_owner_enc(repo, dst):
-    """Hämta data/owner.enc från gh-pages till dst. True = hämtad, False = finns inte än (första gången).
-    Går gh-pages inte att nå stoppas allt – annars kunde en kortare historik skriva över den publicerade."""
+def fetch_published_file(repo, rel, dst):
+    """Hämta rel (t.ex. data/owner.enc) från gh-pages till dst. Bara läsning, inget pushas.
+    True = hämtad, False = finns inte än (första gången). Går gh-pages inte att nå stoppas allt –
+    annars kunde en kortare historik skriva över den publicerade."""
     r = subprocess.run(["git", "ls-remote", "--exit-code", repo, "refs/heads/gh-pages"], capture_output=True)
     if r.returncode == 2:
         return False  # ingen gh-pages ännu
     if r.returncode:
-        sys.exit("Stoppat: kunde inte nå gh-pages för att hämta publicerade owner.enc. Inget publicerat.")
+        sys.exit(f"Stoppat: kunde inte nå gh-pages för att hämta publicerade {rel}. Inget publicerat.")
     with tempfile.TemporaryDirectory() as t:
         subprocess.run(["git", "init", "-q"], cwd=t, check=True)
         if subprocess.run(["git", "fetch", "-q", "--depth=1", repo, "gh-pages"], cwd=t, capture_output=True).returncode:
-            sys.exit("Stoppat: kunde inte hämta gh-pages (owner.enc). Inget publicerat.")
-        show = subprocess.run(["git", "show", "FETCH_HEAD:data/owner.enc"], cwd=t, capture_output=True)
+            sys.exit(f"Stoppat: kunde inte hämta gh-pages ({rel}). Inget publicerat.")
+        show = subprocess.run(["git", "show", f"FETCH_HEAD:{rel}"], cwd=t, capture_output=True)
         if show.returncode:
-            return False  # gh-pages finns men utan owner.enc – inget att tappa
+            return False  # gh-pages finns men utan filen – inget att tappa
         Path(dst).write_bytes(show.stdout)
     return True
+
+
+def fetch_published_owner_enc(repo, dst):
+    return fetch_published_file(repo, "data/owner.enc", dst)
+
+
+def fetch_published_cache(repo, dst):
+    return fetch_published_file(repo, "data/cache.json", dst)
+
+
+def merge_market_cache(local, pages):
+    """Slå ihop lokal och publicerad marknadscache. marketLog förenas per datum: den nyare cachens rader
+    vinner, men en klar dag skrivs aldrig över av en halvfärdig (samma regel som append_log).
+    market/fetchedAt/sources tas från den nyare cachen."""
+    import walter_auto
+    import walter_public as wpub
+    local, pages = local or {}, pages or {}
+    lt, pt = walter_auto.fetched_at(local), walter_auto.fetched_at(pages)
+    pages_newer = bool(pt) and (not lt or pt > lt)
+    older, newer = (local, pages) if pages_newer else (pages, local)
+    log = list(older.get("marketLog") or [])
+    for row in newer.get("marketLog") or []:
+        log = wpub.append_log(log, row)
+    out = {**older, **newer}
+    out["marketLog"] = log
+    return out
+
+
+def merge_published_cache(repo):
+    """Lokal deploy: dagar som Actionen lagt till i publicerade cache.json får inte försvinna.
+    Körs före build_state, som sedan bygger om data/market.js från den sammanslagna cachen."""
+    if not repo:
+        return
+    with tempfile.TemporaryDirectory() as t:
+        dst = Path(t) / "cache.json"
+        if not fetch_published_cache(repo, dst):
+            return  # första gången: inget publicerat att slå ihop
+        try:
+            pages = json.loads(dst.read_text(encoding="utf-8"))
+        except ValueError:
+            sys.exit("Stoppat: publicerade cache.json går inte att läsa. Inget publicerat.")
+    local = walter_fetch.read_json(walter_fetch.CACHE, {})
+    merged = walter_fetch.strip_private_cache(merge_market_cache(local, pages))
+    if merged != walter_fetch.strip_private_cache(local):
+        walter_vault._write_atomic(walter_fetch.CACHE, json.dumps(merged, indent=2, ensure_ascii=False))
+        print("Slog ihop marknadsloggen med publicerade cache.json.")
 
 
 def merge_published(code, enc_path):
@@ -173,16 +222,37 @@ def git(*args, cwd=OUT):
     subprocess.run(["git", *args], cwd=cwd, check=True)
 
 
+def current_branch():
+    r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
 def push_source():
-    """Lokalt: commit + push av den låsta state.enc till main. Actionen gör aldrig detta."""
+    """Lokalt: commit + push av den låsta state.enc till main. Actionen gör aldrig detta.
+    Pushar uttryckligen HEAD:main, och bara när main är utcheckad – annars hamnar journalen på fel gren
+    (eller en ogranskad gren på main)."""
     if os.environ.get("GITHUB_ACTIONS") or not (ROOT / ".git").exists():
+        return
+    branch = current_branch()
+    if branch != "main":
+        warn(f"Du står på grenen '{branch}', inte main – state.enc committas och pushas inte. "
+             "Byt till main (git switch main) och kör walter deploy igen, annars kör Actionen med förra journalen.")
         return
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     subprocess.run(["git", "add", "data/state.enc"], cwd=ROOT)
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode:
         subprocess.run(["git", "commit", "-q", "-m", f"journal {stamp}"], cwd=ROOT)
-    if subprocess.run(["git", "push", "-q"], cwd=ROOT).returncode:
+    if subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=ROOT).returncode:
         warn("Kunde inte pusha state.enc till main – Actionen kör med förra journalen tills du kör git push.")
+
+
+def check_publish_config(code, repo):
+    """Med WALTER_PAGES_REPO men utan WALTER_OWNER_KEY skulle publiceringen ta bort owner.enc från gh-pages:
+    ägarens vy i mobilen och dagshistoriken försvinner. Då publiceras ingenting."""
+    if repo and not code:
+        sys.exit("Stoppat: WALTER_PAGES_REPO är satt men WALTER_OWNER_KEY saknas i fetcher/.env. "
+                 "En publicering nu skulle ta bort din Walter i mobilen (owner.enc) och dagshistoriken. "
+                 "Lägg in koden i fetcher/.env och kör igen. Inget publicerat.")
 
 
 def push_pages(repo):
@@ -207,8 +277,10 @@ def main():
     repo = os.environ.get("WALTER_PAGES_REPO", "").strip()
     if repo and not shutil.which("git"):
         sys.exit("git saknas – installera Git for Windows eller använd Netlify Drop.")
+    check_publish_config(code, repo)
     if code:
         lock_if_changed(code)
+    merge_published_cache(repo)  # före build_state, som bygger om data/market.js med hela loggen
     build_state()
     publish_owner(code, repo)
     copy_site()

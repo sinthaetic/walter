@@ -243,3 +243,122 @@ class CliAndGateTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def log_row(d, ready=True, red=3):
+    return {"date": d, "ready": ready, "red": red, "px": None, "ethBtcAbove30dMa": None, "vix": None,
+            "spxBelowMa": None}
+
+
+class MergePublishedCacheTest(unittest.TestCase):
+    """Lokal deploy: dagar som Actionen lagt i publicerade cache.json tappas inte. Inget nätverk."""
+
+    def setUp(self):
+        self.t = tempfile.TemporaryDirectory()
+        self.cache = Path(self.t.name) / "cache.json"
+        self.p = mock.patch.object(walter_fetch, "CACHE", self.cache)
+        self.p.start()
+
+    def tearDown(self):
+        self.p.stop()
+        self.t.cleanup()
+
+    def fake(self, obj):
+        def f(repo, dst):
+            if obj is None:
+                return False
+            Path(dst).write_text(json.dumps(obj), encoding="utf-8")
+            return True
+        return mock.patch.object(wd, "fetch_published_cache", side_effect=f)
+
+    def test_pages_newer_adds_action_days_and_keeps_newer_market(self):
+        self.cache.write_text(json.dumps({"fetchedAt": "2026-10-20T10:00:00", "market": {"x": 1},
+                                          "marketLog": [log_row("2026-10-19"), log_row("2026-10-20")]}),
+                              encoding="utf-8")
+        pages = {"fetchedAt": "2026-10-22T10:00:00", "market": {"x": 2},
+                 "marketLog": [log_row("2026-10-20", red=5), log_row("2026-10-21"), log_row("2026-10-22")]}
+        with self.fake(pages), redirect_stdout(io.StringIO()):
+            wd.merge_published_cache("https://example.invalid/r.git")
+        got = json.loads(self.cache.read_text(encoding="utf-8"))
+        self.assertEqual([r["date"] for r in got["marketLog"]],
+                         ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"])
+        self.assertEqual(got["marketLog"][1]["red"], 5)  # nyare cachen vinner
+        self.assertEqual(got["market"], {"x": 2})
+        self.assertEqual(got["fetchedAt"], "2026-10-22T10:00:00")
+
+    def test_ready_row_never_replaced_by_not_ready(self):
+        local = {"fetchedAt": "2026-10-20T10:00:00", "marketLog": [log_row("2026-10-20", red=2)]}
+        pages = {"fetchedAt": "2026-10-20T12:00:00", "marketLog": [log_row("2026-10-20", ready=False, red=0)]}
+        got = wd.merge_market_cache(local, pages)
+        self.assertEqual(got["marketLog"], [log_row("2026-10-20", red=2)])
+
+    def test_local_newer_keeps_local_market_and_wins_rows(self):
+        local = {"fetchedAt": "2026-10-23T09:00:00", "market": {"x": "lokal"},
+                 "marketLog": [log_row("2026-10-22", red=7)]}
+        pages = {"fetchedAt": "2026-10-22T09:00:00", "market": {"x": "pages"},
+                 "marketLog": [log_row("2026-10-21"), log_row("2026-10-22", red=1)]}
+        got = wd.merge_market_cache(local, pages)
+        self.assertEqual(got["market"], {"x": "lokal"})
+        self.assertEqual([(r["date"], r["red"]) for r in got["marketLog"]],
+                         [("2026-10-21", 3), ("2026-10-22", 7)])
+
+    def test_first_run_without_published_cache(self):
+        self.cache.write_text('{"fetchedAt": "2026-10-20T10:00:00"}', encoding="utf-8")
+        with self.fake(None):
+            wd.merge_published_cache("https://example.invalid/r.git")
+        self.assertEqual(json.loads(self.cache.read_text(encoding="utf-8")), {"fetchedAt": "2026-10-20T10:00:00"})
+
+    def test_first_run_without_local_cache(self):
+        pages = {"fetchedAt": "2026-10-22T10:00:00", "marketLog": [log_row("2026-10-22")]}
+        with self.fake(pages), redirect_stdout(io.StringIO()):
+            wd.merge_published_cache("https://example.invalid/r.git")
+        self.assertEqual(json.loads(self.cache.read_text(encoding="utf-8"))["marketLog"], [log_row("2026-10-22")])
+
+    def test_private_keys_never_written(self):
+        pages = {"fetchedAt": "2026-10-22T10:00:00", "daily": {"d": 1}, "notis": {"n": 1}, "marketLog": []}
+        with self.fake(pages), redirect_stdout(io.StringIO()):
+            wd.merge_published_cache("https://example.invalid/r.git")
+        got = json.loads(self.cache.read_text(encoding="utf-8"))
+        self.assertNotIn("daily", got)
+        self.assertNotIn("notis", got)
+
+    def test_no_repo_skips_fetch(self):
+        with mock.patch.object(wd, "fetch_published_cache") as f:
+            wd.merge_published_cache("")
+        f.assert_not_called()
+
+
+class PublishConfigTest(unittest.TestCase):
+    def test_repo_without_key_refuses(self):
+        with self.assertRaises(SystemExit) as e:
+            wd.check_publish_config(None, "https://example.invalid/r.git")
+        self.assertIn("WALTER_OWNER_KEY", str(e.exception))
+
+    def test_ok_with_key_or_without_repo(self):
+        wd.check_publish_config("k", "https://example.invalid/r.git")
+        wd.check_publish_config(None, "")
+
+
+class PushSourceTest(unittest.TestCase):
+    def run_push(self, branch):
+        calls = []
+
+        def fake_run(args, **kw):
+            calls.append(args)
+            return mock.Mock(returncode=0)
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": ""}), \
+                mock.patch.object(wd, "current_branch", return_value=branch), \
+                mock.patch.object(wd.subprocess, "run", side_effect=fake_run), \
+                mock.patch.object(wd, "warn") as w, \
+                mock.patch.object(wd, "ROOT", ROOT):
+            wd.push_source()
+        return calls, w
+
+    def test_pushes_head_to_main_explicitly(self):
+        calls, _ = self.run_push("main")
+        self.assertIn(["git", "push", "-q", "origin", "HEAD:main"], calls)
+
+    def test_other_branch_does_not_commit_or_push(self):
+        calls, w = self.run_push("steg-9")
+        self.assertEqual(calls, [])
+        self.assertIn("main", w.call_args[0][0])

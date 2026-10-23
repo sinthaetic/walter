@@ -51,7 +51,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
   Testade även anpassade gränser (percentil av senaste 2–4 åren): ingen var bättre, flera missade 2024–25.
 
 ## Öppna frågor
-- Ska git-historiken skrivas om? Gamla versioner av `state.json` (ägarens journal och belopp) ligger okrypterade i det publika repots historik. Att skriva om den kräver force-push och nytt repo-läge; avgörs av ägaren före första publika push.
+- Ska git-historiken skrivas om? Gamla versioner av `state.json` (ägarens journal och belopp) ligger okrypterade i det publika repots historik. Repot är redan publikt, så den gamla historiken är redan synlig och kan ha kopierats. Att skriva om den (force-push) tar bort den från GitHub framåt men gör den inte hemlig igen; avgörs av ägaren.
 - ~~Vilka lampnivåer ger vilket läge?~~ Beslutat 22 okt: 0–2 Köper, 3–4 Köper lite, 5–6 Avvaktar, 7+ Vilar (vaknar vid 5).
 - Live-handel för andra än dig själv (steg 9 och senare) kräver FI/jurist först.
 - Ska W-Cipher någonsin bli en lampa? Nu: nej.

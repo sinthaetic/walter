@@ -58,7 +58,7 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
 
    Saknas Netlify-nycklarna hoppar Actionen bara över Netlify-steget. GitHub Pages fungerar ändå.
 
-5. **Första push**, i mappen `walter`. Pusha och öppna PR **först när Secreten `WALTER_OWNER_KEY` ligger inne** (steg 4), annars publicerar Actionen sidan utan `owner.enc`. Gamla versioner av `state.json` kan ligga i git-historiken: se öppna frågan i `docs/ROADMAP.md` innan repot görs publikt.
+5. **Första push**, i mappen `walter`. Utan Secreten `WALTER_OWNER_KEY` (steg 4) hämtar och publicerar Actionen **ingenting** – sidan ligger kvar som den var (eller finns inte än). Vill du publicera innan Secreten finns: kör `walter deploy` lokalt (med koden i `fetcher/.env`). Gamla versioner av `state.json` kan ligga i git-historiken: se öppna frågan i `docs/ROADMAP.md`.
    ```
    git init -b main
    git add .
@@ -72,7 +72,7 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
 6. **Slå på GitHub Pages:** repot → **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
    Grenen `gh-pages` skapas av första körningen. Kör därför steg 8 först om den inte syns i listan.
 
-7. **Skriv in koden i mobilen:** öppna sidan → **Inställningar → Lås upp min Walter** → skriv koden → **LÅS UPP**. Den sparas bara i den webbläsaren. Då visas din Walter (journal, K4) på alla enheter där du gjort det.
+7. **Skriv in koden i mobilen:** öppna sidan → **GÅ IN** → **Har du en kod? Lås upp din Walter** (första rutan) → skriv koden → **LÅS UPP**. Du behöver inte skapa någon egen Walter först. (Har du redan en Walter i den webbläsaren: **Inställningar → Lås upp min Walter**.) Koden sparas bara i den webbläsaren, och bara när den stämmer. Då visas din Walter (journal, K4) på alla enheter där du gjort det. Vill du ta bort den från en enhet: **Inställningar → Glöm koden på den här enheten**.
 
 8. **Provkör:** repot → **Actions → WALTER auto → Run workflow**. En grön bock betyder att sidan är uppdaterad på
    `https://MITT-NAMN.github.io/walter/` (och på Netlify om du har lagt in nycklarna).
@@ -106,8 +106,13 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
 - **Läckspärren** går igenom `deploy/` före varje publicering. Står `journal`, `portfolio`, `k4`,
   `capitalChange`, `daily`, `notis`, `proposal` eller `WALTER_OWNER_KEY` okrypterat i `deploy/data/`
   (utom i `owner.enc`), eller finns `state.js`, `reports/`, `.env`, `etf_raw.json` med, stoppas allt.
-- **Utan kod lokalt:** saknas `WALTER_OWNER_KEY` i `fetcher/.env` publiceras sidan utan `owner.enc`
-  (bara marknaden) och du får en varning.
+- **Utan kod lokalt:** är `WALTER_PAGES_REPO` satt men `WALTER_OWNER_KEY` saknas i `fetcher/.env` **stoppas** `walter deploy` –
+  annars skulle din Walter i mobilen (`owner.enc`) och dagshistoriken försvinna från sidan. Utan `WALTER_PAGES_REPO` (Netlify Drop)
+  byggs `deploy/` utan `owner.enc` (bara marknaden) och du får en varning.
+- **Marknadsloggen tappas inte:** före varje lokal `walter deploy` hämtas publicerade `cache.json` från `gh-pages` och
+  dagarna som Actionen lagt till slås ihop med dina (en klar dag skrivs aldrig över av en halvfärdig).
+- **Journalen pushas bara från `main`:** `walter deploy` committar och pushar `state.enc` till `main` (HEAD:main) bara när
+  `main` är utcheckad. Står du på en annan gren får du en varning och inget pushas.
 - **Utan Secret i Actionen:** saknas `WALTER_OWNER_KEY` som Secret hämtar och publicerar Actionen
   **ingenting**. Körningen blir grön med en varning, och sidan ligger kvar exakt som den var.
 - **Dagsvärdena tappas aldrig i tysthet.** Före varje publicering hämtas den publicerade `owner.enc` från
@@ -119,6 +124,6 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
 - **Byter du kod:** lägg den nya i `fetcher/.env` och i Secreten och kör `walter_vault.py las`. Nästa
   `walter deploy` stoppas, eftersom den publicerade `owner.enc` är låst med den gamla koden. Kör då en gång
   `set WALTER_GLOM_GAMLA_DAGAR=1` och sedan `walter deploy` i samma fönster. Gamla dagsvärden försvinner,
-  och efter det fungerar Actionen igen med den nya koden.
+  och efter det fungerar Actionen igen med den nya koden. Lägg **aldrig** `WALTER_GLOM_GAMLA_DAGAR` i `fetcher/.env` – då skulle varje deploy tyst kunna tappa dagshistoriken. Bara i fönstret, en gång.
 - GitHub stänger av schemalagda Actions efter 60 dagar utan commits i repot. Kör `walter deploy`
   då och då, eller tryck **Enable workflow** under Actions.
