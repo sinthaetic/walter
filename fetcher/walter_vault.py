@@ -120,11 +120,21 @@ def _read_enc(text, code):
         return None
 
 
+OFFLINE_HINTS = ("could not resolve host", "unable to access", "could not read from remote",
+                 "failed to connect", "connection timed out", "network is unreachable")
+
+
+def _offline(stderr):
+    s = stderr.lower()
+    return any(h in s for h in OFFLINE_HINTS)
+
+
 def sync_from_repo(root=ROOT, state=STATE, enc=ENC, run=subprocess.run):
     """Datorn: hämta main (Walter kan ha handlat i Actionen och committat state.enc) och lås upp
     state.enc -> state.json om innehållet är annat och state.json inte har egna, nyare ändringar.
     Tyst om offline, ingen git eller inget repo. Körs aldrig i Actionen.
-    Returnerar None (gjorde inget), "same", "local" (behöll lokala ändringar) eller "unlocked"."""
+    Returnerar None (gjorde inget), "same", "local" (behöll lokala ändringar), "pullfail" (git pull
+    gick inte av annat skäl än offline – rör inget) eller "unlocked" (gamla state.json -> state.json.bak)."""
     if os.environ.get("GITHUB_ACTIONS"):
         return None
     root, state, enc = Path(root), Path(state), Path(enc)
@@ -133,9 +143,12 @@ def sync_from_repo(root=ROOT, state=STATE, enc=ENC, run=subprocess.run):
     pre_text = enc.read_text(encoding="utf-8") if enc.exists() else None
     pre_mtime = enc.stat().st_mtime if enc.exists() else 0
     try:
-        run(["git", "pull", "--ff-only", "-q"], cwd=root, capture_output=True, timeout=60)
+        r = run(["git", "pull", "--ff-only", "-q"], cwd=root, capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
-        pass  # offline eller ingen git: jobba med det som finns
+        r = None  # ingen git eller timeout: jobba med det som finns
+    if r is not None and r.returncode and not _offline(getattr(r, "stderr", "") or ""):
+        print("Kunde inte hämta main – kör git status. Walter använder din lokala state.json tills vidare.")
+        return "pullfail"
     if not enc.exists():
         return None
     code = owner_key()
@@ -157,9 +170,11 @@ def sync_from_repo(root=ROOT, state=STATE, enc=ENC, run=subprocess.run):
         pre = remote if pre_text == text else (_read_enc(pre_text, code) if pre_text else None)
         if local != pre:
             print(f"Du har ändringar i {state.name} som är nyare än den låsta {enc.name} – Walter använder "
-                  "dina lokala. Kör walter deploy för att spara dem (eller 'walter_vault.py las-upp' för att "
-                  "ta Walters version från GitHub).")
+                  "dina lokala. Välj själv: kör walter_vault.py las (tar dina, skriver över Walters) "
+                  "eller las-upp (tar Walters).")
             return "local"
+    if state.exists():  # reservkopia av den gamla, ifall något gick fel (gitignorerad)
+        _write_atomic(state.with_name(state.name + ".bak"), state.read_text(encoding="utf-8"))
     _write_atomic(state, json.dumps(remote, ensure_ascii=False, indent=2))
     print(f"Hämtade Walters senaste journal från GitHub ({enc.name} -> {state.name}).")
     return "unlocked"

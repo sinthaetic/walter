@@ -127,14 +127,16 @@ class SyncTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         os.utime(path, (mtime, mtime))
 
-    def fake_run(self, pulled=None):
+    def fake_run(self, pulled=None, rc=0, stderr=""):
         def run(cmd, **kw):
             self.calls.append(cmd)
             if pulled is not None:  # "git pull" kom med en ny state.enc
                 self.put(self.enc, pulled, 5000, enc=True)
 
             class R:
-                returncode = 0
+                returncode = rc
+            R.stderr = stderr
+            R.stdout = ""
             return R()
         return run
 
@@ -170,6 +172,31 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(res, "local")
         self.assertEqual(self.local(), {"a": 3})
         self.assertIn("nyare", out)
+        self.assertIn("las (tar dina, skriver över Walters) eller las-upp (tar Walters)", out)
+
+    def test_unlock_keeps_backup(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 2}, 2000, enc=True)
+        res, _ = self.sync(self.fake_run())
+        self.assertEqual(res, "unlocked")
+        bak = self.state.with_name("state.json.bak")
+        self.assertEqual(json.loads(bak.read_text(encoding="utf-8")), {"a": 1})
+
+    def test_failed_pull_is_said_and_not_unlocked(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 2}, 2000, enc=True)
+        res, out = self.sync(self.fake_run(rc=1, stderr="fatal: Not possible to fast-forward, aborting."))
+        self.assertEqual(res, "pullfail")
+        self.assertIn("Kunde inte hämta main – kör git status", out)
+        self.assertEqual(self.local(), {"a": 1})
+
+    def test_offline_pull_is_quiet(self):
+        self.put(self.state, {"a": 1}, 1000)
+        self.put(self.enc, {"a": 2}, 2000, enc=True)
+        err = "fatal: unable to access 'https://github.com/x/walter.git/': Could not resolve host: github.com"
+        res, out = self.sync(self.fake_run(rc=128, stderr=err))
+        self.assertEqual(res, "unlocked")
+        self.assertNotIn("Kunde inte hämta", out)
 
     def test_same_content_does_nothing(self):
         self.put(self.state, {"a": 1}, 1000)
@@ -196,6 +223,39 @@ class SyncTest(unittest.TestCase):
             raise FileNotFoundError("git")
         res, _ = self.sync(boom)
         self.assertEqual(res, "unlocked")  # offline/ingen git: jobbar med det som finns
+
+
+class PaperCliTest(unittest.TestCase):
+    def run_main(self, argv, sync_result="same"):
+        calls = {"auto": 0, "sync": 0}
+
+        def fake_auto(w, today=None, say=lambda s: None):
+            calls["auto"] += 1
+            say("Walter handlar inte: test.")
+
+        def fake_sync():
+            calls["sync"] += 1
+            return sync_result
+
+        def no_input(prompt=""):
+            raise AssertionError("input() får inte anropas")
+
+        out = io.StringIO()
+        out.reconfigure = lambda **kw: None
+        with patch.object(sys, "argv", ["walter_paper.py", *argv]), patch.object(wpaper, "auto", fake_auto),                 patch.object(v, "sync_from_repo", fake_sync), patch("builtins.input", no_input),                 patch.object(wpaper, "rebuild", lambda w: {}),                 patch.object(wpaper, "propose", lambda s: proposal()), redirect_stdout(out):
+            wpaper.main()
+        return calls, out.getvalue()
+
+    def test_auto_flag_runs_auto_without_sync_or_input(self):
+        calls, out = self.run_main(["--auto"])
+        self.assertEqual(calls, {"auto": 1, "sync": 0})
+        self.assertIn("Walter handlar inte: test.", out)
+
+    def test_manual_stops_before_ja_when_local_changes(self):
+        for res in ("local", "pullfail"):
+            calls, out = self.run_main([], sync_result=res)
+            self.assertEqual(calls, {"auto": 0, "sync": 1})
+            self.assertIn("Inget handlat", out)
 
 
 class NotisAutoTest(unittest.TestCase):

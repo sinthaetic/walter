@@ -5,6 +5,7 @@ data/etf_raw.json
 
 # Ägarens data – bara krypterad (data/state.enc) i repot
 data/state.json
+data/state.json.bak
 data/owner-cache.json
 data/owner.enc
 data/paper-journal-*.csv

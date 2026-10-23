@@ -36,7 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # ref = grenens topp nu, inte github.sha från när körningen startades: en körning som stått i kö
+      # ska inte börja från en state.enc från före Walters senaste affär.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Hämta senast publicerade cache.json och owner.enc från gh-pages
         run: |
@@ -88,7 +92,7 @@ jobs:
       # Walter handlar själv, högst en gång per dag (walter_paper.py --auto skriver journalposten med "auto": true).
       # Före notis och deploy, så att notisen och publicerade owner.enc redan har affären.
       # Affären sparas som state.enc på main innan något publiceras. Går pushen inte (inte ens efter en
-      # pull --rebase) blir steget rött och resten hoppas över – en affär som inte sparats publiceras aldrig.
+      # pull --rebase --autostash; cache.json är ändrad i runnern) blir steget rött och resten hoppas över – en affär som inte sparats publiceras aldrig.
       # [skip ci]: pushen ska inte starta en ny körning (push.paths innehåller data/state.enc).
       # Bara på main, så att en manuell körning på en annan gren aldrig pushar den grenen till main.
       - name: Walter handlar själv
@@ -109,7 +113,7 @@ jobs:
           git -c user.name=WALTER -c user.email=walter@localhost commit -q -m "Walter handlade $(date +%Y-%m-%d) [skip ci]"
           if ! git push -q origin HEAD:main; then
             echo "main har rört sig – hämtar och försöker en gång till."
-            git -c user.name=WALTER -c user.email=walter@localhost pull -q --rebase origin main
+            git -c user.name=WALTER -c user.email=walter@localhost pull -q --rebase --autostash origin main
             git push -q origin HEAD:main
           fi
           echo "Sparade Walters affär i data/state.enc på main."

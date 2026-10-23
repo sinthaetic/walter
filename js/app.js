@@ -160,7 +160,7 @@
   const Pnow = S.proposal || {};
   const pending = !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
   $("quote").textContent = MODE.quote + (pending
-    ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa hämtning.`
+    ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`
     : "");
   $("mode-explain").textContent = "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
 
@@ -275,7 +275,7 @@
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
       : isUser
         ? `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge själv nästa gång han räknar.`
-        : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge vid nästa hämtning.`;
+        : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`;
   $("lamps").innerHTML = `
     <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
     <ul class="lamp-grid">

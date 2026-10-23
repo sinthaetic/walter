@@ -268,7 +268,11 @@ def main():
     if "--auto" in sys.argv[1:]:
         auto(wf, say=print)
         return
-    walter_vault.sync_from_repo()  # Walter kan ha handlat i Actionen – hämta det först
+    # Walter kan ha handlat i Actionen – hämta det först. Är läget oklart handlas inget manuellt,
+    # så att ett JA aldrig skriver över en state.enc med Walters egen affär.
+    if walter_vault.sync_from_repo() in ("local", "pullfail"):
+        print("\nInget handlat. Reda ut state.json/state.enc först (se ovan), kör sedan paper.bat igen.")
+        return
     built = rebuild(wf)
     prop = propose(built)
     print("\nWALTER FÖRESLÅR\n" + prop["plain"])
