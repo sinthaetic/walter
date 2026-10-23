@@ -22,7 +22,8 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
 | 6 | ✓ K4-underlag i ny design (klar 22 okt) | Sonnet |
 | 7 | ✓ Designen inbyggd i riktiga koden: index.html med flikarna Översikt, Pro, Logg, K4, Inställningar + W-CIPHER i menyn, nya logon, ljust/mörkt, mobil. cipher.html publiceras nu också (klar 22 okt) | Opus |
 | 8 | ✓ Logikluckor: trade-motor för paper (`paper.bat`), lampnivåer för lägena, buffert (vilar vid 7, vaknar vid 5), Sharpe utan flows. Level 3 i procent (klart 22 okt) | Opus |
-| 9 | Walter som app: vem som helst väljer summa och börs (Kraken m.fl. med deras avgifter), allt sparas i webbläsaren, Walter handlar deras paper. Proof of concept före live mot börs | Opus |
+| 9 | ✓ Walter som app: vem som helst väljer summa och börs (5 MiCA-börser med avgifter), allt sparas i webbläsaren, Walter handlar deras paper. Ägarens data krypterad (`state.enc`, `owner.enc`). Proof of concept före live mot börs (klar 23 okt) | Opus |
+| 10 | SOL och fler valutor: testa först historiken (lampor, trend, drawdown) för varje ny tillgång innan den får ett tak; sedan fler valutor än SEK | Opus |
 
 ## W-Cipher (steg 5, förslag)
 - Grafen: Heikin-Ashi-ljus + trendband (Cipher A) överst, vågen + pengaflöde (Cipher B) under.
@@ -50,6 +51,7 @@ Ta en ny Claude-session per steg. Modellförslaget står vid varje steg.
   Testade även anpassade gränser (percentil av senaste 2–4 åren): ingen var bättre, flera missade 2024–25.
 
 ## Öppna frågor
+- Ska git-historiken skrivas om? Gamla versioner av `state.json` (ägarens journal och belopp) ligger okrypterade i det publika repots historik. Att skriva om den kräver force-push och nytt repo-läge; avgörs av ägaren före första publika push.
 - ~~Vilka lampnivåer ger vilket läge?~~ Beslutat 22 okt: 0–2 Köper, 3–4 Köper lite, 5–6 Avvaktar, 7+ Vilar (vaknar vid 5).
 - Live-handel för andra än dig själv (steg 9 och senare) kräver FI/jurist först.
 - Ska W-Cipher någonsin bli en lampa? Nu: nej.

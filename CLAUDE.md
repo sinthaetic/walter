@@ -1,16 +1,18 @@
-# WALTER paper trading tracker V1.13
+# WALTER paper trading tracker V2.0
 
 Statisk frontend (HTML/CSS/JS, ingen build). Öppna `index.html` direkt i webbläsaren.
 Frontend läser `data/state.js` (`window.WALTER_STATE`), som GENERERAS – redigera den aldrig för hand.
 
 ## Data-flöde
-- `data/state.json` – handredigerad: journal, portfölj, mode, level, regler, KPI-lampan. Hämtaren skriver aldrig hit.
-- `data/cache.json` – senast hämtade marknadsvärden (skrivs av hämtaren).
-- `fetcher/walter_fetch.py` – hämtar, räknar lampor, bygger `state.js` = state.json + cache. `--offline` bygger bara om. `hamta.bat` = dubbelklick.
+- `data/state.json` – handredigerad (ägaren): journal, portfölj, mode, level, regler, KPI-lampan. Hämtaren skriver aldrig hit. Går ALDRIG till GitHub okrypterad (gitignorerad).
+- `data/state.enc` – state.json låst med `WALTER_OWNER_KEY` (`fetcher/walter_vault.py`: `ny-kod` | `las` | `las-upp` | `sla-ihop`). Det är den som ligger i repot; Actionen låser upp den med Secret.
+- `data/cache.json` – senast hämtade marknadsvärden (publik, skrivs av hämtaren).
+- `data/owner-cache.json` – ägarens privata dagsvärden och notis (gitignorerad; publiceras bara krypterad).
+- `fetcher/walter_fetch.py` – hämtar, räknar lampor, bygger `state.js` (bara lokalt, ägarens hela bild) = state.json + cache, och `data/market.js` via `fetcher/walter_public.py` (publik, bara marknaden: lamps, mode, px, usdsek, eursek, rules, levels, version, `log` = dagsrader). `--offline` bygger bara om. `hamta.bat` = dubbelklick.
 - Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode ändras ALDRIG automatiskt – bara via journalpost.
 - `fetcher/walter_paper.py` = trade-motorn. Hämtaren räknar förslaget (`state.proposal`), dagens värde och Sharpe i state.js men handlar aldrig.
   `paper.bat` visar förslaget; skriver man JA skrivs läge, `portfolio.positions`, kontanter, historik, journalpost och K4-rad in i state.json.
-  `cache.json` → `daily` = portföljvärdet per dag (för Sharpe).
+  `owner-cache.json` → `daily` = portföljvärdet per dag (för Sharpe).
 - En lampa vars data är äldre än `rules.lampMaxAgeDays` blir "väntar" (null), så gammal data aldrig räknas som färsk.
 - bykaranteli kräver gratis nyckel i `fetcher/.env` (`BYKARANTELI_API_KEY`). FRED svarar ofta inte → reserv Yahoo `^TNX`. BGeometrics gratis = ~7 dagar fördröjt och bara 4 års historik, därför räknas MVRV-Z själv från Coin Metrics Community (gratis, hela historiken, 1 dag efter) med BGeometrics som reserv. SOPR kommer fortfarande från BGeometrics.
 - KPI-lampan räknas från `market.cpi` (actual/expected/asOf) som skrivs för hand.
@@ -34,6 +36,20 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Procenten är MARKNADSVINST över alla insättningar (startkapital + `capitalChange.manualTopUp`). Insättningar låser aldrig upp. Belopp räknas från procenten, sparas aldrig fast.
 - Sharpe (årstakt, riskfri ränta 0) visas först efter 30 dagar riktig handel, räknat från `portfolio.firstTrade`. Insättningar (`flow`) räknas bort.
 - `portfolio.history`: insättningar får `"flow": belopp`, paper-testet före start får `"test": true`. Avkastning räknas utan flows.
+
+## Publicering och ägare
+- Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `data/market.js`, `data/cache.json`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.
+- Utan Secret `WALTER_OWNER_KEY` hoppar Actionen över hämtning och publicering (sidan ligger kvar som den var).
+- Lokal deploy slår först ihop publicerade `owner.enc` (dagsvärden) och vägrar korta historiken. `WALTER_GLOM_GAMLA_DAGAR=1` är nödutgången vid kodbyte: lägg den ALDRIG i `.env`.
+- Boot (`js/boot.js`): `data/state.js` finns → ägare lokalt. Annars `walter.ownerKey` i localStorage (skrivs in under Inställningar) → dekryptera `owner.enc` → ägarens Walter. Annars landning (`js/landing.js`) → användarens Walter eller intro (`js/intro.js`).
+
+## Walter som app (användare, steg 9)
+- Allt sparas i webbläsaren: `walter.user` (state), `walter.user.goal`, `walter.user.plan`, `walter.ownerKey`. Inget skickas någonstans. Säkerhetskopia/inläsning finns i Inställningar (`js/user-state.js`).
+- `js/engine.js` = trade-motorn i JS (samma regler som `walter_paper.py`), `catchUp` spelar upp missade loggdagar från `market.js` → `log` och visar en ikapp-notis. Ny användare: Walter gör sitt första drag samma dag.
+- `js/exchanges.js`: 5 MiCA-börser (Bitstamp, Bybit EU, Kraken, OKX Europe, Safello) med avgift, tillstånd och källa/datum. Alla avgifter är paper, inga riktiga pengar.
+- `js/vault.js` = dekryptering i webbläsaren (samma format som `walter_vault.py`).
+- Appens vy för användare: förklaringar i vanliga ord, "Siffrorna", Pro-läge, "Live: inte än".
+- Tester: `python -m unittest discover -s tests -v` och `tests/js/run.html` (via lokal server).
 
 ## W-Cipher (`cipher.html`)
 - Egen sida: `js/wcipher.js` (ren matte, inga DOM-anrop) + `js/cipher-app.js` (börser, graf, text) + `css/cipher.css` (nya designen).

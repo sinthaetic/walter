@@ -58,7 +58,7 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
 
    Saknas Netlify-nycklarna hoppar Actionen bara över Netlify-steget. GitHub Pages fungerar ändå.
 
-5. **Första push**, i mappen `walter`:
+5. **Första push**, i mappen `walter`. Pusha och öppna PR **först när Secreten `WALTER_OWNER_KEY` ligger inne** (steg 4), annars publicerar Actionen sidan utan `owner.enc`. Gamla versioner av `state.json` kan ligga i git-historiken: se öppna frågan i `docs/ROADMAP.md` innan repot görs publikt.
    ```
    git init -b main
    git add .
@@ -72,7 +72,9 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
 6. **Slå på GitHub Pages:** repot → **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
    Grenen `gh-pages` skapas av första körningen. Kör därför steg 7 först om den inte syns i listan.
 
-7. **Provkör:** repot → **Actions → WALTER auto → Run workflow**. En grön bock betyder att sidan är uppdaterad på
+7. **Skriv in koden i mobilen:** öppna sidan → **Inställningar → Åtkomstkod** → skriv koden → **Lås upp**. Den sparas bara i den webbläsaren. Då visas din Walter (journal, K4) på alla enheter där du gjort det.
+
+8. **Provkör:** repot → **Actions → WALTER auto → Run workflow**. En grön bock betyder att sidan är uppdaterad på
    `https://MITT-NAMN.github.io/walter/` (och på Netlify om du har lagt in nycklarna).
 
 ## Notiser morgon och kväll
