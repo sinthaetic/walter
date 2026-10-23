@@ -51,7 +51,7 @@ def _market(vix, spx_below, eth_above):
 
 def engine_cases():
     """Python-motorn är facit: samma indata som en loggrad, förväntat utfall från propose/apply."""
-    rules = json.loads((ROOT / "data" / "state.json").read_text(encoding="utf-8"))["rules"]
+    rules = dict(json.loads((ROOT / "data" / "state.json").read_text(encoding="utf-8"))["rules"], strategy="lamps")
     btc_full = (0.033, 30000)   # ≈ 34,6 % av ~100 000 kr
     cases = [  # namn, röda, läge, level, portfölj, vix, S&P under snitt, ETH/BTC över snitt
         ("offensiv_from_cash", 1, "AVVAKTAR", 1, _pf(100000), 15, False, False),
@@ -79,8 +79,47 @@ def engine_cases():
         out.append({"name": name, "row": row, "user": {"mode": mode, "level": level, "portfolio": pf},
                     "expect": {"mode": prop["mode"], "valueSek": prop["valueSek"], "trades": prop["trades"],
                                "portfolio": raw["portfolio"]}})
-    doc = {"rules": rules, "exchange": PARITY_EXCHANGE, "cases": out}
+    doc = {"rules": rules, "exchange": PARITY_EXCHANGE, "cases": out, "autopilot": autopilot_cases(rules)}
     (FIX / "engine-cases.json").write_text(json.dumps(doc, indent=1, ensure_ascii=False), encoding="utf-8")
+
+
+def autopilot_cases(lamp_rules):
+    """Autopiloten (rules.strategy = "autopilot"): samma indata i Python och JS, Python är facit."""
+    rules = dict(lamp_rules, strategy="autopilot", decision={"weekday": "söndag", "bandPp": 5})
+    sun, fri = "2026-10-25", "2026-10-23"
+    px = walter_paper.prices_sek(_market(20, False, False))
+    # ≈ 35/20/20/25 av ~100 000 kr till MARKET-priserna
+    near = {"BTC": (0.034, 34000), "ETH": (0.52, 19000), "GOLD": (0.55, 20000)}
+    near_cash = 100000 - sum(round(u * px[a], 2) for a, (u, _c) in near.items())
+    heavy = {"BTC": (0.042, 34000), "ETH": (0.52, 19000), "GOLD": (0.30, 20000)}  # BTC ≈ 42 %, guld ≈ 11 %
+    no_gold = {"BTC": True, "ETH": True}
+    cases = [  # namn, dag, röda, läge, portfölj, börsens tillgångar, guldpris finns
+        ("ap_sunday_within_band", sun, 3, "NORMAL", _pf(near_cash, near), None, True),
+        ("ap_sunday_outside_band", sun, 3, "NORMAL", _pf(near_cash, heavy), None, True),
+        ("ap_weekday_waits", fri, 3, "NORMAL", _pf(near_cash, heavy), None, True),
+        ("ap_first_trade_weekday", fri, 8, "AVVAKTAR", _pf(100000), None, True),
+        ("ap_missing_gold_on_exchange", fri, 1, "AVVAKTAR", _pf(100000), no_gold, True),
+        ("ap_missing_price", sun, 3, "NORMAL", _pf(100000), None, False),
+    ]
+    out = []
+    for name, day, red, mode, pf, assets, gold in cases:
+        m = _market(15, False, False)
+        if not gold:
+            m["gold"] = {"value": None}
+        state = {"rules": rules, "market": m, "portfolio": copy.deepcopy(pf), "mode": mode, "level": 1,
+                 "lampScore": {"source": "data", "red": red}}
+        prop = walter_paper.propose(state, today=day, assets=assets)
+        raw = {"portfolio": copy.deepcopy(pf), "rules": rules, "mode": mode, "updatedAt": day, "journal": [], "k4": []}
+        walter_paper.apply(raw, prop, day)
+        ex = dict(PARITY_EXCHANGE, assets=assets or PARITY_EXCHANGE["assets"])
+        row = {"date": day, "ready": True, "red": red, "px": walter_paper.prices_sek(m),
+               "ethBtcAbove30dMa": False, "vix": 15, "spxBelowMa": False}
+        out.append({"name": name, "row": row, "exchange": ex, "user": {"mode": mode, "level": 1, "portfolio": pf},
+                    "expect": {"mode": prop["mode"], "valueSek": prop["valueSek"], "trades": prop["trades"],
+                               "plain": prop["plain"], "nextCheck": prop["nextCheck"],
+                               "waiting": prop["waiting"], "missing": prop["missing"],
+                               "portfolio": raw["portfolio"]}})
+    return {"rules": rules, "cases": out}
 
 
 def main():

@@ -17,8 +17,9 @@ Omkostnad räknas med genomsnittsmetoden (Skatteverkets regel för krypto), avgi
 import json
 import math
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import walter_vault  # noqa: E402
@@ -78,11 +79,162 @@ def gold_wanted(m, g):
     return (vix is not None and vix > g["vixAbove"]) or spx is True
 
 
-def propose(state):
-    """Walters förslag från en byggd state (lamporna räknade). Ändrar ingenting."""
+def stockholm_today():
+    return datetime.now(ZoneInfo("Europe/Stockholm")).date().isoformat()
+
+
+def strategy_of(rules):
+    """Autopiloten är standard. "lamps" = den gamla strategin där lamporna och läget handlar."""
+    return rules.get("strategy") or "autopilot"
+
+
+def propose(state, today=None, assets=None):
+    """Walters förslag från en byggd state (lamporna räknade). Ändrar ingenting.
+    today = svenskt datum (YYYY-MM-DD). assets = vad börsen har {tillgång: True}; None = allt."""
+    today = today or stockholm_today()
+    if strategy_of(state["rules"]) == "autopilot":
+        return propose_autopilot(state, today, assets)
+    return propose_lamps(state, today)
+
+
+# ---------- Autopiloten ----------
+WEEKDAYS = {"måndag": 0, "tisdag": 1, "onsdag": 2, "torsdag": 3, "fredag": 4, "lördag": 5, "söndag": 6,
+            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
+DAY_WORDS = ("måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag")
+MONTHS = ("jan", "feb", "mars", "apr", "maj", "juni", "juli", "aug", "sep", "okt", "nov", "dec")
+
+
+def decision(rules):
+    """(veckodag 0-6, band i procentenheter) från rules.decision. Standard: söndag, 5."""
+    d = rules.get("decision") or {}
+    return WEEKDAYS[str(d.get("weekday", "söndag")).lower()], d.get("bandPp", 5)
+
+
+def next_check(today, rules):
+    """Nästa beslutsdag efter today (är today beslutsdag: en vecka fram)."""
+    t = date.fromisoformat(today)
+    return (t + timedelta(days=(decision(rules)[0] - t.weekday()) % 7 or 7)).isoformat()
+
+
+def day_text(iso):
+    d = date.fromisoformat(iso)
+    return f"{DAY_WORDS[d.weekday()]} {d.day} {MONTHS[d.month - 1]}"
+
+
+def weights_for(rules, assets=None):
+    """Målandelar (rules.caps). Det börsen saknar får andel 0 och ligger som kontanter."""
+    caps = rules.get("caps") or {}
+    w = {a: float(caps.get(a, 0)) for a in ASSETS}
+    missing = [a for a in ASSETS if assets is not None and assets.get(a) is not True]
+    for a in missing:
+        w[a] = 0.0
+    return w, missing
+
+
+def rebalance_trades(pf, px, hold, total, weights, rules, fee):
+    """Autopilotens affärer: en tillgång som glidit MER än bandet (minst minTradePct) från sin andel går hela
+    vägen tillbaka till andelen. Sälj först, köp sedan med kontanterna över minCash. Affärer under minTradePct
+    görs inte. Saknas pris väntar den tillgången. Returnerar (affärer, väntar), oavrundade."""
+    band = max(rules["paper"]["minTradePct"], decision(rules)[1]) / 100 * total
+    min_trade = rules["paper"]["minTradePct"] / 100 * total
+    cash_free = hold["CASH"] - rules["minCash"] * total
+    pos = pf.get("positions") or {}
+    trades, waiting = [], []
+    for a in ASSETS:
+        target = weights[a] * total
+        if hold[a] > target + band:
+            if px[a] is None:
+                waiting.append(a); continue
+            units = pos[a]["units"] if target == 0 else (hold[a] - target) / px[a]
+            gross = units * px[a]
+            trades.append({"asset": a, "side": "sälj", "units": units, "priceSek": px[a],
+                           "sek": gross, "feeSek": gross * fee})
+            cash_free += gross * (1 - fee)
+    for a in ASSETS:
+        target = weights[a] * total
+        if target > hold[a] + band:
+            if px[a] is None:
+                waiting.append(a); continue
+            sek = min(target - hold[a], cash_free)
+            if sek < min_trade:
+                continue
+            trades.append({"asset": a, "side": "köp", "units": sek * (1 - fee) / px[a], "priceSek": px[a],
+                           "sek": sek, "feeSek": sek * fee})
+            cash_free -= sek
+    return trades, waiting
+
+
+def _list(xs):
+    return xs[0] if len(xs) < 2 else ", ".join(xs[:-1]) + " och " + xs[-1]
+
+
+def autopilot_plain(trades, hold, total, weights, first, due, today, rules, waiting, wanted_missing):
+    """Walters egna ord om autopiloten. Samma text som js/engine.js (paritetstest)."""
+    wd = decision(rules)[0]
+    nxt = f"Nästa koll {day_text(next_check(today, rules))}."
+    if not due:
+        s = f"Jag handlar bara på {DAY_WORDS[wd]}ar. {nxt}"
+    elif trades:
+        parts, fresh = [], []
+        for t in trades:
+            a = t["asset"]
+            share, w = round(hold[a] / total * 100) if total else 0, round(weights[a] * 100)
+            if t["side"] == "sälj":
+                parts.append(f"{NAMES[a]} har vuxit till {share} % – jag säljer för {num(t['sek'])} kr, "
+                             f"tillbaka till {w} %.")
+            elif hold[a] <= 0:
+                fresh.append(f"{NAMES[a]} för {num(t['sek'])} kr ({w} %)")
+            else:
+                parts.append(f"{NAMES[a]} ligger på {share} % – jag köper för {num(t['sek'])} kr, "
+                             f"tillbaka till {w} %.")
+        if fresh:
+            parts.append(f"jag köper {_list(fresh)}.")
+        parts = [parts[0]] + [p[0].upper() + p[1:] for p in parts[1:]]
+        head = "Första dagen" if first else DAY_WORDS[date.fromisoformat(today).weekday()].capitalize()
+        s = f"{head}: {' '.join(parts)} {nxt}"
+    elif first:
+        s = "Jag börjar så fort jag har priserna."
+    else:
+        s = f"{DAY_WORDS[wd].capitalize()}: allt ligger inom marginalen. Jag rör ingenting. {nxt}"
+    if waiting:
+        s += f" Jag väntar på pris för {_list([NAMES[a] for a in waiting])}."
+    for a in wanted_missing:
+        s += f" {NAMES[a].capitalize()} finns inte på din börs, så den delen ligger kvar som kontanter."
+    return s
+
+
+def propose_autopilot(state, today, assets=None):
+    """Fasta andelar (rules.caps), koll på beslutsdagen (rules.decision.weekday, svenskt datum). Första affären
+    någonsin (firstTrade saknas) får ske vilken dag som helst. Lamporna räknas bara för läget (väderrapporten)."""
+    r, m, pf = state["rules"], state["market"], state["portfolio"]
+    score = state.get("lampScore") or {}
+    current = state["mode"]
+    lamps_ok = score.get("source") == "data"
+    red = score["red"] if lamps_ok else None
+    mode = suggest_mode(red, current, r) if lamps_ok else current
+    px = prices_sek(m)
+    hold, total = valuation(pf, px)
+    weights, missing = weights_for(r, assets)
+    first = not pf.get("firstTrade")
+    due = first or date.fromisoformat(today).weekday() == decision(r)[0]
+    fee = (r["withdrawalFees"]["takerPct"] + r["withdrawalFees"]["slippagePct"]) / 100
+    trades, waiting = rebalance_trades(pf, px, hold, total, weights, r, fee) if due else ([], [])
+    for t in trades:
+        for k in ("sek", "feeSek", "priceSek"):
+            t[k] = round(t[k], 2)
+        t["units"] = round(t["units"], 8)
+    wanted_missing = [a for a in missing if (r.get("caps") or {}).get(a, 0) > 0]
+    plain = autopilot_plain(trades, hold, total, weights, first, due, today, r, waiting, wanted_missing)
+    return {"asOf": today, "ready": True, "strategy": "autopilot", "red": red, "mode": mode, "currentMode": current,
+            "trades": trades, "valueSek": round(total, 2), "plain": plain,
+            "needsApproval": bool(trades) or mode != current, "decisionDay": due,
+            "nextCheck": next_check(today, r), "weights": weights, "missing": missing, "waiting": waiting}
+
+
+def propose_lamps(state, today):
+    """Den gamla strategin (rules.strategy = "lamps"): lamporna väljer läge, läget och Levels styr affärerna."""
     r, m, pf = state["rules"], state["market"], state["portfolio"]
     score = state["lampScore"]
-    today = date.today().isoformat()
     if score.get("source") != "data":
         return {"asOf": today, "ready": False,
                 "plain": "Walter väntar på data för alla tio lampor innan han föreslår något."}
@@ -212,13 +364,23 @@ def apply(raw, prop, today):
 
     raw["mode"] = prop["mode"]
     raw["updatedAt"] = max(raw["updatedAt"], today)
-    facts.append(f"{prop['red']}/10 röda lampor → {WORDS[prop['mode']]}")
+    auto_pilot = prop.get("strategy") == "autopilot"
+    if prop.get("red") is not None:
+        facts.append(f"{prop['red']}/10 röda lampor → {WORDS[prop['mode']]}" + (" (väderrapport)" if auto_pilot else ""))
+    if auto_pilot:
+        facts.append("Autopilot: " + " · ".join(f"{a} {round(w * 100)} %" for a, w in prop["weights"].items()))
     facts.append(f"Kontant {num(pf['holdings']['CASH'])} kr av {num(pf['value'])} kr")
     done = " och ".join(f"{'köpte' if t['side'] == 'köp' else 'sålde'} {NAMES[t['asset']]} för {num(t['sek'])} kr"
                         for t in prop["trades"])
-    plain = (f"WALTER {done}. " if done else "") + \
-        f"{prop['red']} av 10 lampor var röda, så läget är {WORDS[prop['mode']]}. " \
-        f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
+    if auto_pilot:
+        weather = (f"Väderrapport: {prop['red']} av 10 lampor röda ({WORDS[prop['mode']]}). "
+                   if prop.get("red") is not None else "")
+        plain = (f"WALTER {done}. Autopiloten justerade andelarna. " if done else "") + weather + \
+            f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
+    else:
+        plain = (f"WALTER {done}. " if done else "") + \
+            f"{prop['red']} av 10 lampor var röda, så läget är {WORDS[prop['mode']]}. " \
+            f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
     entry = {"date": today, "mode": prop["mode"], "red": prop["red"], "plain": plain, "facts": facts}
     raw["journal"].insert(0, entry)
     return entry
@@ -243,7 +405,7 @@ def auto(wf, today=None, say=lambda s: None):
     if last.get("date") == today and last.get("auto"):
         say(f"Walter har redan handlat själv i dag ({today}).")
         return None
-    prop = propose(rebuild(wf))
+    prop = propose(rebuild(wf), today=today)
     if not prop.get("ready") or not prop.get("needsApproval"):
         say("Walter handlar inte: " + prop.get("plain", "inget förslag."))
         return None

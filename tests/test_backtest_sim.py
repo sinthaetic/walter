@@ -293,6 +293,25 @@ class Del3Model(unittest.TestCase):
         # första köpet direkt, +20 % ligger inom bandet, sälj först dagen efter söndagen ds[13]
         self.assertEqual(dates(slow), [(ds[1], "köp"), (ds[14], "sälj")])
 
+    def test_autopilot_uses_live_path_and_matches_mix(self):
+        """Del 4: autopiloten i historiktestet går genom walter_paper.propose och gör samma affärer som den
+        fasta veckomixen med 5 %-band."""
+        ds = days("2021-01-04", 28)
+        btc = {d: (100.0 if i < 2 else 120.0 if i < 9 else 240.0) for i, d in enumerate(ds)}
+        series = {"btc": btc, "usdsek": const(ds, 1.0), "gold": const(ds, 10.0),
+                  "eth": const(ds, 5.0)}
+        w = {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2}
+        calls = []
+        real = wp.propose
+        with mock.patch.object(wp, "propose", lambda *a, **k: calls.append(1) or real(*a, **k)):
+            ap = sim.run(sim.autopilot(), ds[0], ds[-1], FREE, series=series)
+        mx = sim.run(sim.mix(w, cadence_days=7, band_pp=5), ds[0], ds[-1], FREE, series=series)
+        self.assertTrue(calls)
+        key = lambda r: [(t["date"], t["asset"], t["side"], round(t["sek"], 2)) for t in r.trades]  # noqa: E731
+        self.assertEqual(key(ap), key(mx))
+        self.assertGreater(len([t for t in ap.trades if t["why"] == "walter"]), 3)
+        self.assertAlmostEqual(ap.final_sek, mx.final_sek, places=2)
+
     def test_buy_once_mix_waits_for_eth(self):
         ds = days("2021-01-01", 10)
         series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0), "gold": const(ds, 10.0),

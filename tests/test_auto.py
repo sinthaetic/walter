@@ -58,7 +58,7 @@ class AutoTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def run_auto(self, prop):
-        with patch.object(wpaper, "propose", lambda s: prop):
+        with patch.object(wpaper, "propose", lambda s, **k: prop):
             return wpaper.auto(wf, today=TODAY)
 
     def test_trades_and_marks_auto_and_locks(self):

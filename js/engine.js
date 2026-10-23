@@ -55,8 +55,113 @@
   }
   const goldWanted = (row, g) => (row.vix != null && row.vix > g.vixAbove) || row.spxBelowMa === true;
 
+  // ---------- Autopiloten ----------
+  // Som propose_autopilot i Python: fasta andelar (rules.caps), koll på beslutsdagen (rules.decision.weekday,
+  // loggradens svenska datum), band rules.decision.bandPp. Lamporna räknas bara för läget (väderrapporten).
+  const WEEKDAYS = { "måndag": 0, "tisdag": 1, "onsdag": 2, "torsdag": 3, "fredag": 4, "lördag": 5, "söndag": 6,
+    monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6 };
+  const DAY_WORDS = ["måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"];
+  const MONTHS = ["jan", "feb", "mars", "apr", "maj", "juni", "juli", "aug", "sep", "okt", "nov", "dec"];
+  const strategyOf = (rules) => (rules && rules.strategy) || "autopilot";
+  const ms = (iso) => Date.parse(iso + "T00:00:00Z");
+  const weekday = (iso) => (new Date(ms(iso)).getUTCDay() + 6) % 7; // måndag = 0, som Python
+  function decision(rules) {
+    const d = rules.decision || {};
+    return { wd: WEEKDAYS[String(d.weekday == null ? "söndag" : d.weekday).toLowerCase()],
+      bandPp: d.bandPp == null ? 5 : d.bandPp };
+  }
+  function nextCheck(iso, rules) {
+    const n = ((decision(rules).wd - weekday(iso)) % 7 + 7) % 7 || 7;
+    return new Date(ms(iso) + n * 864e5).toISOString().slice(0, 10);
+  }
+  function dayText(iso) {
+    const d = new Date(ms(iso));
+    return `${DAY_WORDS[weekday(iso)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  }
+  function weightsFor(rules, exchange) {
+    const caps = rules.caps || {}, w = {}, missing = [];
+    for (const a of ASSETS) {
+      w[a] = Number(caps[a] || 0);
+      if (!exchange.assets || exchange.assets[a] !== true) { missing.push(a); w[a] = 0; }
+    }
+    return { w, missing };
+  }
+  function rebalanceTrades(pf, px, hold, total, w, rules, fee) {
+    const band = Math.max(rules.paper.minTradePct, decision(rules).bandPp) / 100 * total;
+    const minTrade = rules.paper.minTradePct / 100 * total;
+    let cashFree = hold.CASH - rules.minCash * total;
+    const pos = pf.positions || {}, trades = [], waiting = [];
+    for (const a of ASSETS) {
+      const target = w[a] * total;
+      if (hold[a] > target + band) {
+        if (px[a] === null) { waiting.push(a); continue; }
+        const units = target === 0 ? pos[a].units : (hold[a] - target) / px[a];
+        const gross = units * px[a];
+        trades.push({ asset: a, side: "sälj", units, priceSek: px[a], sek: gross, feeSek: gross * fee });
+        cashFree += gross * (1 - fee);
+      }
+    }
+    for (const a of ASSETS) {
+      const target = w[a] * total;
+      if (target > hold[a] + band) {
+        if (px[a] === null) { waiting.push(a); continue; }
+        const sek = Math.min(target - hold[a], cashFree);
+        if (sek < minTrade) continue;
+        trades.push({ asset: a, side: "köp", units: sek * (1 - fee) / px[a], priceSek: px[a], sek, feeSek: sek * fee });
+        cashFree -= sek;
+      }
+    }
+    return { trades, waiting };
+  }
+  function autopilotPlain(trades, hold, total, w, first, due, iso, rules, waiting, wantedMissing) {
+    const wd = decision(rules).wd;
+    const nxt = `Nästa koll ${dayText(nextCheck(iso, rules))}.`;
+    let s;
+    if (!due) s = `Jag handlar bara på ${DAY_WORDS[wd]}ar. ${nxt}`;
+    else if (trades.length) {
+      let parts = [];
+      const fresh = [];
+      for (const t of trades) {
+        const a = t.asset, share = total ? round(hold[a] / total * 100, 0) : 0, pct = round(w[a] * 100, 0);
+        if (t.side === "sälj") parts.push(`${NAMES[a]} har vuxit till ${share} % – jag säljer för ${num(t.sek)} kr, tillbaka till ${pct} %.`);
+        else if (hold[a] <= 0) fresh.push(`${NAMES[a]} för ${num(t.sek)} kr (${pct} %)`);
+        else parts.push(`${NAMES[a]} ligger på ${share} % – jag köper för ${num(t.sek)} kr, tillbaka till ${pct} %.`);
+      }
+      if (fresh.length) parts.push(`jag köper ${list(fresh)}.`);
+      parts = [parts[0]].concat(parts.slice(1).map(cap));
+      const head = first ? "Första dagen" : cap(DAY_WORDS[weekday(iso)]);
+      s = `${head}: ${parts.join(" ")} ${nxt}`;
+    } else if (first) s = "Jag börjar så fort jag har priserna.";
+    else s = `${cap(DAY_WORDS[wd])}: allt ligger inom marginalen. Jag rör ingenting. ${nxt}`;
+    if (waiting.length) s += ` Jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}.`;
+    for (const a of wantedMissing) s += ` ${cap(NAMES[a])} finns inte på din börs, så den delen ligger kvar som kontanter.`;
+    return s;
+  }
+  function proposeAutopilot(user, row, rules, exchange) {
+    const r = rules, pf = user.portfolio, current = user.mode;
+    const red = row.red, mode = suggestMode(red, current, r);
+    const px = {};
+    for (const a of ASSETS) px[a] = (row.px && row.px[a]) || null;
+    const { hold, total } = valuation(pf, px);
+    const { w, missing } = weightsFor(r, exchange);
+    const first = !pf.firstTrade;
+    const due = first || weekday(row.date) === decision(r).wd;
+    const fee = (exchange.takerPct + exchange.slippagePct + (exchange.quote !== "SEK" ? exchange.fxPct : 0)) / 100;
+    const { trades, waiting } = due ? rebalanceTrades(pf, px, hold, total, w, r, fee) : { trades: [], waiting: [] };
+    for (const t of trades) {
+      t.sek = round(t.sek, 2); t.feeSek = round(t.feeSek, 2); t.priceSek = round(t.priceSek, 2);
+      t.units = round(t.units, 8);
+    }
+    const wantedMissing = missing.filter((a) => ((r.caps || {})[a] || 0) > 0);
+    const plain = autopilotPlain(trades, hold, total, w, first, due, row.date, r, waiting, wantedMissing);
+    return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades, valueSek: round(total, 2),
+      plain, missing, waiting, decisionDay: due, nextCheck: nextCheck(row.date, r), weights: w };
+  }
+
   // ---------- Förslag ----------
   function propose(user, row, rules, exchange) {
+    // En loggrad som inte är klar räknas aldrig (catchUp och firstMove hoppar också över den).
+    if (row && row.ready && strategyOf(rules) === "autopilot") return proposeAutopilot(user, row, rules, exchange);
     const current = user.mode;
     if (!row || !row.ready) {
       return { ready: false, red: row ? row.red : null, mode: current, currentMode: current, trades: [],
@@ -166,12 +271,18 @@
     hist.push({ date, value: pf.value, cash: pf.holdings.CASH, note });
 
     user.mode = prop.mode;
-    facts.push(`${prop.red}/10 röda lampor → ${WORDS[prop.mode]}`);
+    const auto = prop.strategy === "autopilot";
+    if (prop.red != null) facts.push(`${prop.red}/10 röda lampor → ${WORDS[prop.mode]}` + (auto ? " (väderrapport)" : ""));
+    if (auto) facts.push("Autopilot: " + ASSETS.map((a) => `${a} ${round(prop.weights[a] * 100, 0)} %`).join(" · "));
     facts.push(`Kontant ${num(pf.holdings.CASH)} kr av ${num(pf.value)} kr`);
     const done = prop.trades.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
-    const plain = (done.length ? `Jag ${done.join(" och ")}. ` : "") +
-      `${prop.red} av 10 lampor var röda, så läget är ${WORDS[prop.mode]}. ${num(pf.holdings.CASH)} kr ligger som kontanter.` +
-      ((prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "");
+    const waitText = (prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "";
+    const plain = auto
+      ? (done.length ? `Jag ${done.join(" och ")}. Autopiloten justerade andelarna. ` : "") +
+        (prop.red != null ? `Väderrapport: ${prop.red} av 10 lampor röda (${WORDS[prop.mode]}). ` : "") +
+        `${num(pf.holdings.CASH)} kr ligger som kontanter.` + waitText
+      : (done.length ? `Jag ${done.join(" och ")}. ` : "") +
+        `${prop.red} av 10 lampor var röda, så läget är ${WORDS[prop.mode]}. ${num(pf.holdings.CASH)} kr ligger som kontanter.` + waitText;
     const entry = { date, mode: prop.mode, red: prop.red, plain, facts,
       trades: prop.trades.map((t) => ({ asset: t.asset, side: t.side, sek: t.sek })) };
     (user.journal || (user.journal = [])).unshift(entry);
@@ -234,7 +345,8 @@
       pf.value = v.total;
       pf.peak = Math.max(pf.peak || 0, pf.value);
 
-      const lv = Math.max(user.level || 1, levelFor(user, row, rules, levels));
+      // Autopiloten har inga Levels: allt köps från dag 1, så ingen upplåsning räknas.
+      const lv = strategyOf(rules) === "autopilot" ? (user.level || 1) : Math.max(user.level || 1, levelFor(user, row, rules, levels));
       if (lv > (user.level || 1)) {
         const entry = { date: row.date, mode: user.mode, red: row.red,
           plain: `Level ${lv} är upplåst: ${UNLOCK_TEXT[lv]}`,
@@ -274,5 +386,6 @@
     return s;
   }
 
-  root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, NAMES };
+  root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, NAMES,
+    strategyOf, nextCheck, dayText };
 })(typeof window !== "undefined" ? window : this);

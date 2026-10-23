@@ -186,9 +186,32 @@ MONEY = [("Strategi", lambda r: r["label"]), ("Bank kr", lambda r: fmt(r["bank"]
          ("Skatt kr", lambda r: fmt(r["tax"])), ("Skattereduktion kr", lambda r: fmt(r["credit"]))]
 
 
+def headline(pool):
+    """Del 4: Walters autopilot (live-koden via sim.autopilot) mot den fasta veckomixen i del 3b, 44 starter
+    varje kvartal 2014-2024 till idag, Kraken-lik börs. Siffrorna ska stämma med docs/BACKTEST.md."""
+    import statistics as st
+    w = {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2}
+    strats = {"Autopilot (live-koden)": sim.autopilot(),
+              "Passiv 35/20/20 vecka band5 (del 3b)": sim.mix(w, cadence_days=7, band_pp=5)}
+    jobs = [((n, q), s, q, FULL[1], "Kraken") for n, s in strats.items() for q in quarters()]
+    res = {}
+    for (n, q), r in run_jobs(jobs, pool):
+        res.setdefault(n, []).append(r)
+    rows = []
+    for n, v in res.items():
+        b = [x["bank"] for x in v]
+        rows.append({"label": n, "median": st.median(b), "p10": st.quantiles(b, n=10, method="inclusive")[0],
+                     "max_dd": max(x["dd"] for x in v), "trades": st.median(x["trades"] for x in v), "n": len(v)})
+    print(table(rows, [("Strategi", lambda r: r["label"]), ("Median", lambda r: fmt(r["median"])),
+                       ("10 % sämsta", lambda r: fmt(r["p10"])), ("Största nedgång", lambda r: f"{r['max_dd']:.0%}"),
+                       ("Affärer (median)", lambda r: f"{r['trades']:.0f}"), ("Starter", lambda r: str(r["n"]))]))
+    return rows
+
+
 def main(quick=False):
     out = {}
     with Pool(initializer=_init) as pool:
+        out["headline"] = headline(pool)
         # 0. Dagens Walter: gamla modellen -> rättad modell, och avrundningens spann
         base_jobs = []
         for rnd in ("up", "nearest", "down"):

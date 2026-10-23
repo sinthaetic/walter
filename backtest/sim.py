@@ -32,6 +32,7 @@ from backtest.costs import Exchange, TaxBook  # noqa: E402
 # Dagens regler (data/state.json -> rules och levels, 23 okt 2026). state.json är ägarens fil och finns inte
 # i repot, så testet har en egen kopia. Avgifterna i withdrawalFees byts mot börsens i run().
 DEFAULT_RULES = {
+    "strategy": "lamps",  # den gamla lamp-strategin; autopiloten = autopilot() nedan
     "parkeraAtRed": 7, "wakeAtRed": 5,
     "modes": {"buyAtRed": 2, "buyLittleAtRed": 4, "littleShare": 0.5},
     "paper": {"minTradePct": 2}, "maxInvested": 0.75, "minCash": 0.25,
@@ -81,6 +82,16 @@ class Strategy:
     # Jämförelser utan lampor: fasta andelar {"BTC": 0.35, ...}
     weights: dict = None
     rebalance: bool = True          # True: tillbaka till andelarna när de glidit mer än minTradePct; False: köp en gång
+
+
+AUTOPILOT_RULES = dict(copy.deepcopy(DEFAULT_RULES), strategy="autopilot",
+                       decision={"weekday": "söndag", "bandPp": 5})
+
+
+def autopilot(name="Autopilot 35/20/20 (söndag, 5 %-band)", rules=None):
+    """Walters strategi sedan 23 okt 2026. Besluten tas av walter_paper.propose (samma kod som live), så att
+    historiktestet och Walter inte kan glida isär."""
+    return Strategy(name=name, rules=copy.deepcopy(rules or AUTOPILOT_RULES))
 
 
 def hold_btc(share):
@@ -463,6 +474,13 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
             break
 
         # ---------- Beslut för i morgon ----------
+        if strategy.weights is None and wp.strategy_of(rules) == "autopilot":
+            # Live-koden: samma propose som Walter. Lamporna handlar inte, så de räknas inte här.
+            prop = wp.propose(dict(raw, market=mk.build(d), lampScore={"source": None}), today=d)
+            if prop["trades"]:
+                pending = prop
+            res.modes[d] = "AUTOPILOT"
+            continue
         if strategy.weights is not None:
             # cadence_days / band_pp gäller även fasta andelar: ombalansera bara beslutsdagar, och bara när en
             # tillgång glidit mer än max(minTradePct, band_pp) av portföljen (sedan hela vägen tillbaka till målet).
