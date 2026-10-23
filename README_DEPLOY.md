@@ -70,9 +70,9 @@ Innehav på högst 1 000 kr (t.ex. 89 kr i BTC) räknas som damm, inte som öppe
    med. `.gitignore` stoppar dem.
 
 6. **Slå på GitHub Pages:** repot → **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
-   Grenen `gh-pages` skapas av första körningen. Kör därför steg 7 först om den inte syns i listan.
+   Grenen `gh-pages` skapas av första körningen. Kör därför steg 8 först om den inte syns i listan.
 
-7. **Skriv in koden i mobilen:** öppna sidan → **Inställningar → Åtkomstkod** → skriv koden → **Lås upp**. Den sparas bara i den webbläsaren. Då visas din Walter (journal, K4) på alla enheter där du gjort det.
+7. **Skriv in koden i mobilen:** öppna sidan → **Inställningar → Lås upp min Walter** → skriv koden → **LÅS UPP**. Den sparas bara i den webbläsaren. Då visas din Walter (journal, K4) på alla enheter där du gjort det.
 
 8. **Provkör:** repot → **Actions → WALTER auto → Run workflow**. En grön bock betyder att sidan är uppdaterad på
    `https://MITT-NAMN.github.io/walter/` (och på Netlify om du har lagt in nycklarna).
