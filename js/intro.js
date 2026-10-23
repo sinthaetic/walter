@@ -84,6 +84,7 @@
       row.appendChild(button("Hoppa över", "i-btn ghost", () => go(3)));
       row.appendChild(button(step === 2 ? "Kom igång" : "Vidare", "i-btn", () => go(step + 1)));
       body.appendChild(row);
+      if (step === 0) body.appendChild(importRow());
     } else if (step === 3) renderAmount(body);
     else renderExchange(body);
     const head = body.querySelector(".i-head");
@@ -91,6 +92,27 @@
   }
 
   function go(n) { step = n; render(); }
+
+  // Har man redan en Walter (en sparad kopia) kan man läsa in den direkt i stället för att börja om.
+  function importRow() {
+    const box = el("div", "i-import");
+    const input = el("input");
+    input.type = "file"; input.accept = ".json,application/json"; input.hidden = true;
+    const msg = el("p", "i-import-msg");
+    msg.setAttribute("role", "status");
+    const link = button("Har du en kopia? Läs in den", "i-link", () => input.click());
+    input.onchange = async () => {
+      const f = input.files && input.files[0];
+      input.value = "";
+      if (!f) return;
+      let user;
+      try { user = window.WalterUser.importText(await f.text()); } catch (e) { msg.textContent = "Det här är ingen Walter-kopia."; return; }
+      if (!window.WalterUser.save(user)) { msg.textContent = NO_STORAGE; return; }
+      done(user);
+    };
+    box.append(link, input, msg);
+    return box;
+  }
 
   function renderAmount(body) {
     body.appendChild(heading("Hur mycket låtsaspengar vill du börja med?"));
@@ -162,7 +184,13 @@
     const m = window.WALTER_MARKET;
     const day = (m && m.now && m.now.date) || window.WalterUser.today();
     const user = window.WalterUser.create(amount, exchangeId, day);
+    window.WalterUser.firstMove(user, m); // Walter gör sitt första drag direkt (null = väntar på data)
     window.WalterUser.save(user); // false = lagring blockerad; varningen står redan ovanför knappen
+    done(user);
+  }
+
+  // Introt är klart: dölj det, ge användaren till boot.js och flytta fokus till appen
+  function done(user) {
     hide();
     if (onDone) onDone(user);
     // Fokus till appens rubrik (läget), så att tangentbord och skärmläsare inte blir kvar på <body>

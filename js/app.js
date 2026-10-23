@@ -111,7 +111,7 @@
     NORMAL: { word: "KÖPER LITE", acc: "green", quote: "Fler lampor är gröna. Jag går in med en liten del, resten ligger kvar." },
     OFFENSIV: { word: "KÖPER", acc: "green", quote: "Läget är bra. Jag går in, aldrig över 75 %. En fjärdedel ligger alltid kvar." }
   };
-  const modeOf = (k) => MODES[k] || { word: String(k || "OKÄNT"), acc: "blurple", quote: "Journalen har ett läge Walter inte känner igen. Rätta det i state.json." };
+  const modeOf = (k) => MODES[k] || { word: String(k || "OKÄNT"), acc: "blurple", quote: isUser ? "Jag känner inte igen läget i min egen anteckning. Läs in en kopia eller börja om." : "Journalen har ett läge Walter inte känner igen. Rätta det i state.json." };
   const MODE = modeOf(S.mode);
 
   // USDSEK: senast sparade live-kurs med datum, annars null. Ingen fast reservkurs.
@@ -261,7 +261,9 @@
   // Läget ändras bara via journalen – säg till om datan pekar åt ett annat läge (förslaget från trade-motorn)
   const P = S.proposal || { ready: false, plain: "Kör hämtaren så räknar Walter ett förslag." };
   const lampNote = !fromData
-    ? `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
+    ? isUser
+      ? `${confirmed} av ${total} lampor har data här. Walter väntar på resten innan han gör något.`
+      : `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
     : !P.ready || P.mode === S.mode
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
       : isUser
@@ -277,7 +279,7 @@
           ${EXPLAIN[l.id] ? `<p class="explain">${esc(EXPLAIN[l.id])}</p>` : ""}</li>`; }).join("")}
     </ul>
     <p class="lamp-note">${esc(lampNote)} <a href="#pro">Värdena bakom lamporna →</a></p>
-    ${lampCountOk ? "" : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
+    ${lampCountOk ? "" : isUser ? `<p class="warn small">Marknadsfilen har ${S.lamps.length} lampor. Walter räknar alltid med 10.</p>` : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
 
   // ---------- Walter föreslår (trade-motorn, fetcher/walter_paper.py) ----------
   // Förslaget räknas vid varje hämtning men görs aldrig av sig självt: det godkänns med paper.bat.
@@ -438,7 +440,7 @@
   const levels = [
     { n: 1, name: "Level 1 · Bitcoin", tag: "BTC max 35 % · kontant minst 25 %", conds: [
       ["Aktiv från start", true],
-      [`Walter vilar inte (färre än ${S.rules.parkeraAtRed}/${total} röda lampor i journalen)`, !parked]
+      [`Walter vilar inte (färre än ${S.rules.parkeraAtRed}/${total} röda lampor${isUser ? "" : " i journalen"})`, !parked]
     ] },
     { n: 2, name: "Level 2 · Ethereum", tag: "ETH 20 %", bar: lvUnlocked(2) ? null : lv2pct, conds: [
       [`Upplåst: tidig eller normal väg klar (marknadsvinst nu ${kr(Math.max(0, marketGain))} av ${kr(lv2Profit)})`, lvUnlocked(2), true],
@@ -532,7 +534,7 @@
   const SOURCES = {
     spx: "yfinance ^GSPC", btcTrend: "CoinGecko", btcWeek: "CoinGecko", vix: "yfinance ^VIX",
     us10y: (m.us10y && m.us10y.source) || "FRED DGS10", dxy: "yfinance DX-Y.NYB", etf: "bykaranteli (ETF-flöden)",
-    cpi: "state.json, handskriven", mvrv: (m.mvrvZ && m.mvrvZ.source) || "Coin Metrics", sopr: "BGeometrics"
+    cpi: isUser ? "handskrivet värde i Walters marknadsfil" : "state.json, handskriven", mvrv: (m.mvrvZ && m.mvrvZ.source) || "Coin Metrics", sopr: "BGeometrics"
   };
   const maxAge = S.rules.lampMaxAgeDays || {};
   let proSel = Math.max(0, S.lamps.findIndex((l) => l.status === "red"));
@@ -647,9 +649,9 @@
                 <span class="when">${day(j.date)}</span>
                 <span class="md"><span class="dot ${modeOf(j.mode).acc}"></span>${esc(modeOf(j.mode).word)}</span>
                 <span class="tx">${esc(j.plain)}</span>
-                <span class="rd">${j.red}/${total}</span>
+                <span class="rd">${j.red == null ? "–" : esc(j.red)}/${total}</span>
               </button></li>`).join("")}</ul>
-            <p class="small" style="margin-top:12px">Tryck på en rapport för siffrorna bakom. Journalen är facit.</p>` : `
+            <p class="small" style="margin-top:12px">Tryck på en rapport för siffrorna bakom.${isUser ? "" : " Journalen är facit."}</p>` : `
             <div class="table-wrap"><table class="log-table">
               <thead><tr><th>DATUM</th><th>TYP</th><th>TILLGÅNG</th><th class="r">BELOPP</th><th class="r">AVGIFT</th></tr></thead>
               <tbody>${trades.map((t) => `<tr>
@@ -664,7 +666,7 @@
           ${logTab && e ? `
           <div class="panel">
             <span class="label">SIFFRORNA · ${esc(day(e.date).toUpperCase())}</span>
-            <div class="sel-name" style="font-size:18px"><span class="dot ${modeOf(e.mode).acc}"></span>${esc(modeOf(e.mode).word)} · ${e.red}/${total}</div>
+            <div class="sel-name" style="font-size:18px"><span class="dot ${modeOf(e.mode).acc}"></span>${esc(modeOf(e.mode).word)} · ${e.red == null ? "–" : esc(e.red)}/${total}</div>
             <ul class="facts">${(e.facts || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
           </div>` : `
           <div class="panel">
@@ -781,7 +783,7 @@
   const feesKnown = FEE_KEYS.every((k) => fees[k] != null);
   // Användaren: säg ärligt vilken börs avgifterna kommer från, källan och när den kontrollerades
   const feeSourceText = ex
-    ? `Taker-avgiften kommer från <a href="${esc(ex.source)}" target="_blank" rel="noopener">${esc(ex.name)}s prislista</a>, kontrollerad ${esc(day(ex.checked))} ${esc(ex.checked.slice(0, 4))}. Slippage, valutaväxling och SEPA-uttag är Walters antaganden, inte börsens. Tomt fält = det värdet.`
+    ? `Taker-avgiften kommer från ${ex.source ? `<a href="${esc(ex.source)}" target="_blank" rel="noopener">${esc(ex.name)}s prislista</a>` : `${esc(ex.name)}s prislista`}, ${/^\d{4}-\d{2}-\d{2}$/.test(ex.checked || "") ? `kontrollerad ${esc(day(ex.checked))} ${esc(ex.checked.slice(0, 4))}` : "kontrollerat datum saknas"}. Slippage, valutaväxling och SEPA-uttag är Walters antaganden, inte börsens. Tomt fält = det värdet.`
     : "Jag hittar inte din börs i listan, så avgifterna är Walters standard. Tomt fält = standard.";
 
   $("view-installningar").innerHTML = `
@@ -888,7 +890,7 @@
           <div class="form-actions"><button type="submit" class="btn btn-danger" id="reset-ok" disabled>BÖRJA OM</button></div>
         </form>
       </section>` : ""}
-      ${who !== "owner-local" ? `
+      ${isUser ? `
       <section class="panel" aria-label="Lås upp min Walter">
         <h3>LÅS UPP MIN WALTER</h3>
         <form id="owner-form">
@@ -1146,9 +1148,9 @@
     });
   }
 
-  // ---------- Lås upp min Walter (alla utom ägaren lokalt) ----------
+  // ---------- Lås upp min Walter (bara användaren – ägaren är redan upplåst) ----------
   // Som boot.js: bara en misslyckad dekryptering är "fel kod". Når jag inte filen kan koden vara rätt.
-  if (who !== "owner-local") {
+  if (isUser) {
     const ownerMsg = $("owner-msg"), ownerOk = $("owner-ok");
     $("owner-form").addEventListener("submit", async (e) => {
       e.preventDefault();

@@ -144,3 +144,67 @@ test("toState_waits_without_levels", () => {
   eq(S.proposal.ready, false);
   eq(S.levels, {});
 });
+
+// En kopia med trasiga eller elaka poster får aldrig läsas in (den kunde låsa appen eller skriva in HTML).
+test("import_rejects_bad_shapes", () => {
+  const good = () => {
+    const u = WU().create(10000, "kraken", "2026-10-23");
+    u.journal.push({ date: "2026-10-23", mode: "AVVAKTAR", red: 5, plain: "Jag avvaktar.", facts: ["5/10 röda"] });
+    return u;
+  };
+  eq(WU().importText(JSON.stringify(good())).start, 10000); // utgångsläget är giltigt
+  const bad = [
+    (u) => { u.journal = [{}]; },
+    (u) => { u.journal[0].red = "<img src=x onerror=alert(1)>"; },
+    (u) => { u.journal[0].date = 20261023; },
+    (u) => { u.journal[0].date = "<b>"; },
+    (u) => { u.journal[0].facts = [1]; },
+    (u) => { u.journal[0].trades = [{ asset: "BTC", side: "köp", sek: "x" }]; },
+    (u) => { u.portfolio.history.push({ date: "2026-10-24", value: NaN }); },
+    (u) => { u.portfolio.history[0].date = 5; },
+    (u) => { u.portfolio.history[0].note = {}; },
+    (u) => { u.portfolio.peak = "1"; },
+    (u) => { u.portfolio.holdings.BTC = null; },
+    (u) => { u.portfolio.positions.BTC = { units: "1", costSek: 0 }; },
+    (u) => { u.level = "<i>"; },
+    (u) => { u.startDate = "igår"; },
+    (u) => { u.trades = [{ date: "2026-10-23" }]; }
+  ];
+  bad.forEach((f, i) => {
+    const u = good();
+    f(u);
+    // JSON gör NaN till null – båda ska avvisas
+    let msg = null;
+    try { WU().importText(JSON.stringify(u)); } catch (e) { msg = e.message; }
+    if (msg !== "Det här är ingen Walter-kopia") throw new Error("fall " + i + " avvisades inte");
+  });
+});
+
+// En ny Walter gör sitt första drag samma dag: dagens rad räknas och genomförs, dagen spelas inte upp igen.
+test("first_move_on_creation_day", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    const entry = WU().firstMove(u, m);
+    if (!entry) throw new Error("inget första drag");
+    eq(u.mode, "NORMAL"); // 3 röda → Köper lite
+    eq(u.journal.length, 1);
+    eq(u.journal[0].date, "2026-10-22");
+    if (!(u.portfolio.holdings.BTC > 0)) throw new Error("köpte ingen bitcoin");
+    if (!/^Jag köpte bitcoin/.test(entry.plain)) throw new Error("inte Walters röst: " + entry.plain);
+    eq(u.lastDay, "2026-10-22");
+    // Ikapp-räkningen samma dag gör inget mer
+    const before = JSON.stringify(u);
+    window.WalterEngine.catchUp(u, m.log, m.now.rules, m.now.levels, window.WALTER_EXCHANGES.find((x) => x.id === "kraken"));
+    eq(JSON.stringify(u), before);
+    // Kopian av en Walter efter första draget går att läsa in
+    eq(WU().importText(JSON.stringify(u)).journal.length, 1);
+    // Utan klar data väntar Walter
+    const m2 = fakeMarket(); m2.now.ready = false;
+    const u2 = WU().create(100000, "kraken", "2026-10-22");
+    eq(WU().firstMove(u2, m2), null);
+    eq(u2.journal.length, 0);
+  } finally { window.WALTER_MARKET = saved; }
+});
