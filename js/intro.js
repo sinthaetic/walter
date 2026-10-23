@@ -21,7 +21,12 @@
     const n = Number(m[1].replace(/[\s ]/g, ""));
     return Number.isFinite(n) && n >= MIN && n <= MAX ? n : null;
   }
-  if (typeof document === "undefined") { window.WalterIntro = { parseAmount }; return; }
+  // Börsens två rader i listan: tillståndslandet och avgiften
+  function exMeta(x) {
+    const c = x && x.licence ? x.licence.country : "";
+    return [`Tillstånd: ${COUNTRY[c] || c}`, `Avgift ${x.takerPct.toLocaleString("sv-SE", { maximumFractionDigits: 2 })} %`];
+  }
+  if (typeof document === "undefined") { window.WalterIntro = { parseAmount, exMeta }; return; }
 
   const reduce = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isDark = () => document.documentElement.dataset.theme === "dark";
@@ -131,8 +136,10 @@
       r.onchange = () => { exchangeId = x.id; start.disabled = false; };
       const txt = el("span", "i-ex-txt");
       txt.appendChild(el("span", "i-ex-name", x.name));
-      txt.appendChild(el("span", "i-ex-meta",
-        `Tillstånd: ${COUNTRY[x.licence.country] || x.licence.country} · avgift ${sv(x.takerPct, 2)}${NB}%`));
+      // Land och avgift på var sin rad, så att en smal skärm aldrig bryter mitt i
+      const meta = el("span", "i-ex-meta");
+      exMeta(x).forEach((t) => meta.appendChild(el("span", "", t)));
+      txt.appendChild(meta);
       if (x.assets && x.assets.ETH === false) txt.appendChild(el("span", "i-ex-miss", "Ether finns inte här"));
       if (x.assets && x.assets.GOLD === false) txt.appendChild(el("span", "i-ex-miss", "Guld finns inte här"));
       lab.append(r, txt);
@@ -158,6 +165,9 @@
     window.WalterUser.save(user); // false = lagring blockerad; varningen står redan ovanför knappen
     hide();
     if (onDone) onDone(user);
+    // Fokus till appens rubrik (läget), så att tangentbord och skärmläsare inte blir kvar på <body>
+    const h = document.querySelector("main .mode-name") || document.querySelector("main");
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
   }
 
   function hide() {
@@ -184,5 +194,5 @@
     render();
   }
 
-  window.WalterIntro = { start, parseAmount };
+  window.WalterIntro = { start, parseAmount, exMeta };
 })();

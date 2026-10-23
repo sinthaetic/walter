@@ -14,15 +14,23 @@
     get(k, def, area = "localStorage") { try { const v = window[area].getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } },
     set(k, v, area = "localStorage") { try { window[area].setItem(k, JSON.stringify(v)); } catch { /* lagring blockerad */ } }
   };
-  // Användarens plan och mål har egna nycklar, så att ägarens värden aldrig blandas in i en användares Walter.
-  const own = (k) => (ctx && ctx.who === "user" ? "walter.user." : "walter.") + k;
-  const settings = store.get("walter.settings", {});
+  const who = (ctx && ctx.who) || "owner-local";
+  const isUser = who === "user";
+  // Användarens plan, mål, inställningar och LIVE-flagga har egna nycklar, så att ägarens värden aldrig blandas in.
+  const own = (k) => keyFor(who, k);
+  const settings = store.get(own("settings"), {});
   // Startkapital kommer bara från state.json. Ett gammalt eget värde (från 500-kronorstiden) rensas bort.
-  if ("startCapital" in settings) { delete settings.startCapital; store.set("walter.settings", settings); }
-  // Uttagsavgifter: standard i state.json (rules.withdrawalFees), kan skrivas över under Inställningar.
+  if ("startCapital" in settings) { delete settings.startCapital; store.set(own("settings"), settings); }
+  // Pro-läge: förklaringarna döljs (walter.settings.pro, standard false)
+  document.body.classList.toggle("pro", settings.pro === true);
+  // Uttagsavgifter: ägaren har standard i state.json (rules.withdrawalFees), användaren sin börs (ctx.exchange)
+  // med Walters standard för det börsen inte publicerar (SEPA). Kan skrivas över under Inställningar.
   // Aldrig hårdkodade här. null = inte angivet.
   const FEE_KEYS = ["takerPct", "slippagePct", "sepaEur", "fxPct"];
-  const feeDefaults = S.rules.withdrawalFees || {};
+  const ex = isUser && ctx.exchange ? ctx.exchange : null;
+  const ruleFees = S.rules.withdrawalFees || {};
+  const feeDefaults = ex ? { takerPct: ex.takerPct, slippagePct: ex.slippagePct, sepaEur: ruleFees.sepaEur, fxPct: ex.fxPct } : ruleFees;
+  const feeName = ex ? ex.name : isUser ? "Börsen" : "Kraken";
   const fees = Object.fromEntries(FEE_KEYS.map((k) => [k,
     Number.isFinite(settings[k]) ? settings[k] : Number.isFinite(feeDefaults[k]) ? feeDefaults[k] : null]));
 
@@ -127,7 +135,20 @@
   };
 
   // ---------- Topp, sidfot ----------
-  $("stamp").textContent = "NÄSTA RAPPORT " + nextReport();
+  // Rapporterna (mejl) är ägarens. Användaren får ingen rapporttid.
+  $("stamp").textContent = isUser ? "" : "NÄSTA RAPPORT " + nextReport();
+  // Vad Walter gjorde medan sidan var stängd (boot.js räknade ikapp), överst som notis
+  if (isUser && ctx.catchUpText) {
+    const box = document.createElement("div");
+    box.className = "panel catchup-note";
+    box.setAttribute("role", "status");
+    const p = document.createElement("p");
+    p.className = "plain";
+    p.textContent = ctx.catchUpText;
+    box.appendChild(p);
+    const main = document.querySelector("main.page");
+    main.insertBefore(box, main.firstChild);
+  }
 
   // ================================================================
   // ÖVERSIKT
@@ -136,6 +157,7 @@
   $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
     <h1 class="mode-name">${esc(MODE.word)}</h1>`;
   $("quote").textContent = MODE.quote;
+  $("mode-explain").textContent = "Läget räknas från hur många av de tio lamporna som är röda: få röda och Walter köper, många röda och han vilar i kontanter.";
 
   // ---------- Ringen: tio bågar, en per lampa ----------
   const lampState = (l) => (l.status === "red" ? "red" : l.status === "green" ? "green" : "wait");
@@ -220,6 +242,19 @@
   })();
 
   // ---------- Tio lampor ----------
+  // Förklaringar i vanliga ord (under varje lampa på översikten och i Pro-fliken)
+  const EXPLAIN = {
+    spx: "USA:s breda aktieindex jämfört med sitt eget snitt de senaste 50 dagarna. Under snittet betyder att trenden har vänt nedåt.",
+    btcTrend: "Bitcoins pris mot snittet de senaste 200 dagarna. Under snittet är bitcoin i en svagare, längre trend.",
+    btcWeek: "Hur mycket bitcoin har rört sig på en vecka. Ett fall på mer än 10 % är en varning.",
+    vix: "Marknadens oro-mätare. Över 20 betyder att många är nervösa.",
+    us10y: "USA:s tioåriga statsränta. Stiger den snabbt blir risk dyrare för alla.",
+    dxy: "Dollarns styrka mot andra valutor. En dollar över sitt snitt brukar trycka ned krypto.",
+    etf: "Pengar in i och ut ur bitcoin-fonderna (ETF) de senaste fem handelsdagarna. Utflöde är en varning.",
+    cpi: "Inflationen i USA mot vad marknaden väntade sig. Högre än väntat är en varning. Värdet skrivs in för hand.",
+    mvrv: "Visar om bitcoin är dyrt jämfört med vad ägarna har betalat. Över 3 betyder att det börjar bli varmt, inte att toppen är nådd.",
+    sopr: "Visar om bitcoin säljs med vinst eller förlust. Under 1 i snitt över en vecka betyder att folk säljer med förlust."
+  };
   const STATE_WORD = { red: "RISK", green: "LUGN", wait: "VÄNTAR" };
   const confirmed = S.lamps.filter((l) => l.status !== null).length;
   const fromData = S.lampScore.source === "data";
@@ -229,14 +264,17 @@
     ? `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
     : !P.ready || P.mode === S.mode
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
-      : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}, men journalen säger ${MODE.word}. Läget ändras först när du godkänner förslaget.`;
+      : isUser
+        ? `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge själv nästa gång han räknar.`
+        : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}, men journalen säger ${MODE.word}. Läget ändras först när du godkänner förslaget.`;
   $("lamps").innerHTML = `
     <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
     <ul class="lamp-grid">
       ${S.lamps.map((l) => { const s = lampState(l); return `
-        <li><span class="dot ${s === "wait" ? "" : s + " lit"}"></span>
+        <li><div class="lamp-row"><span class="dot ${s === "wait" ? "" : s + " lit"}"></span>
           <span class="txt"><span class="nm">${esc(l.name)}</span><span class="rl">${esc(l.rule)}</span></span>
-          <span class="st">${STATE_WORD[s]}</span></li>`; }).join("")}
+          <span class="st">${STATE_WORD[s]}</span></div>
+          ${EXPLAIN[l.id] ? `<p class="explain">${esc(EXPLAIN[l.id])}</p>` : ""}</li>`; }).join("")}
     </ul>
     <p class="lamp-note">${esc(lampNote)} <a href="#pro">Värdena bakom lamporna →</a></p>
     ${lampCountOk ? "" : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
@@ -246,18 +284,24 @@
   const sh = pf.sharpe || {};
   const sharpeTxt = sh.value != null ? nf(2).format(sh.value) : `dag ${sh.days || 0}/${sh.need || 30}`;
   const pTrades = P.trades || [];
+  // Användaren: Walter handlar själv (boot.js räknar ikapp), så rutan säger vad han gjorde, inget att godkänna.
+  const lastDone = S.journal[0];
   $("proposal").innerHTML = `
-    <h3>WALTER FÖRESLÅR</h3>
+    <h3>${isUser ? "WALTER GJORDE" : "WALTER FÖRESLÅR"}</h3>
     <div class="kv">
       <div><span>LÄGE ENLIGT LAMPORNA</span><strong>${P.ready ? esc(modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
       <div><span>RÖDA LAMPOR</span><strong>${P.ready ? `${P.red}/${total}` : "–"}</strong></div>
       <div><span>SHARPE</span><strong title="Avkastning per risk, räknas efter 30 dagars handel. Insättningar räknas inte.">${sharpeTxt}</strong></div>
     </div>
+    <p class="explain"><b>Sharpe:</b> Avkastning per risk. Visas efter 30 dagars handel.</p>
+    ${isUser ? `
+    <p class="plain">${lastDone ? `<b>Senast (${day(lastDone.date)}):</b> ${esc(lastDone.plain)}` : "Walter har inte gjort något än. Han räknar och handlar nästa gång marknadsdatan uppdateras."}</p>
+    <p class="small" style="margin-top:12px">Walter handlar själv åt dig och skriver upp varje affär i loggen. Du behöver inte godkänna något. Låtsaspengar (PAPER).</p>` : `
     <p class="plain">${esc(P.plain)}</p>
     ${pTrades.length ? `<ul class="conds trades">${pTrades.map((t) => `<li><b>${esc(t.side.toUpperCase())}</b><span>${esc(t.asset)} · ${nf(8).format(t.units)} st à ${kr(t.priceSek)}</span><span class="num">${kr2(t.sek)} · avgift ${kr2(t.feeSek)}</span></li>`).join("")}</ul>` : ""}
     <p class="small" style="margin-top:12px">${P.needsApproval
       ? "Inget händer förrän du godkänner. Dubbelklicka <b>paper.bat</b> och skriv JA – då skrivs affären, journalposten och K4-raden."
-      : "Inget att godkänna just nu."} Låtsaspengar (PAPER).</p>`;
+      : "Inget att godkänna just nu."} Låtsaspengar (PAPER).</p>`}`;
 
   // ---------- Status + Uppdatera ----------
   // Webbläsaren kan bara hämta från källor som tillåter det (CORS): CoinGecko och valutakurser.
@@ -275,7 +319,7 @@
       <div><span>MARKNADSVINST</span><strong class="${marketGain < 0 ? "down" : marketGain > 0 ? "up" : ""}">${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))}</strong></div>
     </div>
     ${S.notis && S.notis.text ? `<p class="plain">${esc(S.notis.text)}${notisOld ? ` <span class="small">(från ${day(S.notis.at)})</span>` : ""}</p>` : ""}
-    ${latest ? `<p class="plain"><b>Senast (${day(latest.date)}):</b> ${esc(latest.plain)}</p>` : ""}
+    ${latest && !isUser ? `<p class="plain"><b>Senast (${day(latest.date)}):</b> ${esc(latest.plain)}</p>` : ""}
     <div class="status-actions"><button type="button" class="btn btn-primary" id="btn-refresh">UPPDATERA</button>
       <span class="small">Insättningar ${kr(deposits)}${topUp ? ` (${kr(start)} + ${kr(topUp)})` : ""}</span></div>
     <p class="status-msg" id="status-msg" aria-live="polite">Knappen hämtar färska kurser för BTC, USDSEK och EURSEK. ${autoMsg}</p>`;
@@ -409,6 +453,7 @@
   ];
   $("levels").innerHTML = `
     <h3>NIVÅER</h3>
+    <p class="explain">Walter får handla med fler tillgångar först när han har tjänat pengar på marknaden. Insättningar låser aldrig upp något.</p>
     ${levels.map((l) => `
       <div class="level${l.n === S.level ? " current" : ""}">
         <div class="level-head"><b>${l.name}${l.n === S.level ? " · nu" : ""}</b><span>${esc(l.tag)}</span></div>
@@ -420,6 +465,7 @@
   $("unlock").innerHTML = `
     <h3>VÄGEN TILL LEVEL 2</h3>
     <p class="small">En av vägarna räcker.</p>
+    <p class="explain"><b>Drawdown:</b> Hur långt värdet har fallit från sin högsta punkt.</p>
     ${paths.map((p) => {
       const done = p.conds.filter(([, ok]) => ok === true).length;
       return `<div class="unlock-path" style="margin-top:14px">
@@ -487,18 +533,6 @@
     spx: "yfinance ^GSPC", btcTrend: "CoinGecko", btcWeek: "CoinGecko", vix: "yfinance ^VIX",
     us10y: (m.us10y && m.us10y.source) || "FRED DGS10", dxy: "yfinance DX-Y.NYB", etf: "bykaranteli (ETF-flöden)",
     cpi: "state.json, handskriven", mvrv: (m.mvrvZ && m.mvrvZ.source) || "Coin Metrics", sopr: "BGeometrics"
-  };
-  const EXPLAIN = {
-    spx: "USA:s breda aktieindex jämfört med sitt eget snitt de senaste 50 dagarna. Under snittet betyder att trenden har vänt nedåt.",
-    btcTrend: "Bitcoins pris mot snittet de senaste 200 dagarna. Under snittet är bitcoin i en svagare, längre trend.",
-    btcWeek: "Hur mycket bitcoin har rört sig på en vecka. Ett fall på mer än 10 % är en varning.",
-    vix: "Marknadens oro-mätare. Över 20 betyder att många är nervösa.",
-    us10y: "USA:s tioåriga statsränta. Stiger den snabbt blir risk dyrare för alla.",
-    dxy: "Dollarns styrka mot andra valutor. En dollar över sitt snitt brukar trycka ned krypto.",
-    etf: "Pengar in i och ut ur bitcoin-fonderna (ETF) de senaste fem handelsdagarna. Utflöde är en varning.",
-    cpi: "Inflationen i USA mot vad marknaden väntade sig. Högre än väntat är en varning. Värdet skrivs in för hand.",
-    mvrv: "Visar om bitcoin är dyrt jämfört med vad ägarna har betalat. Över 3 betyder att det börjar bli varmt, inte att toppen är nådd.",
-    sopr: "Visar om bitcoin säljs med vinst eller förlust. Under 1 i snitt över en vecka betyder att folk säljer med förlust."
   };
   const maxAge = S.rules.lampMaxAgeDays || {};
   let proSel = Math.max(0, S.lamps.findIndex((l) => l.status === "red"));
@@ -722,7 +756,9 @@
       if (b) b.focus();
     }));
   };
-  renderK4();
+  // K4 och rapportfilerna är ägarens. Användaren får varken flik eller länkar.
+  if (!isUser) renderK4();
+  else { const a = document.querySelector('.nav [data-view="k4"]'); if (a) a.remove(); $("view-k4").remove(); }
 
   // ================================================================
   // INSTÄLLNINGAR – din plan, uttag, avgifter, PAPER/LIVE. Allt sparas bara i den här webbläsaren.
@@ -743,6 +779,10 @@
   if (!PURPOSES[goal.purpose]) goal.purpose = "buffert";
   if (!(goal.amount > 0)) goal.amount = 50000;
   const feesKnown = FEE_KEYS.every((k) => fees[k] != null);
+  // Användaren: säg ärligt vilken börs avgifterna kommer från, källan och när den kontrollerades
+  const feeSourceText = ex
+    ? `Taker-avgiften kommer från <a href="${esc(ex.source)}" target="_blank" rel="noopener">${esc(ex.name)}s prislista</a>, kontrollerad ${esc(day(ex.checked))} ${esc(ex.checked.slice(0, 4))}. Slippage, valutaväxling och SEPA-uttag är Walters antaganden, inte börsens. Tomt fält = det värdet.`
+    : "Jag hittar inte din börs i listan, så avgifterna är Walters standard. Tomt fält = standard.";
 
   $("view-installningar").innerHTML = `
     <p class="kicker">INSTÄLLNINGAR · DIN PLAN</p>
@@ -803,23 +843,62 @@
         <h3>AVGIFTER</h3>
         <form id="settings-form">
           <div class="form-grid">
-            ${[["takerPct", "KRAKEN TAKER FEE (%)"], ["slippagePct", "SLIPPAGE (%)"], ["sepaEur", "SEPA-UTTAG (€)"], ["fxPct", "VALUTAVÄXLING PÅ BANKEN (%)"]].map(([k, t]) => `
+            ${[["takerPct", `${esc(feeName.toUpperCase())} TAKER FEE (%)`], ["slippagePct", "SLIPPAGE (%)"], ["sepaEur", "SEPA-UTTAG (€)"], ["fxPct", "VALUTAVÄXLING PÅ BANKEN (%)"]].map(([k, t]) => `
             <label class="field"><span>${t}</span>
               <input class="input num" type="number" name="${k}" min="0" max="100" step="0.01" placeholder="${feeDefaults[k] != null ? esc(feeDefaults[k]) + " (standard)" : "från din börs prislista"}">
             </label>`).join("")}
           </div>
-          <p class="small" style="margin-top:12px">Tomt fält = standard från state.json. Sparas bara i den här webbläsaren. API-nycklar läggs aldrig in här.</p>
+          <p class="small" style="margin-top:12px">${isUser ? feeSourceText : "Tomt fält = standard från state.json."} Sparas bara i den här webbläsaren. API-nycklar läggs aldrig in här.</p>
           <div class="form-actions"><button type="submit" class="btn btn-primary">SPARA</button></div>
         </form>
       </section>
       <section class="panel" aria-label="Handelsläge">
         <h3>HANDELSLÄGE</h3>
+        ${isUser ? `
+        <p class="live-not-yet"><b>PAPER</b><span>Live: inte än</span></p>
+        <p class="small" style="margin-top:12px">Walter handlar bara med låtsaspengar. Han kan inte röra riktiga pengar än, så det finns ingen knapp och inget fält för nycklar.</p>` : `
         <div class="seg" role="group" aria-label="Handelsläge" style="width:max-content">
           <button type="button" id="btn-paper">PAPER</button>
           <button type="button" id="btn-live">LIVE</button>
         </div>
-        <p class="small" style="margin-top:12px">PAPER är standard: inga riktiga pengar. LIVE kräver att du skriver JA GÅ LIVE och gäller bara den här fliken. Walter lägger aldrig order själv.</p>
+        <p class="small" style="margin-top:12px">PAPER är standard: inga riktiga pengar. LIVE kräver att du skriver JA GÅ LIVE och gäller bara den här fliken. Walter lägger aldrig order själv.</p>`}
       </section>
+      <section class="panel" aria-label="Visning">
+        <h3>VISNING</h3>
+        <label class="switch"><input type="checkbox" role="switch" id="pro-toggle"><span>Pro-läge – dölj förklaringarna</span></label>
+        <p class="small" style="margin-top:12px">Förklaringarna i vanliga ord är påslagna från början. Pro-läget döljer dem, siffrorna finns kvar.</p>
+      </section>
+      ${isUser ? `
+      <section class="panel" aria-label="Kopia">
+        <h3>KOPIA</h3>
+        <p class="plain">Din Walter finns bara i den här webbläsaren. Rensar du den är portföljen borta – spara en kopia ibland.</p>
+        ${ctx.storageOk === false ? '<p class="warn small">Din webbläsare låter mig inte spara. Allt försvinner när du stänger fliken.</p>' : ""}
+        <div class="form-actions start">
+          <button type="button" class="btn btn-primary" id="btn-export">SPARA KOPIA</button>
+          <button type="button" class="btn" id="btn-import">LÄS IN KOPIA</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+        <p class="small msg" id="copy-msg" aria-live="polite"></p>
+      </section>
+      <section class="panel" aria-label="Börja om">
+        <h3>BÖRJA OM</h3>
+        <form id="reset-form">
+          <p class="small">Tar bort din Walter, portföljen och loggen i den här webbläsaren. Skriv <b>BÖRJA OM</b> för att bekräfta.</p>
+          <input id="reset-confirm" class="input" type="text" autocomplete="off" spellcheck="false" placeholder="BÖRJA OM" aria-label="Skriv BÖRJA OM för att bekräfta" style="margin-top:12px">
+          <div class="form-actions"><button type="submit" class="btn btn-danger" id="reset-ok" disabled>BÖRJA OM</button></div>
+        </form>
+      </section>` : ""}
+      ${who !== "owner-local" ? `
+      <section class="panel" aria-label="Lås upp min Walter">
+        <h3>LÅS UPP MIN WALTER</h3>
+        <form id="owner-form">
+          <label class="field"><span>KOD</span>
+            <input id="owner-code" class="input" type="password" autocomplete="off" spellcheck="false" aria-describedby="owner-msg">
+          </label>
+          <div class="form-actions"><button type="submit" class="btn btn-primary" id="owner-ok">LÅS UPP</button></div>
+        </form>
+        <p class="small msg" id="owner-msg" aria-live="polite">Bara för ägaren. Koden sparas i den här webbläsaren först när den stämmer.</p>
+      </section>` : ""}
     </div>`;
 
   // ---------- Din plan ----------
@@ -864,7 +943,7 @@
 
   // ---------- Uttag: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
   // Brutto = det som måste säljas för att netto ska landa på banken i SEK:
-  // sälj på Kraken (taker + slippage) → EUR → SEPA-uttag (fast €) → banken växlar till SEK (FX %).
+  // sälj på börsen (taker + slippage) → EUR → SEPA-uttag (fast €) → banken växlar till SEK (FX %).
   // null när avgifter eller dagens EURSEK saknas – då räknas inget på gissning.
   const grossFor = (netto) => {
     const eursek = m.eursek && m.eursek.value;
@@ -876,7 +955,7 @@
     return {
       brutto,
       parts: [
-        [`Kraken taker ${nf(2).format(fees.takerPct)} %`, brutto * t],
+        [`${feeName} taker ${nf(2).format(fees.takerPct)} %`, brutto * t],
         [`Slippage ${nf(1).format(fees.slippagePct)} %`, brutto * (1 - t) * s],
         [`SEPA-uttag €${nf(0).format(fees.sepaEur)} (EURSEK ${nf(4).format(eursek)}, ${day(m.eursek.asOf)})`, sepa],
         [`Valutaväxling ${nf(1).format(fees.fxPct)} %`, beforeFx - netto]
@@ -964,51 +1043,139 @@
   FEE_KEYS.forEach((k) => { if (Number.isFinite(settings[k])) sf.elements[k].value = settings[k]; });
   sf.addEventListener("submit", (e) => {
     e.preventDefault();
-    const next = {};
+    const next = settings.pro === true ? { pro: true } : {};
     FEE_KEYS.forEach((k) => {
       const raw = sf.elements[k].value.trim();
       if (raw !== "" && Number.isFinite(+raw) && +raw >= 0) next[k] = +raw;
     });
-    store.set("walter.settings", next);
+    store.set(own("settings"), next);
     location.reload();
   });
 
   // ---------- PAPER / LIVE ----------
   // PAPER är standard. LIVE kräver "JA GÅ LIVE" och gäller bara den här fliken (sessionStorage).
+  // Användaren har ingen LIVE: "Live: inte än" står där knapparna skulle ha legat, och dialogen tas bort.
   const LIVE_PHRASE = "JA GÅ LIVE";
-  let live = store.get("walter.live", false, "sessionStorage") === true;
+  let live = !isUser && store.get(own("live"), false, "sessionStorage") === true;
   const dlg = $("live-dialog"), confirmInput = $("live-confirm"), okBtn = $("live-ok");
   const renderLive = () => {
-    $("btn-paper").setAttribute("aria-pressed", String(!live));
-    $("btn-live").setAttribute("aria-pressed", String(live));
+    if (!isUser) {
+      $("btn-paper").setAttribute("aria-pressed", String(!live));
+      $("btn-live").setAttribute("aria-pressed", String(live));
+    }
     document.body.classList.toggle("is-live", live);
     $("trade-mode").textContent = live ? "LIVE" : "PAPER";
     $("footer").textContent = (live
       ? "LIVE · RIKTIGA PENGAR · WALTER LÄGGER INGA ORDER SJÄLV"
-      : "PAPER TRADING · INGA RIKTIGA PENGAR") + ` · V${S.version} · DATA PER ${day(S.updatedAt).toUpperCase()}`;
+      : "PAPER TRADING · INGA RIKTIGA PENGAR" + (isUser ? " · LIVE: INTE ÄN" : "")) +
+      `${S.version ? ` · V${S.version}` : ""} · DATA PER ${day(S.updatedAt).toUpperCase()}`;
   };
-  $("btn-paper").addEventListener("click", () => { live = false; store.set("walter.live", false, "sessionStorage"); renderLive(); });
-  $("btn-live").addEventListener("click", () => {
-    if (live) return;
-    confirmInput.value = "";
-    okBtn.disabled = true;
-    dlg.showModal();
-    confirmInput.focus();
-  });
-  confirmInput.addEventListener("input", () => { okBtn.disabled = confirmInput.value.trim() !== LIVE_PHRASE; });
-  $("live-form").addEventListener("submit", (e) => {
-    if (e.submitter && e.submitter.value === "live" && confirmInput.value.trim() === LIVE_PHRASE) {
-      live = true;
-      store.set("walter.live", true, "sessionStorage");
-    }
-    renderLive();
-  });
+  if (isUser) {
+    if (dlg) dlg.remove();
+  } else {
+    $("btn-paper").addEventListener("click", () => { live = false; store.set(own("live"), false, "sessionStorage"); renderLive(); });
+    $("btn-live").addEventListener("click", () => {
+      if (live) return;
+      confirmInput.value = "";
+      okBtn.disabled = true;
+      dlg.showModal();
+      confirmInput.focus();
+    });
+    confirmInput.addEventListener("input", () => { okBtn.disabled = confirmInput.value.trim() !== LIVE_PHRASE; });
+    $("live-form").addEventListener("submit", (e) => {
+      if (e.submitter && e.submitter.value === "live" && confirmInput.value.trim() === LIVE_PHRASE) {
+        live = true;
+        store.set(own("live"), true, "sessionStorage");
+      }
+      renderLive();
+    });
+  }
   renderLive();
+
+  // ---------- Pro-läge ----------
+  const proToggle = $("pro-toggle");
+  proToggle.checked = settings.pro === true;
+  proToggle.addEventListener("change", () => {
+    settings.pro = proToggle.checked;
+    if (!settings.pro) delete settings.pro;
+    store.set(own("settings"), settings);
+    document.body.classList.toggle("pro", proToggle.checked);
+  });
+
+  // ---------- Kopia och Börja om (bara användaren) ----------
+  if (isUser) {
+    const U = window.WalterUser;
+    const copyMsg = $("copy-msg");
+    $("btn-export").addEventListener("click", () => {
+      const user = U.load();
+      if (!user) { copyMsg.textContent = "Jag hittar ingen sparad Walter att kopiera."; return; }
+      const file = U.exportFile(user);
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      copyMsg.textContent = `Kopian ${file.name} är sparad i dina nedladdningar.`;
+    });
+    const fileInput = $("import-file");
+    $("btn-import").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", async () => {
+      const f = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!f) return;
+      let user;
+      try { user = U.importText(await f.text()); } catch (e) { copyMsg.textContent = "Det här är ingen Walter-kopia."; return; }
+      if (!U.save(user)) { copyMsg.textContent = "Din webbläsare låter mig inte spara kopian."; return; }
+      location.reload();
+    });
+
+    const RESET_PHRASE = "BÖRJA OM";
+    const resetInput = $("reset-confirm"), resetOk = $("reset-ok");
+    resetInput.addEventListener("input", () => { resetOk.disabled = resetInput.value.trim() !== RESET_PHRASE; });
+    $("reset-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (resetInput.value.trim() !== RESET_PHRASE) return;
+      try {
+        const ls = window.localStorage;
+        const keys = [];
+        for (let i = 0; i < ls.length; i++) keys.push(ls.key(i));
+        keys.filter(isUserKey).forEach((k) => ls.removeItem(k));
+        Object.keys(window.sessionStorage).filter(isUserKey).forEach((k) => window.sessionStorage.removeItem(k));
+      } catch (err) { /* lagring blockerad: inget sparat att ta bort */ }
+      location.reload();
+    });
+  }
+
+  // ---------- Lås upp min Walter (alla utom ägaren lokalt) ----------
+  // Som boot.js: bara en misslyckad dekryptering är "fel kod". Når jag inte filen kan koden vara rätt.
+  if (who !== "owner-local") {
+    const ownerMsg = $("owner-msg"), ownerOk = $("owner-ok");
+    $("owner-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const code = $("owner-code").value;
+      if (!code) return;
+      ownerOk.disabled = true;
+      ownerMsg.textContent = "Provar koden …";
+      let env = null;
+      try {
+        const res = await fetch("data/owner.enc", { cache: "no-store" });
+        if (res.ok) env = await res.json();
+      } catch (err) { env = null; }
+      if (!env) { ownerMsg.textContent = "Jag når inte ägarfilen just nu."; ownerOk.disabled = false; return; }
+      try { await window.WalterVault.decrypt(env, code); } catch (err) {
+        ownerMsg.textContent = "Koden stämde inte."; ownerOk.disabled = false; return;
+      }
+      try { window.localStorage.setItem("walter.ownerKey", code); } catch (err) {
+        ownerMsg.textContent = "Koden stämde, men din webbläsare låter mig inte spara den."; ownerOk.disabled = false; return;
+      }
+      location.reload();
+    });
+  }
 
   // ================================================================
   // Sidbyte via # (#siffror och okända # visar översikten)
   // ================================================================
-  const PAGES = ["oversikt", "pro", "logg", "k4", "installningar"];
+  const PAGES = ["oversikt", "pro", "logg", "k4", "installningar"].filter((p) => !(isUser && p === "k4"));
   const route = () => {
     const h = location.hash.slice(1);
     const page = PAGES.includes(h) ? h : "oversikt";
@@ -1023,5 +1190,10 @@
   route();
   }
 
-  window.WalterApp = { start };
+  // Nyckeln i localStorage/sessionStorage: användaren får walter.user.*, ägaren walter.*
+  function keyFor(who, k) { return (who === "user" ? "walter.user." : "walter.") + k; }
+  // Det som "Börja om" rensar: användarens Walter och allt under walter.user.*
+  function isUserKey(k) { return k === "walter.user" || String(k).startsWith("walter.user."); }
+
+  window.WalterApp = { start, keyFor, isUserKey };
 })();
