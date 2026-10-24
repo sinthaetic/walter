@@ -398,7 +398,8 @@ def build(state, cache, fetched_any, owner_cache=None):
     # Trade-motorn: dagens värde, förslag och Sharpe. Handlar aldrig här – Walter handlar själv i Actionen (walter_paper.py --auto).
     pf = state["portfolio"]
     pf["holdings"], pf["value"] = wp.valuation(pf, wp.prices_sek(m))
-    daily = owner_cache.get("daily", {})
+    # Bara dagar från startDate: efter en nystart får gamla dagsvärden aldrig styra toppen eller Sharpe
+    daily = {d: v for d, v in owner_cache.get("daily", {}).items() if d >= state.get("startDate", "")}
     pf["peak"] = max([pf["peak"], pf["value"], *daily.values()])
     flows = {}  # insättningar per dag (månadssparandet kan ge flera rader samma dag)
     for h in pf.get("history", []):

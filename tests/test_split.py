@@ -39,6 +39,24 @@ class SplitTest(unittest.TestCase):
         self.assertEqual(state["portfolio"]["peak"], 222)
         self.assertEqual(state["notis"], {"text": "hej"})
 
+    def test_build_ignores_daily_before_start_date(self):
+        state = minimal_state()
+        state["startDate"] = "2026-10-24"
+        seen = {}
+
+        def fake_sharpe(daily, flows, first_trade):
+            seen.update(daily)
+            return None
+
+        with patch.object(wf.wp, "valuation", lambda pf, px: ({}, 1000)), \
+                patch.object(wf.wp, "prices_sek", lambda m: {}), \
+                patch.object(wf.wp, "propose", lambda s: {}), \
+                patch.object(wf.wp, "sharpe", fake_sharpe):
+            state["portfolio"]["peak"] = 1000
+            wf.build(state, {}, False, owner_cache={"daily": {"2026-10-23": 254332, "2026-10-25": 1010}})
+        self.assertNotIn("2026-10-23", seen)
+        self.assertEqual(state["portfolio"]["peak"], 1010)
+
     def test_paper_rebuild_keeps_notis_and_daily(self):
         import walter_paper as wpaper
         with tempfile.TemporaryDirectory() as d:
