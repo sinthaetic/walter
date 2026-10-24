@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WALTER">
+  <style>.i{stroke:#14222A}.a{fill:#17808D}@media (prefers-color-scheme: dark){.i{stroke:#E8F0F2}.a{fill:#6FD3DE}}</style>
+  <path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" class="i" fill="none" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" class="i" fill="none" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle class="a" cx="32" cy="5.5" r="3.8"/>
+</svg>

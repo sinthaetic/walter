@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WALTER">
+  <path d="M14 20 L23 44 L32 28 L41 44 L50 20" fill="none" stroke="#14222A" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M23 44 V54 M41 44 V54 M32 28 V18" fill="none" stroke="#14222A" stroke-width="3.2" stroke-linecap="round"/>
+  <circle cx="14" cy="20" r="3.1" fill="#14222A"/>
+  <circle cx="50" cy="20" r="3.1" fill="#14222A"/>
+  <circle cx="23" cy="54" r="3.1" fill="#14222A"/>
+  <circle cx="41" cy="54" r="3.1" fill="#14222A"/>
+  <circle cx="32" cy="15" r="3.1" fill="#17808D"/>
+</svg>

@@ -1,0 +1,106 @@
+//@version=5
+// W-Cipher B – Walters oscillator (vågen, pengaflöde, signaler, divergenser).
+// Egen kod från öppna formler (LazyBears WaveTrend, RSI, Stoch RSI), inspirerad av
+// VuManChu Cipher B. Ingen kod kopierad. Samma parametrar som js/wcipher.js på Walter-sidan.
+// Signalerna är vad indikatorn visar, inte råd.
+indicator("W-Cipher B (Walter)", shorttitle="W-Cipher B", overlay=false, max_lines_count=100)
+
+chan      = input.int(9,     "Vågen: kanal",            group="Vågen")
+avgLen    = input.int(12,    "Vågen: snitt",            group="Vågen")
+maLen     = input.int(3,     "Vågen: MA",               group="Vågen")
+zone      = input.int(60,    "Stark zon ±",             group="Zoner")
+deep      = input.int(75,    "Djup zon för guld (−)",   group="Zoner")
+divTop    = input.int(45,    "Divergens nedåt: över",   group="Divergenser")
+divBot    = input.int(-65,   "Divergens uppåt: under",  group="Divergenser")
+mfiLen    = input.int(60,    "Pengaflöde: period",      group="Pengaflöde")
+mfiMul    = input.float(150, "Pengaflöde: multipel",    group="Pengaflöde")
+mfiY      = input.float(2.5, "Pengaflöde: förskjutning",group="Pengaflöde")
+rsiLen    = input.int(14,    "RSI: längd",              group="RSI")
+rsiLow    = input.int(30,    "RSI låg (guld)",          group="RSI")
+stLen     = input.int(14,    "Stoch RSI: längd",        group="Stoch RSI")
+stK       = input.int(3,     "Stoch RSI: K",            group="Stoch RSI")
+stD       = input.int(3,     "Stoch RSI: D",            group="Stoch RSI")
+showStoch = input.bool(true, "Visa Stoch RSI",          group="Visning")
+showVwap  = input.bool(true, "Visa VWAP",               group="Visning")
+showSmall = input.bool(true, "Visa små vändningar",     group="Visning")
+showDiv   = input.bool(true, "Rita divergenser",        group="Visning")
+
+GREEN = #3DD39A
+RED   = #FF4D66
+GOLD  = #F2C14E
+
+// Vågen (WaveTrend) på hlc3
+ap  = hlc3
+esa = ta.ema(ap, chan)
+d   = ta.ema(math.abs(ap - esa), chan)
+ci  = d == 0 ? 0.0 : (ap - esa) / (0.015 * d)
+wt1 = ta.ema(ci, avgLen)
+wt2 = ta.sma(wt1, maLen)
+vwap = wt1 - wt2
+
+// Pengaflöde (MFI-yta), RSI, Stoch RSI
+rng = high - low
+mfi = ta.sma(rng == 0 ? 0.0 : (close - open) / rng * mfiMul, mfiLen) - mfiY
+r   = ta.rsi(close, rsiLen)
+k   = ta.sma(ta.stoch(r, r, r, stLen), stK)
+dd  = ta.sma(k, stD)
+
+// Vändningar
+up       = wt1[1] < wt2[1] and wt1 >= wt2
+dn       = wt1[1] > wt2[1] and wt1 <= wt2
+guld     = up and wt2 <= -deep and r < rsiLow
+kop      = up and not guld and wt2 <= -zone
+litenUpp = up and not guld and not kop
+salj     = dn and wt2 >= zone
+litenNed = dn and not salj
+
+// Divergenser: fraktaler på vågen, två staplar bakåt (ingen titt in i framtiden)
+topF = wt2[4] < wt2[2] and wt2[3] < wt2[2] and wt2[2] > wt2[1] and wt2[2] > wt2
+botF = wt2[4] > wt2[2] and wt2[3] > wt2[2] and wt2[2] < wt2[1] and wt2[2] < wt2
+var float lastTopWt  = na
+var float lastTopHi  = na
+var int   lastTopBar = na
+var float lastBotWt  = na
+var float lastBotLo  = na
+var int   lastBotBar = na
+divNed = false
+divUpp = false
+if topF
+    if not na(lastTopWt) and wt2[2] >= divTop and wt2[2] < lastTopWt and high[2] > lastTopHi
+        divNed := true
+        if showDiv
+            line.new(lastTopBar, lastTopWt, bar_index - 2, wt2[2], color=RED, width=2)
+    lastTopWt  := wt2[2]
+    lastTopHi  := high[2]
+    lastTopBar := bar_index - 2
+if botF
+    if not na(lastBotWt) and wt2[2] <= divBot and wt2[2] > lastBotWt and low[2] < lastBotLo
+        divUpp := true
+        if showDiv
+            line.new(lastBotBar, lastBotWt, bar_index - 2, wt2[2], color=GREEN, width=2)
+    lastBotWt  := wt2[2]
+    lastBotLo  := low[2]
+    lastBotBar := bar_index - 2
+
+// Rita
+hline(zone,  "Stark zon +", color=color.new(color.gray, 30), linestyle=hline.style_dashed)
+hline(0,     "Noll",        color=color.new(color.gray, 70), linestyle=hline.style_solid)
+hline(-zone, "Stark zon −", color=color.new(color.gray, 30), linestyle=hline.style_dashed)
+
+plot(mfi, "Pengaflöde", color=mfi > 0 ? color.new(GREEN, 65) : color.new(RED, 65), style=plot.style_area)
+plot(wt1, "Vågen", color=color.new(#4994EC, 45), style=plot.style_area)
+plot(wt2, "Vågens snitt", color=color.new(#2A1B7A, 25), style=plot.style_area)
+plot(showVwap ? vwap : na, "VWAP", color=color.new(#FFDC78, 55), style=plot.style_area)
+plot(showStoch ? k : na, "Stoch RSI K", color=#21BAF3)
+plot(showStoch ? dd : na, "Stoch RSI D", color=#A07CF0)
+
+plotshape(showSmall and (litenUpp or litenNed) ? wt2 : na, title="Liten vändning", style=shape.circle, location=location.absolute, color=color.new(color.gray, 20), size=size.tiny)
+plotshape(kop  ? wt2 : na, title="Köpsignal",  style=shape.circle, location=location.absolute, color=GREEN, size=size.small)
+plotshape(salj ? wt2 : na, title="Säljsignal", style=shape.circle, location=location.absolute, color=RED,   size=size.small)
+plotshape(guld ? wt2 : na, title="Guldsignal", style=shape.circle, location=location.absolute, color=GOLD,  size=size.normal)
+
+alertcondition(kop,    "W-Cipher köp",             "W-Cipher: köpsignal på {{ticker}} ({{interval}})")
+alertcondition(salj,   "W-Cipher sälj",            "W-Cipher: säljsignal på {{ticker}} ({{interval}})")
+alertcondition(guld,   "W-Cipher guld",            "W-Cipher: guldsignal på {{ticker}} ({{interval}})")
+alertcondition(divUpp, "W-Cipher divergens uppåt", "W-Cipher: divergens uppåt på {{ticker}} ({{interval}})")
+alertcondition(divNed, "W-Cipher divergens nedåt", "W-Cipher: divergens nedåt på {{ticker}} ({{interval}})")

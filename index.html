@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#D7E0E3">
+  <title>WALTER</title>
+  <link rel="icon" href="assets/logo/vald/walter-favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/logo/vald/walter-appikon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/walter.css">
+  <link rel="stylesheet" href="css/top.css">
+  <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/cipher-chart.css">
+  <!-- Samma nyckel som W-Cipher, så mörkt läge följer med mellan sidorna -->
+  <script>try { if (localStorage.getItem("walterDark") === "1") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <i class="fog fog1"></i><i class="fog fog2"></i>
+    <div class="halo-wrap"><div class="halo"></div></div>
+    <i class="beam"></i>
+  </div>
+
+  <!-- Landningssidan (js/landing.js). Visas av boot.js när man inte gått in i den här fliken. -->
+  <section id="landing" aria-label="WALTER, välkommen" hidden>
+    <canvas class="fluid" aria-hidden="true"></canvas>
+    <div class="lab" aria-hidden="true">
+      <div class="scan"></div>
+      <div class="readout r1"></div>
+      <div class="readout r2"></div>
+      <div class="lamps"></div>
+      <div class="ring"></div>
+      <svg class="chart" viewBox="0 0 1000 200" preserveAspectRatio="none"><path/></svg>
+      <div class="readout r3"></div>
+      <div class="readout r4"></div>
+    </div>
+    <div class="stage">
+      <div class="pane">
+        <div class="frost"></div>
+        <div class="content">
+          <p class="kicker">LABB 01<span class="long"> · STRATEG · FÖRVALTARE</span> · <b>PAPER</b></p>
+          <div class="logo">
+            <svg class="g1" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <svg class="g2" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <svg class="main" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" cx="32" cy="5.5" r="2.7"/></svg>
+          </div>
+          <h1 class="word" aria-label="WALTER">WALTER</h1>
+          <p class="tag"><span>Walter läser marknaden varje dag och förvaltar åt dig.</span> <span>Lugnt, metodiskt, alltid exakt.</span> <span>Han börjar med låtsaspengar, tills du är redo.</span></p>
+          <button type="button" class="cta"><i aria-hidden="true"></i>GÅ IN</button>
+        </div>
+        <div class="status"><span>SYSTEM · ONLINE</span><span class="num" id="landing-clock">--:--:--</span><span id="landing-signals">LÄSER 10 SIGNALER</span></div>
+      </div>
+    </div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <button type="button" class="l-theme" aria-label="Byt till mörkt läge">
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+    </button>
+  </section>
+
+  <!-- Introt (js/intro.js): Walter presenterar sig, summa och börs. Visas av boot.js för en ny besökare efter GÅ IN. -->
+  <section id="intro" aria-label="Möt Walter" hidden>
+    <div class="stage">
+      <div class="pane">
+        <div class="frost"></div>
+        <div class="content">
+          <svg class="i-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" cx="32" cy="5.5" r="2.7"/></svg>
+          <div class="i-body"></div>
+        </div>
+        <div class="steps" role="img"></div>
+      </div>
+    </div>
+    <button type="button" class="l-theme" aria-label="Byt till mörkt läge">
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+    </button>
+  </section>
+
+  <header class="top">
+    <!-- Logo: "Inskriven" hexagon-W (assets/logo/vald). Ordet skrivs som text i Jost. -->
+    <a class="brand" href="#oversikt" aria-label="WALTER, till översikten">
+      <img class="mark mark-light" src="assets/logo/vald/walter-symbol-ljust.svg" alt="" width="40" height="40">
+      <img class="mark mark-dark" src="assets/logo/vald/walter-symbol-morkt.svg" alt="" width="40" height="40">
+      <span class="words"><span class="word">WALTER</span><span class="sub" id="trade-mode">PAPER</span></span>
+    </a>
+    <nav class="nav" aria-label="Sidor">
+      <a href="#oversikt" data-view="oversikt">ÖVERSIKT</a>
+      <a href="#pro" data-view="pro">PRO</a>
+      <a href="#logg" data-view="logg">LOGG</a>
+      <a href="#k4" data-view="k4">K4</a>
+      <a href="#installningar" data-view="installningar">INSTÄLLNINGAR</a>
+      <a href="cipher.html" class="ext">W-CIPHER</a>
+    </nav>
+    <div class="top-right">
+      <span class="stamp" id="stamp"></span>
+      <button type="button" id="theme" class="round" aria-label="Byt till mörkt läge">
+        <svg class="moon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- Översikt: läget är hjälten, siffrorna ligger längre ned -->
+    <section id="view-oversikt" data-page="oversikt" aria-label="Översikt">
+      <div class="hero">
+        <div class="hero-left">
+          <p class="kicker" id="status-line"></p>
+          <div class="mode" id="mode"></div>
+          <p class="quote" id="quote"></p>
+          <p class="explain mode-explain" id="mode-explain"></p>
+          <div class="panel ring-panel" id="ring"></div>
+        </div>
+        <div class="hero-right">
+          <div class="panel pf" id="pf"></div>
+          <div class="panel lamps" id="lamps"></div>
+        </div>
+      </div>
+
+      <!-- Målet med datum (valfritt, js/app.js). Dolt när inget mål finns. -->
+      <section class="panel goal-card" id="goal-card" aria-label="Mål" hidden></section>
+
+      <!-- W-Cipher (js/cipher-chart.js, samma graf som cipher.html i CIPHER-läget) + Walters lampor och affärer. Ritas av js/app.js. -->
+      <section class="panel wc-panel" id="wc" aria-label="W-Cipher">
+        <div class="panel-head"><span>BITCOIN · W-CIPHER <em>CIPHER A + B · WALTER</em></span><span class="num" id="wc-live">HÄMTAR …</span></div>
+        <div class="wc-bar">
+          <div class="seg" id="wc-tf" role="group" aria-label="Tidsram">
+            <button type="button" data-tf="4h" aria-pressed="false">4 TIM</button>
+            <button type="button" data-tf="1D" aria-pressed="true">DAG</button>
+            <button type="button" data-tf="1W" aria-pressed="false">VECKA</button>
+          </div>
+          <a class="wc-open" href="cipher.html">ÖPPNA W-CIPHER →</a>
+        </div>
+        <div class="wc-chart" id="wc-chart" role="img" aria-label="Bitcoin med W-Cipher: pris och trendband överst, vågen och pengaflödet i mitten, Walters lampor längst ned. W-markörerna är Walters affärer."></div>
+        <ul class="wc-legend" id="wc-legend"></ul>
+        <div id="wc-copy"></div>
+      </section>
+
+      <div class="section-title" id="siffror"><h2>SIFFRORNA</h2><span class="small">Allt bakom läget, för den som vill se.</span></div>
+      <div class="cards">
+        <section class="panel wide proposal" id="proposal" aria-label="Walters förslag"></section>
+        <section class="panel" id="status" aria-label="Status och uppdatering"></section>
+        <section class="panel" id="allocation" aria-label="Fördelning"></section>
+        <section class="panel" id="levels" aria-label="Nivåer"></section>
+        <section class="panel" id="unlock" aria-label="Vägen till Level 2"></section>
+        <section class="panel wide" id="journey" aria-label="Resan" hidden></section>
+      </div>
+    </section>
+
+    <section id="view-pro" data-page="pro" aria-label="Pro" hidden></section>
+    <section id="view-logg" data-page="logg" aria-label="Logg" hidden></section>
+    <section id="view-k4" data-page="k4" aria-label="K4" hidden></section>
+    <section id="view-installningar" data-page="installningar" aria-label="Inställningar" hidden></section>
+  </main>
+
+  <footer class="footer" id="footer"></footer>
+
+  <!-- Sätt in pengar (js/app.js fyller dialogen: formulär för användaren, två steg för ägaren) -->
+  <dialog class="live-dialog dep-dialog" id="dep-dialog"></dialog>
+
+  <dialog class="live-dialog" id="live-dialog">
+    <form method="dialog" id="live-form">
+      <h2>Gå över till LIVE?</h2>
+      <p>I LIVE gäller riktiga pengar. Skriv <b>JA GÅ LIVE</b> för att bekräfta.</p>
+      <input id="live-confirm" class="input" type="text" autocomplete="off" spellcheck="false" placeholder="JA GÅ LIVE" aria-label="Bekräftelse">
+      <div class="form-actions">
+        <button type="submit" value="cancel" class="btn">AVBRYT</button>
+        <button type="submit" value="live" class="btn btn-danger" id="live-ok" disabled>GÅ LIVE</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Publik marknadsdata (hämtaren). state.js finns bara lokalt hos ägaren: saknas den händer inget. -->
+  <script src="data/market.js" onerror="void 0"></script>
+  <script src="data/state.js" onerror="void 0"></script>
+  <script src="data/pulse.js" onerror="void 0"></script>
+  <!-- Lightweight Charts (samma version + integrity som cipher.html) laddas utan att blockera: js/cipher-chart.js loadChartLib -->
+  <script src="js/wcipher.js"></script>
+  <script src="js/cipher-chart.js"></script>
+  <script src="js/vault.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/exchanges.js"></script>
+  <script src="js/user-state.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/landing.js"></script>
+  <script src="js/intro.js"></script>
+  <script src="js/boot.js"></script>
+</body>
+</html>
