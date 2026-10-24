@@ -85,7 +85,8 @@ class OwnerEncTest(unittest.TestCase):
         self.assertEqual(out, {"state": {}, "daily": {}, "notis": None})
 
     def test_allow_has_no_private_files(self):
-        self.assertEqual(wd.ALLOW, ["index.html", "cipher.html", "css", "js", "assets", "tradingview",
+        self.assertEqual(wd.ALLOW, ["index.html", "cipher.html", "css", "js", "assets",
+                                    "tradingview/w-cipher.pine", "tradingview/w-cipher-a.pine",
                                     "data/market.js", "data/cache.json", "data/pulse.js", "data/owner.enc"])
 
     def test_pulse_js_passes_leak_check(self):

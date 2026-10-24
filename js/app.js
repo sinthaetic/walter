@@ -225,106 +225,68 @@
         <div><span>INVESTERAT</span><strong title="${AUTO ? "Autopilotens mål" : `Tak på Level ${S.level}`}">${nf(0).format(invested * 100)} / ${nf(0).format((AUTO ? 1 - apCash : levelCap) * 100)} %</strong></div>
       </div>
     </div>
-    <div class="candles" id="candles"><span class="small">Hämtar bitcoin …</span></div>
-    <div class="pf-foot"><span id="candles-label">BITCOIN · HEIKIN-ASHI · DAG</span><a href="#siffror">SIFFRORNA →</a></div>`;
-
-  // Bitcoin-ljus (Heikin-Ashi, dag) direkt från en öppen börs-källa. Ingen data = ingen graf, aldrig påhittade ljus.
-  const SHOW = 28;
-  const candleSources = [
-    ["Binance", "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=60",
-      (j) => j.map((k) => [+k[1], +k[2], +k[3], +k[4]])],
-    ["Coinbase", "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400",
-      (j) => j.slice(0, 60).reverse().map((k) => [k[3], k[2], k[1], k[4]])]
-  ];
-  const heikin = (ohlc) => {
-    const out = [];
-    ohlc.forEach(([o, h, l, c], i) => {
-      const hc = (o + h + l + c) / 4;
-      const ho = i ? (out[i - 1][0] + out[i - 1][3]) / 2 : (o + c) / 2;
-      out.push([ho, Math.max(h, ho, hc), Math.min(l, ho, hc), hc]);
-    });
-    return out;
-  };
-  const drawCandles = (bars, src) => {
-    const W = SHOW * 20, H = 130, P = 4;
-    const lo = Math.min(...bars.map((b) => b[2])), hi = Math.max(...bars.map((b) => b[1]));
-    const y = (v) => P + (hi - v) * (H - 2 * P) / (hi - lo || 1);
-    const body = bars.map(([o, h, l, c], i) => {
-      const x = i * 20 + 5, top = y(Math.max(o, c)), bh = Math.max(2, Math.abs(y(o) - y(c)));
-      return `<line class="wick" x1="${x + 5}" x2="${x + 5}" y1="${y(h).toFixed(1)}" y2="${y(l).toFixed(1)}" vector-effect="non-scaling-stroke"/>` +
-        `<rect class="body${c < o ? " fall" : ""}" x="${x}" y="${top.toFixed(1)}" width="10" height="${bh.toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
-    }).join("");
-    const first = bars[0][3], last = bars[bars.length - 1][3];
-    $("candles").innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
-      aria-label="Bitcoin senaste ${SHOW} dagarna, Heikin-Ashi, från ${src}: ${last >= first ? "upp" : "ned"} ${nf(1).format(Math.abs(last / first - 1) * 100)} %">${body}</svg>`;
-    $("candles-label").textContent = `BITCOIN · HEIKIN-ASHI · ${SHOW} DAGAR · ${src.toUpperCase()}`;
-  };
-  (async () => {
-    for (const [name, url, parse] of candleSources) {
-      try {
-        const r = await fetch(url, { cache: "no-store" });
-        if (!r.ok) throw new Error(r.status);
-        const bars = heikin(parse(await r.json())).slice(-SHOW);
-        if (bars.length < 5) throw new Error("för få ljus");
-        drawCandles(bars, name);
-        return;
-      } catch { /* prova nästa källa */ }
-    }
-    $("candles").innerHTML = '<span class="small">Kunde inte hämta bitcoin-ljus just nu. Väntar på data.</span>';
-  })();
+    <div class="pf-foot"><a href="#wc">BITCOIN · W-CIPHER ↓</a><a href="#siffror">SIFFRORNA →</a></div>`;
 
   // ---------- W-Cipher under hjälten ----------
   // Samma graf som cipher.html i CIPHER-läget (js/cipher-chart.js), plus Walters lampor (data/pulse.js + market.js-loggen)
   // och Walters affärer ur journalen. Börsen: användarens om grafen har den, ägarens Kraken, annars W-Cipherns standard.
+  // Lightweight Charts laddas först här (inte som blockerande skripttagg), så att resten av översikten ritas direkt.
+  // Ett fel här får aldrig stoppa resten av översikten.
   (() => {
     const CC = window.WalterCipherChart, el = $("wc-chart");
-    if (!el || !CC) return;
-    $("wc-copy") && CC.mountCopy($("wc-copy"));
-    if (!window.LightweightCharts || !window.WCipher) { $("wc-live").textContent = "GRAFEN KUNDE INTE LADDAS"; return; }
-    const CHART_EX = { kraken: "kraken", "bybit-eu": "bybit", "okx-europe": "okx" };
-    const exId = isUser ? (ex && CHART_EX[ex.id]) || "binance" : "kraken";
-    const pair = "BTC/" + CC.EX[exId].quote;
-    const exName = { binance: "Binance", kraken: "Kraken", bybit: "Bybit", okx: "OKX", coinbase: "Coinbase" }[exId];
-    const pulse = CC.mergePulse(window.WALTER_PULSE, (window.WALTER_MARKET && window.WALTER_MARKET.log) || []);
-    const trades = CC.tradeMarks(S.journal);
-    const extras = { pulse: pulse.length ? pulse : null, trades: trades.length ? trades : null };
-    const TF_KEY = "walterOverviewTf";
-    let tf = store.get(TF_KEY, "1D");
-    if (!["4h", "1D", "1W"].includes(tf)) tf = "1D";
-    if (el._wc) el._wc.destroy();
-    const graph = el._wc = CC.mount(el, { view: "cipher", wavePane: 0.32, pulsePane: 64 });
-    graph.setExtras(extras);
-    const legend = () => {
+    if (!el) return;
+    const fail = () => { if ($("wc-live")) $("wc-live").textContent = "GRAFEN KUNDE INTE LADDAS"; };
+    try {
+      if (!CC || !window.WCipher) { fail(); return; }
+      if ($("wc-copy")) CC.mountCopy($("wc-copy"));
+      const CHART_EX = { kraken: "kraken", "bybit-eu": "bybit", "okx-europe": "okx" };
+      const exId = isUser ? (ex && CHART_EX[ex.id]) || "binance" : "kraken";
+      const pair = "BTC/" + CC.EX[exId].quote;
+      const exName = { binance: "Binance", kraken: "Kraken", bybit: "Bybit", okx: "OKX", coinbase: "Coinbase" }[exId];
+      const pulse = CC.mergePulse(window.WALTER_PULSE, (window.WALTER_MARKET && window.WALTER_MARKET.log) || []);
+      const trades = CC.tradeMarks(S.journal);
+      const extras = { pulse: pulse.length ? pulse : null, trades: trades.length ? trades : null };
+      const TF_KEY = "walterOverviewTf";
+      let tf = store.get(TF_KEY, "1D");
+      if (!["4h", "1D", "1W"].includes(tf)) tf = "1D";
+      const sync = () => document.querySelectorAll("#wc-tf button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tf === tf)));
       // Samma rader på alla tidsramar (lamprutan syns bara på DAG/VECKA), så att panelen aldrig hoppar
       $("wc-legend").innerHTML = CC.legendHTML("cipher", extras);
-    };
-    const sync = () => document.querySelectorAll("#wc-tf button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tf === tf)));
-    let loading = 0;
-    const load = async (reset) => {
-      const my = ++loading;
-      if (reset) $("wc-live").textContent = "HÄMTAR …";
-      try {
-        const bars = await CC.fetchBars(exId, pair, tf);
-        if (my !== loading) return;
-        graph.setBars(bars, tf, reset);
-        legend();
-        $("wc-live").textContent = `${pair} · ${exName.toUpperCase()} · ${new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
-      } catch (e) {
-        if (my !== loading) return;
-        $("wc-live").textContent = "KUNDE INTE HÄMTA · " + exName.toUpperCase();
-        if (reset) graph.clear();
-      }
-    };
-    $("wc-tf").addEventListener("click", (e) => {
-      const b = e.target.closest("button[data-tf]");
-      if (!b || b.dataset.tf === tf) return;
-      tf = b.dataset.tf; store.set(TF_KEY, tf); sync(); load(true);
-    });
-    // Ljust/mörkt byts av knappen i toppen: läs om färgerna
-    new MutationObserver(() => { graph.applyTheme(); graph.redraw(); })
-      .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    sync(); legend(); load(true);
-    setInterval(() => { if (!document.hidden && !$("view-oversikt").hidden) load(false); }, 60000);
+      sync();
+      CC.loadChartLib().then(() => {
+        if (el._wc) el._wc.destroy();
+        const graph = el._wc = CC.mount(el, { view: "cipher", wavePane: 0.32, pulsePane: 64 });
+        graph.setExtras(extras);
+        let loading = 0;
+        const load = async (reset) => {
+          const my = ++loading;
+          if (reset) $("wc-live").textContent = "HÄMTAR …";
+          try {
+            const bars = await CC.fetchBars(exId, pair, tf);
+            if (my !== loading) return;
+            graph.setBars(bars, tf, reset);
+            $("wc-live").textContent = `${pair} · ${exName.toUpperCase()} · ${new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
+          } catch (e) {
+            if (my !== loading) return;
+            $("wc-live").textContent = "KUNDE INTE HÄMTA · " + exName.toUpperCase();
+            if (reset) graph.clear();
+          }
+        };
+        $("wc-tf").onclick = (e) => {
+          const b = e.target.closest("button[data-tf]");
+          if (!b || b.dataset.tf === tf) return;
+          tf = b.dataset.tf; store.set(TF_KEY, tf); sync(); load(true);
+        };
+        // Ljust/mörkt byts av knappen i toppen: läs om färgerna. Städas av graph.destroy().
+        const mo = new MutationObserver(() => { graph.applyTheme(); graph.redraw(); });
+        mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+        const timer = setInterval(() => { if (!document.hidden && !$("view-oversikt").hidden) load(false); }, 60000);
+        graph.onDestroy(() => { mo.disconnect(); clearInterval(timer); });
+        load(true);
+      }).catch(fail);
+    } catch (e) {
+      fail();
+    }
   })();
 
   // ---------- Tio lampor ----------

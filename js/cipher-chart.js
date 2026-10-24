@@ -5,6 +5,7 @@
 // API – window.WalterCipherChart:
 //   EX, STABLE                         börserna (symbolformat, tidsramar, adress, tolkning) och stabila valutor
 //   fetchBars(exId, pair, tf)          -> Promise<[{time, open, high, low, close}]>  (tf: 15m 1h 4h 1D 1W)
+//   loadChartLib()                     -> Promise: laddar Lightweight Charts utan att blockera sidan (om det inte redan finns)
 //   decimals(v)                        antal decimaler för ett pris
 //   mount(el, opts) -> handle          ritar i el. opts: {view: "walter"|"cipher", wavePane: 0.4 (andel av höjden),
 //                                      pulsePane: 64 (px för WALTERS LAMPOR)}
@@ -12,7 +13,8 @@
 //     handle.setView(view)             "walter" eller "cipher" (ritar inte; anropa redraw)
 //     handle.setExtras({pulse, trades}) Walters lampor [[datum, röda]] (bara DAG/VECKA) och affärer från tradeMarks()
 //     handle.applyTheme()              efter byte ljust/mörkt (ritar inte om; anropa setView/redraw)
-//     handle.redraw(), handle.clear(), handle.destroy(), handle.chart
+//     handle.redraw(), handle.clear(), handle.chart
+//     handle.onDestroy(fn), handle.destroy()   städning (observers, timers) + tar bort grafen
 //   legendHTML(view, extras)           <li>-rader till förklaringen (class="wc-legend")
 //   Rena hjälpare (testas i tests/js/cipher-chart.test.js):
 //   mergePulse(pulse, log)             -> [[datum, röda]] sorterad; market.js-loggens rader vinner (nyare dagar)
@@ -86,6 +88,24 @@
     const bars = ex.parse(j).filter(b => isFinite(b.close));
     if (bars.length < 80) throw new Error("för lite historik (" + bars.length + " ljus)");
     return bars;
+  }
+
+  // Lightweight Charts utan blockerande skripttagg (översikten). Samma version och integrity som cipher.html.
+  const LC_SRC = "https://unpkg.com/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.js";
+  const LC_SRI = "sha384-/z0wnnyAhUnLX5YRrxljPlJlhJPGIOuhRU9kt785gf9AUeh8YsG8O6oxSE2sTS9m";
+  let lcPromise = null;
+  function loadChartLib() {
+    if (window.LightweightCharts) return Promise.resolve(window.LightweightCharts);
+    if (!lcPromise) {
+      lcPromise = new Promise((resolve, reject) => {
+        const sc = document.createElement("script");
+        sc.src = LC_SRC; sc.integrity = LC_SRI; sc.crossOrigin = "anonymous"; sc.async = true;
+        sc.onload = () => (window.LightweightCharts ? resolve(window.LightweightCharts) : reject(new Error("ingen graf")));
+        sc.onerror = () => { lcPromise = null; reject(new Error("grafen kunde inte laddas")); };
+        document.head.appendChild(sc);
+      });
+    }
+    return lcPromise;
   }
 
   function decimals(v) { return v >= 1000 ? 0 : v >= 10 ? 2 : v >= 1 ? 3 : v >= 0.01 ? 5 : 8; }
@@ -194,6 +214,7 @@
     waveMarks = LC.createSeriesMarkers(wt2S, []);
     zoneLines = [60, 0, -60].map(p => wt2S.createPriceLine({ price: p, lineWidth: 1, lineStyle: p ? 2 : 0, axisLabelVisible: true, title: "" }));
     const sizePanes = () => {
+      if (!el.clientHeight) return; // dold ruta: görs när den syns
       const panes = chart.panes();
       if (panes[1]) panes[1].setHeight(Math.round(el.clientHeight * o.wavePane));
       if (panes[2]) panes[2].setHeight(o.pulsePane);
@@ -249,7 +270,19 @@
       pulseLabel.hidden = false;
       pulseLabel.style.top = Math.round(pe.getBoundingClientRect().top - el.getBoundingClientRect().top + 4) + "px";
     }
-    if (window.ResizeObserver) new ResizeObserver(() => { if (pulseS) requestAnimationFrame(placeLabel); }).observe(el);
+    // Monterad medan rutan var dold (annan flik, höjd 0): ge rutorna rätt höjd och rita om när den syns.
+    let wasHidden = el.clientHeight === 0;
+    const ro = window.ResizeObserver ? new ResizeObserver(() => {
+      if (wasHidden && el.clientHeight > 0) {
+        wasHidden = false;
+        // efter grafens egen storleksändring (den lyssnar också på rutan)
+        requestAnimationFrame(() => { sizePanes(); firstDraw = true; draw(); });
+      }
+      else if (el.clientHeight === 0) wasHidden = true;
+      if (pulseS) requestAnimationFrame(placeLabel);
+    }) : null;
+    if (ro) ro.observe(el);
+    const cleanups = [];
 
     function draw() {
       if (!bars) return null;
@@ -356,7 +389,13 @@
         bars = null;
         chart.panes().forEach(p => p.getSeries().forEach(s => s.setData([])));
       },
-      destroy() { chart.remove(); }
+      onDestroy(fn) { cleanups.push(fn); },
+      destroy() {
+        cleanups.splice(0).forEach(fn => { try { fn(); } catch (e) { /* städning */ } });
+        if (ro) ro.disconnect();
+        if (pulseLabel) pulseLabel.remove();
+        chart.remove();
+      }
     };
   }
 
@@ -403,22 +442,32 @@
       </ol>
       <p class="wc-honest">W-Cipher är en indikator att läsa marknaden med. I Walters historiktest tjänade signalerna inte pengar som regler – se <a href="${BACKTEST_URL}" target="_blank" rel="noopener">BACKTEST</a>.</p>`;
     const msg = el.querySelector(".wc-copy-msg"), steps = el.querySelector(".wc-steps");
-    // Skripten hämtas direkt, så att klicket kan kopiera utan att vänta (Safari kräver att kopieringen sker i klicket).
+    // Skripten hämtas vid första klicket. Safari kräver att kopieringen startar i klicket: då skrivs en
+    // ClipboardItem med ett löfte om texten, annars väntar vi på texten och kopierar (med textarea som reserv).
     const texts = {};
-    const get = name => fetch(PINE[name], { cache: "no-cache" }).then(r => (r.ok ? r.text() : null))
-      .then(t => { if (t) texts[name] = t; }).catch(() => {});
-    Object.keys(PINE).forEach(get);
+    const get = name => texts[name] || (texts[name] = fetch(PINE[name], { cache: "no-cache" })
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+      .catch(err => { delete texts[name]; throw err; }));
     el.addEventListener("click", async (e) => {
       const b = e.target.closest("button[data-pine]");
       if (!b) return;
       const name = b.dataset.pine;
-      if (!texts[name]) { msg.textContent = "Hämtar " + name + " … tryck igen om en stund."; get(name); return; }
-      const ok = await copyText(texts[name]);
+      const text = get(name);
+      let ok = false;
+      try {
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write && window.isSecureContext) {
+          await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then(t => new Blob([t], { type: "text/plain" })) })]);
+          ok = true;
+        }
+      } catch (err) { ok = false; }
+      if (!ok) {
+        try { ok = await copyText(await text); } catch (err) { ok = false; }
+      }
       steps.hidden = !ok;
       if (ok) msg.textContent = "Kopierat: " + name;
       else msg.innerHTML = `Kunde inte kopiera. <a href="${PINE[name]}" target="_blank" rel="noopener">Öppna ${name}</a> och kopiera själv.`;
     });
   }
 
-  window.WalterCipherChart = { EX, STABLE, fetchBars, decimals, mount, legendHTML, mergePulse, tradeMarks, alignTime, pulseBars, mountCopy };
+  window.WalterCipherChart = { EX, STABLE, fetchBars, loadChartLib, decimals, mount, legendHTML, mergePulse, tradeMarks, alignTime, pulseBars, mountCopy };
 })();
