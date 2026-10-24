@@ -41,6 +41,10 @@ h2, h3, p { margin: 0; }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 [hidden] { display: none !important; }
+/* Radbrytning (progressiv förbättring): brödtext utan ensamma ord sist, rubriker och korta rader jämnt fördelade.
+   Bara text-wrap-style, så att nowrap-regler (white-space) aldrig påverkas. */
+p, li, dd, label, .small, .explain, .plain { text-wrap-style: pretty; }
+h1, h2, h3, .kicker, .quote, .label, .panel h3, .section-title .small { text-wrap-style: balance; }
 
 /* ---------- Bakgrund: dimma, ljusring, ljussvep ---------- */
 /* Mjuka kanter med gradienter i stället för filter: blur – blur som rör sig under frostat glas
@@ -72,38 +76,19 @@ button, input, select { font: inherit; color: inherit; }
 @keyframes ripple { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(3.2); opacity: 0; } }
 @keyframes lamp { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
 
-/* ---------- Topp ---------- */
-.top, .page, .footer { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding-inline: 56px; }
-.top { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 32px; }
-.brand { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--ink); min-width: 0; }
-.brand .mark { width: 40px; height: 40px; flex: none; }
-.brand .mark-dark, [data-theme="dark"] .brand .mark-light { display: none; }
-[data-theme="dark"] .brand .mark-dark { display: block; }
-.brand .words { display: flex; flex-direction: column; gap: 6px; }
-.brand .word { font-size: 20px; font-weight: 500; letter-spacing: .62em; line-height: 1; }
-.brand .sub { font-size: 9px; font-weight: 400; letter-spacing: .9em; color: var(--teal); line-height: 1; }
-body.is-live .brand .sub { color: var(--red); }
+/* ---------- Topp: css/top.css (samma fil som cipher.html) ---------- */
+.page, .footer { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding-inline: 56px; }
 
-.nav, .seg {
+.seg {
   display: flex; padding: 4px; border-radius: 16px; background: var(--glass);
   border: 1px solid var(--glass-edge); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
 }
-.nav a, .seg button {
+.seg button {
   display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; white-space: nowrap;
   border: 0; border-radius: 12px; background: transparent; color: var(--ink); text-decoration: none;
   font-size: 11px; font-weight: 400; letter-spacing: .2em; cursor: pointer; transition: background-color .25s, color .25s;
 }
-.nav a[aria-current="page"], .seg button[aria-pressed="true"] { background: var(--seg-bg); color: var(--seg-fg); }
-.nav .ext { color: var(--teal); }
-.top-right { display: flex; align-items: center; gap: 20px; }
-.stamp { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .24em; color: var(--muted); white-space: nowrap; }
-.round {
-  width: 48px; height: 48px; flex: none; border-radius: 50%; border: 1px solid var(--glass-edge); background: var(--glass);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
-}
-.round .sun, [data-theme="dark"] .round .moon { display: none; }
-[data-theme="dark"] .round .sun { display: block; }
+.seg button[aria-pressed="true"] { background: var(--seg-bg); color: var(--seg-fg); }
 
 /* ---------- Gemensamt ---------- */
 .panel {
@@ -112,7 +97,7 @@ body.is-live .brand .sub { color: var(--red); }
   border-radius: 26px; padding: 22px 28px; min-width: 0;
 }
 @media (hover: none), (pointer: coarse) {
-  .panel, .nav, .seg, .round { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .panel, .seg { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 }
 .label, .panel-head { font-size: 10px; font-weight: 400; letter-spacing: .42em; color: var(--muted); }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 20px; }
@@ -167,8 +152,9 @@ details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 
 .mode-light i { border: 1px solid currentColor; animation: ripple 3.2s ease-out infinite; }
 .mode-light b { background: currentColor; box-shadow: 0 0 14px currentColor; animation: breathe 3.2s ease-in-out infinite; }
 .mode-name { font-size: 52px; font-weight: 300; letter-spacing: .26em; line-height: 1; white-space: nowrap; }
-.quote { margin-top: 18px; height: 64px; overflow: hidden; font-size: 20px; line-height: 1.6; color: var(--soft); }
-.quote.auto { height: 96px; } /* autopiloten: andelarna + nästa koll, fast höjd */
+.quote { margin-top: 18px; height: 96px; overflow: hidden; font-size: 20px; line-height: 1.6; color: var(--soft); }
+.quote .line, .catchup-note .line { display: block; }
+.quote.auto { height: 160px; } /* autopiloten: andelarna + nästa koll, en mening per rad, fast höjd */
 .ring-panel { margin-top: 28px; height: 420px; padding: 28px; display: flex; align-items: center; gap: 32px; }
 .ring { position: relative; width: 300px; height: 300px; flex: none; }
 .ring svg { display: block; width: 100%; height: 100%; }
@@ -417,12 +403,9 @@ body.pro .explain { display: none; }
 
 /* ---------- Mindre skärmar ---------- */
 @media (max-width: 1280px) {
-  .top { flex-wrap: wrap; }
-  .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; }
-  .nav::-webkit-scrollbar { display: none; }
-  .nav a { flex: 1; }
   .hero { grid-template-columns: minmax(0, 1fr); }
   .ring-panel { height: auto; }
+  .quote.auto { height: 128px; } /* bredare kolumn: färre radbrytningar */
 }
 @media (max-width: 1100px) {
   .two, .plan { grid-template-columns: minmax(0, 1fr); }
@@ -433,21 +416,14 @@ body.pro .explain { display: none; }
   .goal-alt p { min-height: 0; }
 }
 @media (max-width: 800px) {
-  .top, .page, .footer { padding-inline: 16px; }
-  .top { padding-top: 20px; gap: 14px; }
-  .brand .mark { width: 32px; height: 32px; }
-  .brand .word { font-size: 17px; letter-spacing: .62em; }
-  .brand .sub { font-size: 8px; }
-  .stamp { display: none; }
-  .round { width: 44px; height: 44px; }
-  .nav a { padding: 0 12px; font-size: 10px; letter-spacing: .14em; }
+  .page, .footer { padding-inline: 16px; }
   .kicker { margin-top: 28px; font-size: 10px; }
   h1 { font-size: 28px; letter-spacing: .2em; }
   .hero { margin-top: 24px; gap: 16px; }
   .mode { gap: 14px; height: 44px; margin-top: 12px; }
   .mode-name { font-size: clamp(26px, 9vw, 40px); letter-spacing: .3em; }
   .quote { margin-top: 14px; height: 77px; font-size: 17px; line-height: 1.5; }
-  .quote.auto { height: 102px; }
+  .quote.auto { height: 128px; } /* en mening per rad: upp till fem rader */
   .mode-explain { height: 4.5em; font-size: 13px; }
   .lamp-grid .explain { min-height: 0; }
   .ring-panel { margin-top: 12px; padding: 16px; gap: 18px; border-radius: 22px; }
@@ -479,6 +455,16 @@ body.pro .explain { display: none; }
   .goal-amount { grid-template-columns: minmax(0, 1fr); }
   .plan-kpis strong { font-size: 24px; }
   .plan-chart { height: 200px; }
+}
+
+/* Fält på mobil: aldrig bredare än sin ruta, och minst 16 px text.
+   Under 16 px zoomar Safari på iPhone in när man trycker i fältet och stannar inzoomad. Zoom är aldrig avstängd. */
+.input, .field select, .field input { max-width: 100%; min-width: 0; }
+/* Safaris datumfält har en egen minsta bredd och sticker annars ut till höger */
+input[type="date"].input { display: block; -webkit-appearance: none; appearance: none; text-align: left; }
+input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
+@media (hover: none), (pointer: coarse), (max-width: 800px) {
+  .input, .field select, .field input, select, textarea { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

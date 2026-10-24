@@ -419,7 +419,7 @@
       if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
     } catch (e) { /* faller tillbaka */ }
     const ta = document.createElement("textarea");
-    ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px"; // 16 px: ingen zoom i Safari
     document.body.appendChild(ta); ta.select();
     let ok = false;
     try { ok = document.execCommand("copy"); } catch (e) { ok = false; }

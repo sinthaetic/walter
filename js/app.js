@@ -49,6 +49,15 @@
     d.setMonth(d.getMonth() + n);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
+  // En mening per rad (egna block-spans), så att en rad aldrig börjar mitt i en mening. Bara för korta påståenden.
+  const lines = (el, text) => {
+    el.textContent = "";
+    String(text).split(/(?<=[.!?])\s+(?=[A-ZÅÄÖ])/).forEach((t, i) => {
+      if (i) el.append(" ");
+      const s = document.createElement("span");
+      s.className = "line"; s.textContent = t; el.appendChild(s);
+    });
+  };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const pad = (n) => String(n).padStart(2, "0");
   // "22.10 · 20:11" (statusraden) och "22 okt 20:11" (löptext)
@@ -171,7 +180,7 @@
     box.setAttribute("role", "status");
     const p = document.createElement("p");
     p.className = "plain";
-    p.textContent = ctx.catchUpText;
+    lines(p, ctx.catchUpText);
     box.appendChild(p);
     const main = document.querySelector("main.page");
     main.insertBefore(box, main.firstChild);
@@ -189,11 +198,11 @@
   const Pnow = S.proposal || {};
   const pending = !AUTO && !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
   $("quote").classList.toggle("auto", AUTO);
-  $("quote").textContent = AUTO
+  lines($("quote"), AUTO
     ? autoLine + (apNextText ? ` Nästa koll ${apNextText}.` : "")
     : MODE.quote + (pending
       ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`
-      : "");
+      : ""));
   $("mode-explain").textContent = AUTO
     ? `Marknaden är just nu ${MOOD} (${red} av ${total} varningar). Det ändrar inte vad jag gör: jag säljer det som stigit och köper det som fallit – få affärer, låga avgifter och lite skatt.`
     : "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
@@ -1347,6 +1356,9 @@
   };
   window.addEventListener("hashchange", route);
   route();
+  // Menyn börjar alltid till vänster, som på W-Cipher (Safari kan annars minnas en sidledsrullning)
+  const navStart = () => document.querySelectorAll(".nav").forEach((n) => { n.scrollLeft = 0; });
+  navStart(); window.addEventListener("pageshow", navStart);
   }
 
   // Nyckeln i localStorage/sessionStorage: användaren får walter.user.*, ägaren walter.*

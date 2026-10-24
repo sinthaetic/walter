@@ -150,6 +150,8 @@
     $("readTitle").textContent = S.nums ? "WALTERS INSTÄLLNINGAR" : "WALTER LÄSER GRAFEN";
     const isDark = dark();
     $("theme").setAttribute("aria-label", isDark ? "Byt till ljust läge" : "Byt till mörkt läge");
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = isDark ? "#0A1216" : "#D7E0E3";
   }
   function normPair(v) {
     const p = v.trim().toUpperCase().replace(/[-_ ]/, "/");
@@ -187,6 +189,9 @@
   });
 
   // ---------- Start ----------
+  // Menyn börjar alltid till vänster, som på översikten (Safari kan annars minnas en sidledsrullning)
+  const navStart = () => document.querySelectorAll(".nav").forEach(n => { n.scrollLeft = 0; });
+  navStart(); window.addEventListener("pageshow", navStart);
   CC.mountCopy($("wc-copy"));
   if (!LC || !W || !CC) { setLive("GRAFEN KUNDE INTE LADDAS", "err"); return; }
   graph = CC.mount($("chart"), { view: S.view }); syncControls(); load(true);

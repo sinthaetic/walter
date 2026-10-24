@@ -1,0 +1,55 @@
+/* Sidhuvudet (logo, meny, ljust/mörkt) – samma fil för index.html och cipher.html,
+   så att toppen ser exakt likadan ut på båda sidorna. Färgerna (--ink, --glass …) kommer från sidans egen css. */
+
+.top { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding-inline: 56px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 32px; }
+.brand { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--ink); min-width: 0; }
+.brand .mark { width: 40px; height: 40px; flex: none; }
+.brand .mark-dark, [data-theme="dark"] .brand .mark-light { display: none; }
+[data-theme="dark"] .brand .mark-dark { display: block; }
+.brand .words { display: flex; flex-direction: column; gap: 6px; }
+.brand .word { font-size: 20px; font-weight: 500; letter-spacing: .62em; line-height: 1; }
+.brand .sub { font-size: 9px; font-weight: 400; letter-spacing: .9em; color: var(--teal); line-height: 1; }
+body.is-live .brand .sub { color: var(--red); }
+
+.nav {
+  display: flex; padding: 4px; border-radius: 16px; background: var(--glass);
+  border: 1px solid var(--glass-edge); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+}
+.nav a {
+  display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; white-space: nowrap;
+  border: 0; border-radius: 12px; background: transparent; color: var(--ink); text-decoration: none;
+  font-size: 11px; font-weight: 400; letter-spacing: .2em; cursor: pointer; transition: background-color .25s, color .25s;
+}
+.nav a[aria-current="page"] { background: var(--seg-bg); color: var(--seg-fg); }
+.nav .ext { color: var(--teal); }
+.top-right { display: flex; align-items: center; gap: 20px; }
+.stamp { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .24em; color: var(--muted); white-space: nowrap; }
+.round {
+  width: 48px; height: 48px; flex: none; border-radius: 50%; border: 1px solid var(--glass-edge); background: var(--glass);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; color: var(--ink);
+}
+.round .sun, [data-theme="dark"] .round .moon { display: none; }
+[data-theme="dark"] .round .sun { display: block; }
+
+@media (max-width: 1280px) {
+  .top { flex-wrap: wrap; }
+  /* Menyn rullar i sidled. Den börjar alltid till vänster (js nollställer scrollLeft), på båda sidorna. */
+  .nav { order: 3; width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { flex: 1; }
+}
+@media (max-width: 800px) {
+  .top { padding-inline: 16px; padding-top: 20px; gap: 14px; }
+  .brand .mark { width: 32px; height: 32px; }
+  .brand .word { font-size: 17px; letter-spacing: .62em; }
+  .brand .sub { font-size: 8px; }
+  .stamp { display: none; }
+  .round { width: 44px; height: 44px; }
+  .nav a { padding: 0 12px; font-size: 10px; letter-spacing: .14em; }
+}
+/* Pekskärmar: lättare glas */
+@media (hover: none), (pointer: coarse) {
+  .nav, .round { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+}

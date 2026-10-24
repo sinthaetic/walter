@@ -5,10 +5,11 @@
   "use strict";
 
   const MIN = 100, MAX = 100000000;
+  // En mening per rad (egen span), så att en rad aldrig börjar mitt i en mening
   const CARDS = [
-    "Jag är Walter. Jag läser marknaden varje dag – tio signaler, alltid samma regler.",
-    "Jag förvaltar åt dig: köper när läget är bra, vilar när det stormar. Aldrig mer än 75 % investerat.",
-    "Jag rör inga riktiga pengar. Det kan jag inte än. Vi börjar med låtsaspengar, tills du är redo."
+    ["Jag är Walter.", "Jag läser marknaden varje dag – tio signaler, alltid samma regler."],
+    ["Jag förvaltar åt dig: köper när läget är bra, vilar när det stormar.", "Aldrig mer än 75 % investerat."],
+    ["Jag rör inga riktiga pengar.", "Det kan jag inte än.", "Vi börjar med låtsaspengar, tills du är redo."]
   ];
   const NO_STORAGE = "Din webbläsare låter mig inte spara. Allt försvinner när du stänger fliken.";
   const COUNTRY = { AT: "Österrike", IE: "Irland", LU: "Luxemburg", MT: "Malta", SE: "Sverige" };
@@ -77,8 +78,9 @@
     body.textContent = "";
     dots();
     if (step < 3) {
-      const h = heading(CARDS[step]);
+      const h = heading();
       h.classList.add("card-text");
+      CARDS[step].forEach((t, i) => { if (i) h.append(" "); h.appendChild(el("span", "line", t)); });
       body.appendChild(h);
       const row = el("div", "i-actions");
       row.appendChild(button("Hoppa över", "i-btn ghost", () => go(3)));

@@ -72,6 +72,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 
 ## W-Cipher (`cipher.html`)
 - Egen sida: `js/wcipher.js` (ren matte, inga DOM-anrop) + `js/cipher-app.js` (börser, graf, text) + `css/cipher.css` (nya designen).
+- Sidhuvudet (logo, meny, ljust/mörkt) är samma fil på båda sidorna: `css/top.css`. Ändra toppen där, inte i walter.css/cipher.css.
 - Hämtar ljus direkt i webbläsaren från Binance/Coinbase/Kraken/Bybit/OKX, ritar med Lightweight Charts 5.0.0 (unpkg, med integrity-hash).
 - Samma parametrar finns i `tradingview/*.pine`. Ändras en parameter ska båda ändras.
 - W-Cipher ändrar ALDRIG Walters läge. Egen kod från öppna formler – kopiera inte VuManChu-kod.
@@ -98,6 +99,7 @@ yfinance (^IXIC ^GSPC ^VIX DX-Y.NYB), FRED DGS10, Coin Metrics Community (MVRV-Z
 - Lugn rörelse: ljussvep, andande ljusring, lampor med sken. Respektera prefers-reduced-motion.
 - Lägen för användaren: Vilar / Avvaktar / Köper lite / Köper (aldrig "all in", max 75 % investerat).
 - Fasta höjder där innehåll byts, så att inget hoppar.
+- Mobil: fält (input/select/textarea) minst 16 px på pekskärm (annars zoomar Safari), aldrig bredare än skärmen. Korta påståenden: en mening per rad.
 - INTE Kraken Pro order book.
 - Notiser skrivs till en vanlig människa, inte en siffervägg. Siffror får ligga bakom "Siffrorna".
 

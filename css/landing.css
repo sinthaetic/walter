@@ -229,3 +229,11 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
   #landing .frost, #intro .frost { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
   #landing .l-theme, #intro .l-theme { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 }
+
+/* Text: en mening per rad i introts rutor och landningens rad, aldrig ett radbryt mitt i en mening som ser fel ut */
+#intro .i-head.card-text { flex-direction: column; justify-content: center; }
+#intro .i-head .line, #landing .tag span { display: block; }
+#intro .i-head .line + .line { margin-top: .25em; }
+#intro .i-head, #landing .tag, #intro .i-hint, #intro .i-warn { text-wrap: balance; }
+#intro .i-mark .dot { fill: var(--teal); animation: l-breathe 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { #intro .i-mark .dot { animation: none; } }
