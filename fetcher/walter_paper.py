@@ -693,8 +693,8 @@ def auto(wf, today=None, say=lambda s: None):
     if raw is None:
         say("Hittar inte data/state.json – Walter handlar inte.")
         return None
-    last = (raw.get("journal") or [None])[0] or {}
-    if last.get("date") == today and last.get("auto"):
+    # Vilken journalpost som helst från i dag med auto (en insättning kan ligga överst)
+    if any(isinstance(e, dict) and e.get("date") == today and e.get("auto") for e in raw.get("journal") or []):
         say(f"Walter har redan handlat själv i dag ({today}).")
         return None
     prop = propose(rebuild(wf), today=today)
@@ -709,7 +709,10 @@ def auto(wf, today=None, say=lambda s: None):
     entry["auto"] = True
     walter_vault._write_atomic(wf.BASE, json.dumps(raw, indent=2, ensure_ascii=False) + "\n")
     walter_vault.lock_state(code, wf.BASE, walter_vault.ENC)
-    wf.write_js(rebuild(wf))
+    after = rebuild(wf)
+    wf.write_js(after)
+    if prop.get("savings"):  # månadssparandet: dagens värde efter insättningen (Sharpe, se set_daily)
+        set_daily(wf, today, (after.get("portfolio") or {}).get("value"))
     say(f"Walter handlade själv: {entry['plain']}")
     # Rad för Actionens commit-meddelande: handlade (affär), koll (autopilotens koll) eller läge (bara läget).
     say("WALTER_COMMIT=" + ("handlade" if prop["trades"] else "koll" if entry.get("check") else "läge"))
@@ -751,9 +754,28 @@ def deposit_cli(wf, text, today=None, say=print):
     entry = apply_deposit(raw, propose_deposit(built, today, sek), today)
     walter_vault._write_atomic(wf.BASE, json.dumps(raw, indent=2, ensure_ascii=False) + "\n")
     walter_vault.lock_state(code, wf.BASE, walter_vault.ENC)
-    wf.write_js(rebuild(wf))
+    after = rebuild(wf)
+    wf.write_js(after)
+    set_daily(wf, today, (after.get("portfolio") or {}).get("value"))
     say(f"Klart. {entry['plain']}")
+    # Direkt till main, så att Walter i Actionen aldrig handlar på en state.enc utan insättningen
+    import walter_deploy
+    if walter_deploy.push_source(f"Insättning {num(sek)} kr {today}"):
+        say("Den låsta state.enc är pushad till main – Walter i GitHub ser insättningen.")
+    else:
+        say("OBS: state.enc kom INTE upp till main (se ovan). Walter i GitHub ser inte insättningen förrän du "
+            "kör 'walter deploy' eller git push – gör det innan Walter handlar nästa gång.")
     return entry
+
+
+def set_daily(wf, today, value):
+    """Dagens portföljvärde i owner-cache (för Sharpe) efter en insättning. Annars står dagen kvar med värdet
+    FÖRE insättningen medan flödet räknas bort, och Sharpe får en låtsad förlust (och vinst dagen efter)."""
+    if not isinstance(value, (int, float)):
+        return
+    owner = wf.read_json(wf.OWNER_CACHE, {}) or {}
+    owner.setdefault("daily", {})[today] = value
+    walter_vault._write_atomic(wf.OWNER_CACHE, json.dumps(owner, indent=2, ensure_ascii=False))
 
 
 def main():
@@ -768,8 +790,8 @@ def main():
         rest = sys.argv[sys.argv.index("--insattning") + 1:]
         text = " ".join(rest) if rest else input("Hur mycket vill du sätta in (kr)? ")
         if deposit_cli(wf, text):
-            print("\nPAPER – inga riktiga pengar flyttas. Kör nu 'walter deploy' så att Walter i GitHub "
-                  "och sidan ser insättningen.")
+            print("\nPAPER – inga riktiga pengar flyttas. Kör 'walter deploy' när du vill se insättningen "
+                  "på sidan och i mobilen.")
         return
     # Walter kan ha handlat i Actionen – hämta det först. Är läget oklart handlas inget manuellt,
     # så att ett JA aldrig skriver över en state.enc med Walters egen affär.

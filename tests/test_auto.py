@@ -44,7 +44,9 @@ class AutoTest(unittest.TestCase):
         self.state, self.enc = d / "state.json", d / "state.enc"
         self.state.write_text(json.dumps(raw_state()), encoding="utf-8")
         self.built = []
-        self.patches = [patch.object(wf, "BASE", self.state), patch.object(v, "ENC", self.enc),
+        self.owner = d / "owner-cache.json"
+        self.patches = [patch.object(wf, "OWNER_CACHE", self.owner),
+                        patch.object(wf, "BASE", self.state), patch.object(v, "ENC", self.enc),
                         patch.object(v, "STATE", self.state),
                         patch.object(v, "owner_key", lambda: KEY),
                         patch.object(wpaper, "rebuild", lambda w: {"built": True}),
@@ -60,6 +62,26 @@ class AutoTest(unittest.TestCase):
     def run_auto(self, prop):
         with patch.object(wpaper, "propose", lambda s, **k: prop):
             return wpaper.auto(wf, today=TODAY)
+
+    def test_once_per_day_looks_past_a_deposit_on_top(self):
+        # En insättning (inte auto) kan ligga överst – dagens automatiska affär finns ändå: ingen ny
+        raw = raw_state()
+        raw["journal"] = [{"date": TODAY, "plain": "Insättning: 500 kr in.", "deposit": {"sek": 500}},
+                          {"date": TODAY, "plain": "handlade", "auto": True}] + raw["journal"]
+        self.state.write_text(json.dumps(raw), encoding="utf-8")
+        self.assertIsNone(self.run_auto(proposal()))
+        self.assertFalse(self.enc.exists())
+
+    def test_savings_day_sets_daily_after_deposit(self):
+        prop = dict(proposal(), savings={"months": ["2026-10"], "eachSek": 100.0, "sek": 100.0,
+                                         "valueBefore": 1000.0, "trades": [], "waiting": []})
+        with patch.object(wpaper, "rebuild", lambda w: {"portfolio": {"value": 1099.5}}):
+            self.run_auto(prop)
+        self.assertEqual(json.loads(self.owner.read_text(encoding="utf-8"))["daily"], {TODAY: 1099.5})
+
+    def test_no_savings_leaves_daily_alone(self):
+        self.run_auto(proposal())
+        self.assertFalse(self.owner.exists())
 
     def test_trades_and_marks_auto_and_locks(self):
         entry = self.run_auto(proposal())

@@ -1130,8 +1130,8 @@
         <h2 id="dep-title">SÄTT IN PENGAR</h2>
         <p>Din Walter ligger i data/state.json, och sidan kan inte skriva där. Gör så här på datorn:</p>
         <ol class="dep-steps">
-          <li><b>insattning.bat</b><span>Dubbelklicka och skriv beloppet. Walter hämtar sina affärer först och köper direkt till dagens priser.</span></li>
-          <li><b>walter deploy</b><span>Skickar den låsta state.enc till main, så att Walter i GitHub och sidan ser insättningen.</span></li>
+          <li><b>insattning.bat</b><span>Dubbelklicka och skriv beloppet. Walter hämtar sina affärer först, köper direkt till dagens priser och skickar den låsta state.enc till main.</span></li>
+          <li><b>walter deploy</b><span>Publicerar sidan, så att du ser insättningen här och i mobilen.</span></li>
         </ol>
         ${honest}
         <div class="form-actions"><button type="submit" value="cancel" class="btn btn-primary">STÄNG</button></div>
@@ -1145,17 +1145,21 @@
     }));
     if (!isUser) return;
     $("dep-cancel").addEventListener("click", () => dlg.close());
-    // Enter i fältet och SÄTT IN skickar formuläret (AVBRYT är ingen submit-knapp)
-    $("dep-form").addEventListener("submit", (e) => {
+    // Enter i fältet och SÄTT IN skickar formuläret (AVBRYT är ingen submit-knapp).
+    // En gång: knappen är låst tills sidan laddats om, och släpps bara om insättningen inte blev av.
+    const okBtn = $("dep-form").querySelector('button[type="submit"]');
+    $("dep-form").addEventListener("submit", once((e) => {
       e.preventDefault();
+      const fail = (t) => { msg.textContent = t; input.focus(); return false; };
       const user = U.load();
-      if (!user) { msg.textContent = "Jag hittar ingen sparad Walter att sätta in i."; return; }
+      if (!user) return fail("Jag hittar ingen sparad Walter att sätta in i.");
       const res = U.deposit(user, input.value, window.WALTER_MARKET, isoToday);
-      if (!res.ok) { msg.textContent = res.msg; input.focus(); return; }
-      if (!U.save(user)) { msg.textContent = "Din webbläsare låter mig inte spara."; return; }
+      if (!res.ok) return fail(res.msg);
+      if (!U.save(user)) return fail("Din webbläsare låter mig inte spara.");
       store.set(DEP_NOTE, res.msg, "sessionStorage");
       location.reload();
-    });
+      return true;
+    }, (busy) => { okBtn.disabled = busy; }));
   })();
 
   // ---------- Uttag: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
@@ -1430,6 +1434,7 @@
 
   // Insättningar = startkapital + manuella påfyllningar (capitalChange.manualTopUp) + månadssparandet och
   // "Sätt in pengar" (historikrader med note "månadssparande" / "insättning"). Insättningar är aldrig vinst.
+  // (state.json → arkiv läses aldrig av appen; där finns en gammal "insättning"-rad bredvid manualTopUp.)
   const FLOW_NOTES = ["månadssparande", "insättning"];
   function gain(pf) {
     const savedIn = (pf.history || []).reduce((t, h) => t + (h && FLOW_NOTES.includes(h.note) && h.flow > 0 ? h.flow : 0), 0);
@@ -1439,5 +1444,20 @@
     return { topUp, deposits, marketGain, marketPct: deposits > 0 ? (marketGain / deposits) * 100 : 0 };
   }
 
-  window.WalterApp = { start, keyFor, isUserKey, gain };
+  // Kör fn högst en gång i taget: medan den kör, och efter att den lyckats (true), ignoreras nya anrop.
+  // false = misslyckades, då släpps låset. setBusy(true/false) låser/släpper knappen.
+  function once(fn, setBusy) {
+    let busy = false;
+    return (...args) => {
+      if (busy) { if (args[0] && args[0].preventDefault) args[0].preventDefault(); return; }
+      busy = true;
+      if (setBusy) setBusy(true);
+      let ok = false;
+      try { ok = fn(...args) === true; } finally {
+        if (!ok) { busy = false; if (setBusy) setBusy(false); }
+      }
+    };
+  }
+
+  window.WalterApp = { start, keyFor, isUserKey, gain, once };
 })();

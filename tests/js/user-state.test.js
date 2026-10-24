@@ -409,3 +409,18 @@ test("import_rejects_bad_pending_deposit", () => {
   try { WU().importText(JSON.stringify(u)); } catch (e) { threw = true; }
   eq(threw, true);
 });
+
+test("deposit_stale_dated_in_market_timeline", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    u.lastDay = "2026-10-25";
+    WU().deposit(u, "500", m, "2026-10-30"); // webbläsaren säger 30 okt, Walters senaste dag är 25 okt
+    const h = u.portfolio.history;
+    eq(h[h.length - 1].date, "2026-10-25");
+    eq(u.journal[0].date, "2026-10-25");
+    eq(h.map((x) => x.date).slice().sort(), h.map((x) => x.date)); // datumordning
+  } finally { window.WALTER_MARKET = saved; }
+});

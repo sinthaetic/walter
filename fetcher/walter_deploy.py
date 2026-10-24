@@ -229,23 +229,35 @@ def current_branch():
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
-def push_source():
+def push_source(message=None):
     """Lokalt: commit + push av den låsta state.enc till main. Actionen gör aldrig detta.
     Pushar uttryckligen HEAD:main, och bara när main är utcheckad – annars hamnar journalen på fel gren
-    (eller en ogranskad gren på main)."""
+    (eller en ogranskad gren på main). Committar bara data/state.enc, aldrig annat som råkar vara stage:at.
+    Returnerar True när main har den nya state.enc (pushad), annars False (varningen säger varför)."""
     if os.environ.get("GITHUB_ACTIONS") or not (ROOT / ".git").exists():
-        return
+        return False
     branch = current_branch()
     if branch != "main":
         warn(f"Du står på grenen '{branch}', inte main – state.enc committas och pushas inte. "
              "Byt till main (git switch main) och kör walter deploy igen, annars kör Actionen med förra journalen.")
-        return
+        return False
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     subprocess.run(["git", "add", "data/state.enc"], cwd=ROOT)
-    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode:
-        subprocess.run(["git", "commit", "-q", "-m", f"journal {stamp}"], cwd=ROOT)
+    if subprocess.run(["git", "diff", "--cached", "--quiet", "--", "data/state.enc"], cwd=ROOT).returncode:
+        subprocess.run(["git", "commit", "-q", "-m", message or f"journal {stamp}", "--", "data/state.enc"], cwd=ROOT)
     if subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=ROOT).returncode:
         warn("Kunde inte pusha state.enc till main – Actionen kör med förra journalen tills du kör git push.")
+        return False
+    return True
+
+
+SYNC_STOP = {
+    "pullfail": "Stoppat: kunde inte hämta main (git pull). Walter kan ha handlat i GitHub sedan sist. "
+                "Kör git status, reda ut det och kör walter deploy igen. Inget publicerat.",
+    "local": "Stoppat: din state.json har ändringar som är nyare än Walters låsta state.enc. Välj själv: "
+             "'python fetcher/walter_vault.py las' (dina ändringar gäller) eller 'las-upp' (Walters gäller), "
+             "kör sedan walter deploy igen. Inget publicerat.",
+}
 
 
 def check_publish_config(code, repo):
@@ -275,7 +287,11 @@ def main():
     os.system("")  # tom sträng, bara för att slå på färger (ANSI) i Windows-terminalen
     load_env()
     print("WALTER deploy …")
-    walter_vault.sync_from_repo()  # före lock_if_changed: Walters egna affärer från Actionen först
+    # Före lock_if_changed: Walters egna affärer från Actionen först. Oklart läge = inget publiceras,
+    # annars kan en lokal state.json skriva över Walters affär i state.enc.
+    synced = walter_vault.sync_from_repo()
+    if synced in SYNC_STOP:
+        sys.exit(SYNC_STOP[synced])
     code = walter_vault.owner_key()
     repo = os.environ.get("WALTER_PAGES_REPO", "").strip()
     if repo and not shutil.which("git"):

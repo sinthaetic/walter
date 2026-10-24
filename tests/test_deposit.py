@@ -13,6 +13,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "fetcher"))
 sys.path.insert(0, str(ROOT / "tests"))
+import walter_deploy as wd  # noqa: E402
 import walter_fetch as wf  # noqa: E402
 import walter_paper as wp  # noqa: E402
 import walter_vault as v  # noqa: E402
@@ -94,9 +95,14 @@ class DepositCliTest(unittest.TestCase):
         d = Path(self.tmp.name)
         self.state, self.enc = d / "state.json", d / "state.enc"
         self.state.write_text(json.dumps(raw_of(on_weights())), encoding="utf-8")
-        self.built, self.synced = [], []
+        self.owner = d / "owner-cache.json"
+        self.owner.write_text(json.dumps({"daily": {FRIDAY: 99999.0, "2026-10-22": 100000.0}}), encoding="utf-8")
+        self.built, self.synced, self.pushed = [], [], []
         built = lambda w: dict(state(on_weights()), fetchedAt="2026-10-23T08:13:00+02:00")  # noqa: E731
-        self.patches = [patch.object(wf, "BASE", self.state), patch.object(v, "ENC", self.enc),
+        # push_source är ALLTID mockad här: ett test får aldrig committa eller pusha på riktigt
+        self.patches = [patch.object(wd, "push_source", lambda m=None: self.pushed.append(m) or True),
+                        patch.object(wf, "OWNER_CACHE", self.owner),
+                        patch.object(wf, "BASE", self.state), patch.object(v, "ENC", self.enc),
                         patch.object(v, "STATE", self.state), patch.object(v, "owner_key", lambda: KEY),
                         patch.object(v, "sync_from_repo", lambda: self.synced.append(1) or "same"),
                         patch.object(wp, "rebuild", built),
@@ -127,6 +133,17 @@ class DepositCliTest(unittest.TestCase):
         self.assertEqual(v.decrypt(json.loads(self.enc.read_text(encoding="utf-8")), KEY), raw)
         self.assertEqual(len(self.built), 1)
         self.assertIn("Klart.", out)
+        # Pushad direkt, och dagens värde i owner-cache är värdet efter insättningen (Sharpe)
+        self.assertEqual(self.pushed, ["Insättning 500 kr 2026-10-23"])
+        self.assertIn("pushad till main", out)
+        daily = json.loads(self.owner.read_text(encoding="utf-8"))["daily"]
+        self.assertEqual(daily, {FRIDAY: 100000, "2026-10-22": 100000.0})
+
+    def test_push_failure_said_clearly(self):
+        with patch.object(wd, "push_source", lambda m=None: False):
+            entry, out = self.run_cli("500")
+        self.assertIsNotNone(entry)  # insättningen står lokalt och i state.enc
+        self.assertIn("state.enc kom INTE upp till main", out)
 
     def test_minimum_enforced_nothing_written(self):
         before = self.state.read_text(encoding="utf-8")
@@ -137,6 +154,7 @@ class DepositCliTest(unittest.TestCase):
         self.assertEqual(self.state.read_text(encoding="utf-8"), before)
         self.assertFalse(self.enc.exists())
         self.assertEqual(self.synced, [])
+        self.assertEqual(self.pushed, [])
 
     def test_stale_prices_or_unclear_sync_nothing_written(self):
         before = self.state.read_text(encoding="utf-8")
@@ -159,6 +177,49 @@ class DepositCliTest(unittest.TestCase):
         self.assertEqual(raw["portfolio"]["holdings"]["CASH"], 26000.0)
         self.assertEqual(raw["portfolio"]["positions"]["BTC"]["costSek"], 35000)
         self.assertIn("lamp-strategin", entry["plain"])
+
+
+class PushSourceTest(unittest.TestCase):
+    """walter_deploy.push_source med mockad git: bara main, bara data/state.enc, säger till när pushen faller."""
+    def run_push(self, branch="main", push_rc=0, staged=True):
+        calls = []
+
+        def run(cmd, cwd=None, **k):
+            calls.append(cmd)
+            rc = 1 if cmd[1:3] == ["diff", "--cached"] and staged else push_rc if cmd[1] == "push" else 0
+            return type("R", (), {"returncode": rc})()
+        with patch.object(wd.subprocess, "run", run), patch.object(wd, "current_branch", lambda: branch), \
+                patch.object(wd, "warn") as warn, patch.dict("os.environ", {"GITHUB_ACTIONS": ""}):
+            ok = wd.push_source("Insättning 500 kr 2026-10-23")
+        return ok, calls, warn
+
+    def test_commits_only_state_enc_and_pushes_main(self):
+        ok, calls, _ = self.run_push()
+        self.assertTrue(ok)
+        self.assertIn(["git", "commit", "-q", "-m", "Insättning 500 kr 2026-10-23", "--", "data/state.enc"], calls)
+        self.assertEqual(calls[-1], ["git", "push", "-q", "origin", "HEAD:main"])
+
+    def test_push_failure_returns_false(self):
+        ok, _, warn = self.run_push(push_rc=1)
+        self.assertFalse(ok)
+        self.assertIn("Kunde inte pusha", warn.call_args[0][0])
+
+    def test_not_main_never_pushes(self):
+        ok, calls, _ = self.run_push(branch="feature")
+        self.assertFalse(ok)
+        self.assertEqual(calls, [])
+
+
+class DeploySyncGuardTest(unittest.TestCase):
+    def test_stops_on_pullfail_or_local(self):
+        for res, word in (("pullfail", "kunde inte hämta main"), ("local", "nyare än Walters låsta")):
+            with patch.object(wd, "load_env"), patch.object(v, "sync_from_repo", lambda r=res: r), \
+                    patch.object(wd, "build_state") as build, patch.object(wd, "push_source") as push, \
+                    patch.object(wd, "lock_if_changed") as lock:
+                with self.assertRaises(SystemExit) as cm:
+                    wd.main()
+            self.assertIn(word, str(cm.exception.code))
+            build.assert_not_called(); push.assert_not_called(); lock.assert_not_called()
 
 
 class FixtureTest(unittest.TestCase):

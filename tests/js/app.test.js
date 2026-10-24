@@ -23,3 +23,20 @@ test("app_gain_excludes_flows", () => {
   eq([g.topUp, g.deposits, g.marketGain], [1500, 2500, 100]);
   eq(Math.round(g.marketPct * 100) / 100, 4);
 });
+
+// SÄTT IN skickas en gång: dubbelklick/dubbel-Enter ger en insättning; ett misslyckat försök släpper låset
+test("app_once_blocks_double_submit", () => {
+  let runs = 0, busy = [];
+  const f = window.WalterApp.once(() => { runs++; return true; }, (b) => busy.push(b));
+  f(); f(); f();
+  eq(runs, 1);
+  eq(busy, [true]); // låst tills sidan laddas om
+  let tries = 0;
+  const g = window.WalterApp.once(() => { tries++; return false; }, (b) => busy.push(b));
+  g(); g();
+  eq(tries, 2);
+  let reenter = 0;
+  const h = window.WalterApp.once(() => { reenter++; h(); return false; });
+  h();
+  eq(reenter, 1); // ett anrop medan den kör ignoreras
+});

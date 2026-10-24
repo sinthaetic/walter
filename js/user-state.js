@@ -170,7 +170,9 @@
     const iso = day || today();
     const fresh = isFresh(now, iso) && isDate(now.date) && now.date >= user.startDate;
     const prop = E.proposeDeposit(user, now, now.rules, exchange, sek, fresh ? {} : { stale: true });
-    const entry = E.applyDeposit(user, prop, fresh ? now.date : iso);
+    // Datum i Walters egen tidslinje (marknadsdagar), aldrig webbläsarens: historiken håller datumordning
+    const date = [user.lastDay, now.date].filter(isDate).sort().pop() || iso;
+    const entry = E.applyDeposit(user, prop, date);
     if (prop.deposit.stale) user.pendingDeposit = E.round((user.pendingDeposit || 0) + sek, 2);
     return { ok: true, sek, entry, msg: entry.plain };
   }
