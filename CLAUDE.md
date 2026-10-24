@@ -50,7 +50,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - `portfolio.history`: insättningar får `"flow": belopp`, paper-testet före start får `"test": true`. Avkastning räknas utan flows.
 
 ## Publicering och ägare
-- Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `data/market.js`, `data/cache.json`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.
+- Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `tradingview/`, `data/market.js`, `data/cache.json`, `data/pulse.js`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.
 - Utan Secret `WALTER_OWNER_KEY` hoppar Actionen över hämtning och publicering (sidan ligger kvar som den var).
 - Lokal deploy slår först ihop publicerade `owner.enc` (dagsvärden) och vägrar korta historiken. `WALTER_GLOM_GAMLA_DAGAR=1` är nödutgången vid kodbyte: lägg den ALDRIG i `.env`.
 - Boot (`js/boot.js`): `data/state.js` finns → ägare lokalt. Annars `walter.ownerKey` i localStorage (skrivs in under Inställningar) → dekryptera `owner.enc` → ägarens Walter. Annars landning (`js/landing.js`) → användarens Walter eller intro (`js/intro.js`).
@@ -68,6 +68,17 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Hämtar ljus direkt i webbläsaren från Binance/Coinbase/Kraken/Bybit/OKX, ritar med Lightweight Charts 5.0.0 (unpkg, med integrity-hash).
 - Samma parametrar finns i `tradingview/*.pine`. Ändras en parameter ska båda ändras.
 - W-Cipher ändrar ALDRIG Walters läge. Egen kod från öppna formler – kopiera inte VuManChu-kod.
+- Grafen är en modul: `js/cipher-chart.js` (`WalterCipherChart`: börser, `fetchBars`, `mount(el, opts)` -> setBars/setView/setExtras,
+  `legendHTML`, `mountCopy`; API i filhuvudet) + färgerna i `css/cipher-chart.css`. `js/cipher-app.js` är bara cipher-sidans kontroller och text.
+  Ändra ritningen i modulen, aldrig i två kopior.
+- Översikten (index.html, under hjälten, alla tittare) visar samma graf i CIPHER-läget: BTC, DAG som standard (4 TIM/DAG/VECKA),
+  börsen = användarens om grafen har den (Kraken, Bybit EU -> Bybit, OKX Europe -> OKX), ägarens Kraken, annars Binance. Plus Walters egna:
+  rutan WALTERS LAMPOR (5 − röda, grönt över noll / rött under, bara DAG/VECKA) och Walters affärer ur journalen
+  (teal "W KÖPTE"/"W SÅLDE", liten prick = söndagskoll utan affär).
+- `data/pulse.js` (`window.WALTER_PULSE = [[datum, röda]]`) = lamporna bakåt i tiden, byggd av `python -m backtest.pulse`
+  (backtest/lamps.py, närmaste avrundning, från första dagen med minst 4 lampor). Committad, publik. Nya dagar kommer från
+  market.js `log` i webbläsaren (loggen vinner samma dag), så filen behöver bara byggas om för att förlänga historiken.
+- "Kopiera till TradingView" (cipher.html och översikten) kopierar `tradingview/w-cipher.pine` (eller `w-cipher-a.pine`) och visar tre steg.
 
 ## Data (bara gratis)
 yfinance (^IXIC ^GSPC ^VIX DX-Y.NYB), FRED DGS10, Coin Metrics Community (MVRV-Z), BGeometrics (SOPR, reserv för MVRV-Z), bykaranteli (ETF-flöden), CoinGecko. Inga dyra API:er.

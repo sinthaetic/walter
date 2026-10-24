@@ -273,6 +273,60 @@
     $("candles").innerHTML = '<span class="small">Kunde inte hämta bitcoin-ljus just nu. Väntar på data.</span>';
   })();
 
+  // ---------- W-Cipher under hjälten ----------
+  // Samma graf som cipher.html i CIPHER-läget (js/cipher-chart.js), plus Walters lampor (data/pulse.js + market.js-loggen)
+  // och Walters affärer ur journalen. Börsen: användarens om grafen har den, ägarens Kraken, annars W-Cipherns standard.
+  (() => {
+    const CC = window.WalterCipherChart, el = $("wc-chart");
+    if (!el || !CC) return;
+    $("wc-copy") && CC.mountCopy($("wc-copy"));
+    if (!window.LightweightCharts || !window.WCipher) { $("wc-live").textContent = "GRAFEN KUNDE INTE LADDAS"; return; }
+    const CHART_EX = { kraken: "kraken", "bybit-eu": "bybit", "okx-europe": "okx" };
+    const exId = isUser ? (ex && CHART_EX[ex.id]) || "binance" : "kraken";
+    const pair = "BTC/" + CC.EX[exId].quote;
+    const exName = { binance: "Binance", kraken: "Kraken", bybit: "Bybit", okx: "OKX", coinbase: "Coinbase" }[exId];
+    const pulse = CC.mergePulse(window.WALTER_PULSE, (window.WALTER_MARKET && window.WALTER_MARKET.log) || []);
+    const trades = CC.tradeMarks(S.journal);
+    const extras = { pulse: pulse.length ? pulse : null, trades: trades.length ? trades : null };
+    const TF_KEY = "walterOverviewTf";
+    let tf = store.get(TF_KEY, "1D");
+    if (!["4h", "1D", "1W"].includes(tf)) tf = "1D";
+    if (el._wc) el._wc.destroy();
+    const graph = el._wc = CC.mount(el, { view: "cipher", wavePane: 0.32, pulsePane: 64 });
+    graph.setExtras(extras);
+    const legend = () => {
+      // Samma rader på alla tidsramar (lamprutan syns bara på DAG/VECKA), så att panelen aldrig hoppar
+      $("wc-legend").innerHTML = CC.legendHTML("cipher", extras);
+    };
+    const sync = () => document.querySelectorAll("#wc-tf button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tf === tf)));
+    let loading = 0;
+    const load = async (reset) => {
+      const my = ++loading;
+      if (reset) $("wc-live").textContent = "HÄMTAR …";
+      try {
+        const bars = await CC.fetchBars(exId, pair, tf);
+        if (my !== loading) return;
+        graph.setBars(bars, tf, reset);
+        legend();
+        $("wc-live").textContent = `${pair} · ${exName.toUpperCase()} · ${new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
+      } catch (e) {
+        if (my !== loading) return;
+        $("wc-live").textContent = "KUNDE INTE HÄMTA · " + exName.toUpperCase();
+        if (reset) graph.clear();
+      }
+    };
+    $("wc-tf").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-tf]");
+      if (!b || b.dataset.tf === tf) return;
+      tf = b.dataset.tf; store.set(TF_KEY, tf); sync(); load(true);
+    });
+    // Ljust/mörkt byts av knappen i toppen: läs om färgerna
+    new MutationObserver(() => { graph.applyTheme(); graph.redraw(); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    sync(); legend(); load(true);
+    setInterval(() => { if (!document.hidden && !$("view-oversikt").hidden) load(false); }, 60000);
+  })();
+
   // ---------- Tio lampor ----------
   // Förklaringar i vanliga ord (under varje lampa på översikten och i Pro-fliken)
   const EXPLAIN = {

@@ -104,8 +104,8 @@ Varje dag kl **08:13** och **22:05** (svensk tid) hämtar WALTER färskt och skr
 
 ## Säkerhet
 
-- Bara `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `data/market.js`, `data/cache.json` och
-  `data/owner.enc` (krypterad) kopieras till `deploy/`. Aldrig `state.js`, `state.json` eller `reports/`.
+- Bara `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `tradingview/`, `data/market.js`, `data/cache.json`,
+  `data/pulse.js` och `data/owner.enc` (krypterad) kopieras till `deploy/`. Aldrig `state.js`, `state.json` eller `reports/`.
 - **Läckspärren** går igenom `deploy/` före varje publicering. Står `journal`, `portfolio`, `k4`,
   `capitalChange`, `daily`, `notis`, `proposal` eller `WALTER_OWNER_KEY` okrypterat i `deploy/data/`
   (utom i `owner.enc`), eller finns `state.js`, `reports/`, `.env`, `etf_raw.json` med, stoppas allt.

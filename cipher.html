@@ -7,6 +7,7 @@
   <link rel="icon" href="assets/logo/vald/walter-favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/cipher-chart.css">
   <link rel="stylesheet" href="css/cipher.css">
   <script>try { if (localStorage.getItem("walterDark") === "1") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
 </head>
@@ -86,7 +87,7 @@
           <span>NEDRE GRAFEN: VÅGEN · PENGAFLÖDE <em>CIPHER B</em></span>
           <span id="oscNow" class="num"></span>
         </div>
-        <ul class="legend" id="legend"></ul>
+        <ul class="wc-legend" id="legend"></ul>
       </section>
 
       <aside class="side">
@@ -115,6 +116,8 @@
       </aside>
     </div>
 
+    <section class="panel wc-copy-panel" aria-label="Kopiera till TradingView"><div id="wc-copy"></div></section>
+
     <footer class="foot">
       <p>Signalerna är vad indikatorn visar, inte råd. W-Cipher ändrar aldrig Walters läge – det gör bara lamporna och journalen. Går du in när Walter vilar gör du det på egen hand.</p>
       <p>
@@ -129,6 +132,7 @@
   <script src="data/state.js"></script>
   <script src="https://unpkg.com/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.js" integrity="sha384-/z0wnnyAhUnLX5YRrxljPlJlhJPGIOuhRU9kt785gf9AUeh8YsG8O6oxSE2sTS9m" crossorigin="anonymous"></script>
   <script src="js/wcipher.js"></script>
+  <script src="js/cipher-chart.js"></script>
   <script src="js/cipher-app.js"></script>
 </body>
 </html>

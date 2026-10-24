@@ -28,7 +28,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "deploy"
 OWNER_ENC = ROOT / "data" / "owner.enc"
-ALLOW = ["index.html", "cipher.html", "css", "js", "assets", "data/market.js", "data/cache.json", "data/owner.enc"]
+# tradingview/ = Pine-skripten (knappen "Kopiera till TradingView"); data/pulse.js = lampornas historik (backtest/pulse.py)
+ALLOW = ["index.html", "cipher.html", "css", "js", "assets", "tradingview", "data/market.js", "data/cache.json", "data/pulse.js",
+         "data/owner.enc"]
 # extra spärr om någon lägger något fel i en tillåten mapp
 BLOCK = {".env", "etf_raw.json", "state.json", "state.js", "owner-cache.json", "paper-journal-*.csv"}
 # ord som bara finns i ägarens data – får aldrig stå okrypterat i deploy/data/

@@ -3,6 +3,7 @@ import sys
 import tempfile
 import io
 import os
+import shutil
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -84,8 +85,17 @@ class OwnerEncTest(unittest.TestCase):
         self.assertEqual(out, {"state": {}, "daily": {}, "notis": None})
 
     def test_allow_has_no_private_files(self):
-        self.assertEqual(wd.ALLOW, ["index.html", "cipher.html", "css", "js", "assets",
-                                    "data/market.js", "data/cache.json", "data/owner.enc"])
+        self.assertEqual(wd.ALLOW, ["index.html", "cipher.html", "css", "js", "assets", "tradingview",
+                                    "data/market.js", "data/cache.json", "data/pulse.js", "data/owner.enc"])
+
+    def test_pulse_js_passes_leak_check(self):
+        """data/pulse.js (bara datum och heltal) är tillåten och stoppas inte av läckspärren."""
+        self.assertIn("data/pulse.js", wd.ALLOW)
+        pulse = ROOT / "data" / "pulse.js"
+        with tempfile.TemporaryDirectory() as t:
+            (Path(t) / "data").mkdir()
+            shutil.copy2(pulse, Path(t) / "data" / "pulse.js")
+            self.assertEqual(wd.leak_check(t), [])
 
 
 class MergeOwnerTest(unittest.TestCase):

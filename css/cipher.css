@@ -8,13 +8,9 @@
   --line: rgba(20, 34, 42, 0.14);
   --glass: rgba(255, 255, 255, 0.42); --glass-edge: rgba(255, 255, 255, 0.75);
   --fog: rgba(160, 200, 208, 0.55); --fog2: rgba(255, 255, 255, 0.7);
-  --teal: #17808D; --red: #B0203A; --green: #1E8460; --gold: #9A6A00; --blurple: #4B3BF0;
+  --teal: #17808D; --red: #B0203A; --green: #1E8460; --blurple: #4B3BF0;
   --seg-bg: #14222A; --seg-fg: #E9EEF0;
-  /* grafen */
-  --c-up: #17808D; --c-down: #4A5B63; --c-band: rgba(23, 128, 141, 0.22);
-  --c-wave: rgba(23, 128, 141, 0.22); --c-mfi: rgba(20, 34, 42, 0.10);
-  --c-wt1: rgba(46, 117, 214, 0.55); --c-wt2: rgba(40, 24, 110, 0.75); --c-vwap: rgba(176, 128, 0, 0.45);
-  --c-k: #1679B8; --c-d: #6A3FB0; --c-mfi-up: rgba(30, 132, 96, 0.35); --c-mfi-down: rgba(176, 32, 58, 0.35);
+  /* grafens färger (--gold, --c-*): css/cipher-chart.css */
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -24,12 +20,8 @@
   --line: rgba(232, 240, 242, 0.14);
   --glass: rgba(255, 255, 255, 0.05); --glass-edge: rgba(255, 255, 255, 0.12);
   --fog: rgba(60, 140, 155, 0.22); --fog2: rgba(90, 110, 140, 0.2);
-  --teal: #6FD3DE; --red: #FF4D66; --green: #3DD39A; --gold: #F2C14E; --blurple: #8C84FF;
+  --teal: #6FD3DE; --red: #FF4D66; --green: #3DD39A; --blurple: #8C84FF;
   --seg-bg: #E8F0F2; --seg-fg: #0A1216;
-  --c-up: #6FD3DE; --c-down: #90A3AA; --c-band: rgba(111, 211, 222, 0.22);
-  --c-wave: rgba(111, 211, 222, 0.22); --c-mfi: rgba(232, 240, 242, 0.10);
-  --c-wt1: rgba(73, 148, 236, 0.6); --c-wt2: rgba(120, 90, 230, 0.55); --c-vwap: rgba(255, 220, 120, 0.4);
-  --c-k: #21BAF3; --c-d: #A07CF0; --c-mfi-up: rgba(61, 211, 154, 0.35); --c-mfi-down: rgba(255, 77, 102, 0.35);
   color-scheme: dark;
 }
 
@@ -114,10 +106,7 @@ h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-h
 .panel-head .num { letter-spacing: .08em; }
 .panel-head.lower { margin-top: 6px; }
 .chart { height: 640px; margin-top: 6px; }
-.legend { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 12px; color: var(--soft); min-height: 40px; }
-.legend li { display: flex; align-items: center; gap: 8px; }
-.legend .sw { width: 18px; height: 8px; border-radius: 2px; }
-.legend .dt { width: 8px; height: 8px; border-radius: 50%; }
+/* förklaringen under grafen (.wc-legend): css/cipher-chart.css */
 
 .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .says-row { display: flex; justify-content: space-between; align-items: center; height: 44px; border-bottom: 1px solid var(--line); }

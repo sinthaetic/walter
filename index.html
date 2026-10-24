@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/walter.css">
   <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/cipher-chart.css">
   <!-- Samma nyckel som W-Cipher, så mörkt läge följer med mellan sidorna -->
   <script>try { if (localStorage.getItem("walterDark") === "1") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
 </head>
@@ -118,6 +119,22 @@
         </div>
       </div>
 
+      <!-- W-Cipher (js/cipher-chart.js, samma graf som cipher.html i CIPHER-läget) + Walters lampor och affärer. Ritas av js/app.js. -->
+      <section class="panel wc-panel" id="wc" aria-label="W-Cipher">
+        <div class="panel-head"><span>BITCOIN · W-CIPHER <em>CIPHER A + B · WALTER</em></span><span class="num" id="wc-live">HÄMTAR …</span></div>
+        <div class="wc-bar">
+          <div class="seg" id="wc-tf" role="group" aria-label="Tidsram">
+            <button type="button" data-tf="4h" aria-pressed="false">4 TIM</button>
+            <button type="button" data-tf="1D" aria-pressed="true">DAG</button>
+            <button type="button" data-tf="1W" aria-pressed="false">VECKA</button>
+          </div>
+          <a class="wc-open" href="cipher.html">ÖPPNA W-CIPHER →</a>
+        </div>
+        <div class="wc-chart" id="wc-chart" role="img" aria-label="Bitcoin med W-Cipher: pris och trendband överst, vågen och pengaflödet i mitten, Walters lampor längst ned. W-markörerna är Walters affärer."></div>
+        <ul class="wc-legend" id="wc-legend"></ul>
+        <div id="wc-copy"></div>
+      </section>
+
       <div class="section-title" id="siffror"><h2>SIFFRORNA</h2><span class="small">Allt bakom läget, för den som vill se.</span></div>
       <div class="cards">
         <section class="panel wide proposal" id="proposal" aria-label="Walters förslag"></section>
@@ -152,6 +169,10 @@
   <!-- Publik marknadsdata (hämtaren). state.js finns bara lokalt hos ägaren: saknas den händer inget. -->
   <script src="data/market.js" onerror="void 0"></script>
   <script src="data/state.js" onerror="void 0"></script>
+  <script src="data/pulse.js" onerror="void 0"></script>
+  <script src="https://unpkg.com/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.js" integrity="sha384-/z0wnnyAhUnLX5YRrxljPlJlhJPGIOuhRU9kt785gf9AUeh8YsG8O6oxSE2sTS9m" crossorigin="anonymous"></script>
+  <script src="js/wcipher.js"></script>
+  <script src="js/cipher-chart.js"></script>
   <script src="js/vault.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/exchanges.js"></script>
