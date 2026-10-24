@@ -400,7 +400,10 @@ def build(state, cache, fetched_any, owner_cache=None):
     pf["holdings"], pf["value"] = wp.valuation(pf, wp.prices_sek(m))
     daily = owner_cache.get("daily", {})
     pf["peak"] = max([pf["peak"], pf["value"], *daily.values()])
-    flows = {h["date"]: h["flow"] for h in pf.get("history", []) if h.get("flow")}
+    flows = {}  # insättningar per dag (månadssparandet kan ge flera rader samma dag)
+    for h in pf.get("history", []):
+        if h.get("flow"):
+            flows[h["date"]] = flows.get(h["date"], 0) + h["flow"]
     pf["sharpe"] = wp.sharpe({**daily, today: pf["value"]}, flows, pf.get("firstTrade"))
     state["proposal"] = wp.propose(state)
     if owner_cache.get("notis"):

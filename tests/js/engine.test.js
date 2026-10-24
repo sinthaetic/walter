@@ -275,3 +275,90 @@ test("autopilot_catchup_missed_sunday_once", () => {
   if (!/^Jag sålde bitcoin/.test(mon.plain)) throw new Error("plain: " + mon.plain);
   eq(r.user.journal.filter((j) => j.check).map((j) => j.date), ["2026-10-26", "2026-10-23"]);
 });
+// ---------- Månadssparande och målläge (paritet mot Python: engine-cases.json -> savingsGoal) ----------
+const SG = ["sv_deposit_day", "sv_missed_day_next_day", "sv_two_months_missed", "sv_cash_below_floor", "sv_amount_zero",
+  "sv_month_already_done", "sv_before_since", "sv_sunday_with_rebalance", "sv_first_trade", "sv_gold_price_missing",
+  "gl_far_full_weights", "gl_12_months_half", "gl_goal_date_all_cash", "gl_after_goal_date", "gl_with_savings"];
+for (const name of SG) {
+  test("parity_" + name, async () => {
+    const fx = await fixtures();
+    const c = fx.savingsGoal.cases.find((x) => x.name === name);
+    if (!c) throw new Error("fallet saknas i fixturen");
+    const user = Object.assign(newUser(0, 100000), clone(c.user), { trades: [] });
+    const p = E().propose(user, c.row, fx.savingsGoal.rules, c.exchange);
+    eq(p.ready, c.expect.ready);
+    eq(p.valueSek, c.expect.valueSek);
+    same(p.trades, c.expect.trades);
+    eq(p.plain, c.expect.plain);
+    eq(p.glide, c.expect.glide);
+    same(p.weights, c.expect.weights);
+    same(p.savings, c.expect.savings);
+    eq(p.needsApproval, c.expect.needsApproval);
+    eq(p.decisionDay, c.expect.decisionDay);
+    eq(p.check, c.expect.check);
+    if (!c.expect.entryPlain) return;
+    const entry = E().apply(user, p, c.row.date);
+    eq(entry.plain.replace(/^(.*?)WALTER /, "$1Jag "), c.expect.entryPlain.replace(/^(.*?)WALTER /, "$1Jag "));
+    same(user.portfolio.holdings, c.expect.portfolio.holdings);
+    same(user.portfolio.positions, c.expect.portfolio.positions);
+    eq(user.portfolio.value, c.expect.portfolio.value);
+    same(user.portfolio.history, c.expect.portfolio.history);
+  });
+}
+
+const SAVE = (day, since, amt) => ({ monthlySek: amt == null ? 1000 : amt, day, since: since || "2026-10-01" });
+
+test("savings_catchup_deposit_day", () => {
+  // Första köpet fredag 2 okt, sparande den 5:e (måndag): insättning + köp den dagen, sedan inget mer i oktober
+  const user = newUser(100000, 100000, { savings: SAVE(5) });
+  const log = [row("2026-10-02", 3), row("2026-10-05", 3), row("2026-10-06", 3)];
+  const r = E().catchUp(user, log, AP_RULES, LEVELS, EX);
+  const flows = r.user.portfolio.history.filter((h) => h.note === "månadssparande");
+  eq(flows.map((h) => [h.date, h.flow, h.month]), [["2026-10-05", 1000, "2026-10"]]);
+  const j = r.user.journal.find((x) => x.date === "2026-10-05");
+  if (!/^Månadssparande: 1 000 kr in\. Jag köpte bitcoin för /.test(j.plain)) throw new Error("plain: " + j.plain);
+  if (!/Månadssparandet satte in 1 000 kr/.test(E().summary(r.events))) throw new Error("summary: " + E().summary(r.events));
+});
+
+test("savings_catchup_missed_day_next_row", () => {
+  // Loggen saknar den 5:e: insättningen görs den 6:e, en gång
+  const user = newUser(100000, 100000, { savings: SAVE(5) });
+  const r = E().catchUp(user, [row("2026-10-02", 3), row("2026-10-06", 3), row("2026-10-07", 3)], AP_RULES, LEVELS, EX);
+  eq(r.user.portfolio.history.filter((h) => h.note === "månadssparande").map((h) => h.date), ["2026-10-06"]);
+});
+
+test("savings_catchup_two_months_missed", () => {
+  // Borta från 2 okt till 3 dec: oktober och november sätts in på första raden efter (en gång var)
+  const user = newUser(100000, 100000, { savings: SAVE(25) });
+  const r = E().catchUp(user, [row("2026-10-02", 3), row("2026-12-03", 3)], AP_RULES, LEVELS, EX);
+  const flows = r.user.portfolio.history.filter((h) => h.note === "månadssparande");
+  eq(flows.map((h) => [h.date, h.month]), [["2026-12-03", "2026-10"], ["2026-12-03", "2026-11"]]);
+  const j = r.user.journal.find((x) => x.date === "2026-12-03");
+  if (!/^Månadssparande: 2 000 kr in \(okt och nov\)\./.test(j.plain)) throw new Error("plain: " + j.plain);
+  // Marknadsvinsten räknar bort insättningarna: levelFor ser 102 000 kr insatt
+  eq(r.user.portfolio.history.reduce((t, h) => t + (h.flow || 0), 0), 102000);
+});
+
+test("savings_amount_zero_nothing", () => {
+  const user = newUser(100000, 100000, { savings: SAVE(5, null, 0) });
+  const r = E().catchUp(user, [row("2026-10-02", 3), row("2026-10-05", 3)], AP_RULES, LEVELS, EX);
+  eq(r.user.portfolio.history.filter((h) => h.note === "månadssparande").length, 0);
+  eq(E().nextSavings(user.savings, [], "2026-10-05"), null);
+});
+
+test("glide_factor_points", () => {
+  const G = E().glideFactor;
+  eq(G(null, "2026-10-25"), 1);
+  eq(G({ date: "2029-01-01" }, "2026-10-25"), 1);
+  eq(G({ date: "2027-10-25" }, "2026-10-25"), 0.4997);
+  eq(G({ date: "2026-10-25" }, "2026-10-25"), 0);
+  eq(G({ date: "2026-01-01" }, "2026-10-25"), 0);
+  eq(G({ date: "2027-02-30" }, "2026-10-25"), 1);
+});
+
+test("next_savings_day", () => {
+  const N = E().nextSavings;
+  eq(N(SAVE(25), [], "2026-10-24"), "2026-10-25");
+  eq(N(SAVE(25), [{ date: "2026-10-25", value: 1, flow: 1000, note: "månadssparande", month: "2026-10" }], "2026-10-26"), "2026-11-25");
+  eq(N(SAVE(20), [], "2026-10-24"), "2026-10-24");  // missad: görs vid nästa körning
+});

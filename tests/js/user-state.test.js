@@ -271,3 +271,46 @@ test("unlock_owner_saves_key_only_on_success", async () => {
     eq(await WU().unlockOwner("TEST-KOD", ok), { ok: false, msg: "Koden stämde, men din webbläsare låter mig inte spara den." });
   });
 });
+
+// ---------- Månadssparande och mål i användarens Walter ----------
+test("import_savings_goal_optional_and_validated", () => {
+  const base = WU().create(10000, "kraken", "2026-10-23");
+  WU().importText(JSON.stringify(base));  // äldre kopia utan savings/goal är giltig
+  const ok = Object.assign({}, base, { savings: { monthlySek: 1000, day: 25, since: "2026-10-23" },
+    goal: { name: "Studio", amountSek: 300000, date: "2027-03-01" } });
+  eq(WU().importText(JSON.stringify(ok)).goal.name, "Studio");
+  WU().importText(JSON.stringify(Object.assign({}, base, { goal: null })));
+  const bad = [{ savings: { monthlySek: -1, day: 25 } }, { savings: { monthlySek: 1000, day: 29 } },
+    { savings: { monthlySek: "1000", day: 25 } }, { goal: { name: "x", amountSek: 0, date: "2027-03-01" } },
+    { goal: { name: "x", amountSek: 1000, date: "mars" } }, { goal: { name: "<b>" + "x".repeat(80), amountSek: 1, date: "2027-03-01" } }];
+  for (const b of bad) {
+    let threw = false;
+    try { WU().importText(JSON.stringify(Object.assign({}, base, b))); } catch (e) { threw = true; }
+    if (!threw) throw new Error("släppte igenom " + JSON.stringify(b));
+  }
+});
+
+test("set_savings_since_only_when_turned_on", () => {
+  const u = WU().create(10000, "kraken", "2026-10-01");
+  eq(WU().setSavings(u, 1000, 25, "2026-10-24"), true);
+  eq(u.savings, { monthlySek: 1000, day: 25, since: "2026-10-24" });
+  WU().setSavings(u, 1500, 5, "2026-11-30");  // ändrat belopp/dag: since står kvar
+  eq(u.savings.since, "2026-10-24");
+  WU().setSavings(u, 0, 5, "2026-12-01");     // av
+  WU().setSavings(u, 500, 5, "2027-01-10");   // på igen: räknas från i dag, inga gamla månader
+  eq(u.savings.since, "2027-01-10");
+  eq(WU().setSavings(u, 500, 31, "2027-01-10"), false);
+});
+
+test("set_goal_and_to_state", () => {
+  const u = WU().create(10000, "kraken", "2026-10-01");
+  eq(WU().setGoal(u, { name: "  ", amountSek: "300000", date: "2027-03-01" }), true);
+  eq(u.goal, { name: "Mitt mål", amountSek: 300000, date: "2027-03-01" });
+  eq(WU().setGoal(u, { name: "Bil", amountSek: 1000, date: "2027-02-30x" }), false);
+  WU().setSavings(u, 1000, 25, "2026-10-01");
+  const S = WU().toState(u, fakeMarket(), "2026-10-22");
+  eq(S.goal.name, "Mitt mål");
+  eq(S.savings.monthlySek, 1000);
+  WU().setGoal(u, null);
+  eq(WU().toState(u, fakeMarket(), "2026-10-22").goal, null);
+});

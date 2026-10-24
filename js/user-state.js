@@ -69,7 +69,14 @@
   const journalOk = (j) => isObj(j) && isDate(j.date) && (j.mode === null || isStr(j.mode)) &&
     finOrNull(j.red) && isStr(j.plain) && allOk(j.facts, isStr) && optional(j, "trades", (t) => allOk(t, tradeOk));
   const historyOk = (h) => isObj(h) && isDate(h.date) && fin(h.value) && optional(h, "cash", finOrNull) &&
-    optional(h, "note", isStr) && optional(h, "flow", fin) && optional(h, "test", (v) => typeof v === "boolean");
+    optional(h, "note", isStr) && optional(h, "flow", fin) && optional(h, "test", (v) => typeof v === "boolean") &&
+    optional(h, "month", (v) => typeof v === "string" && /^\d{4}-\d{2}$/.test(v));
+  // Månadssparande {monthlySek ≥ 0, day 1..28, since} och mål {name, amountSek > 0, date}. Båda är valfria
+  // (äldre kopior saknar dem). Målet får vara null (inget mål).
+  const savingsOk = (s) => isObj(s) && fin(s.monthlySek) && s.monthlySek >= 0 && s.monthlySek <= 1e9 &&
+    Number.isInteger(s.day) && s.day >= 1 && s.day <= 28 && optional(s, "since", isDate);
+  const goalOk = (g) => g === null || (isObj(g) && isStr(g.name) && g.name.length <= 60 && fin(g.amountSek) &&
+    g.amountSek > 0 && g.amountSek <= 1e10 && isDate(g.date));
   const positionOk = (p) => isObj(p) && fin(p.units) && fin(p.costSek) && optional(p, "since", isDate);
   const userTradeOk = (t) => isObj(t) && isDate(t.date) && isStr(t.asset) && isStr(t.side) &&
     fin(t.units) && fin(t.priceSek) && fin(t.sek) && fin(t.feeSek);
@@ -84,9 +91,28 @@
       isObj(pf.holdings) && Object.values(pf.holdings).every(fin) && fin(pf.holdings.CASH) &&
       isObj(pf.positions) && Object.values(pf.positions).every(positionOk) &&
       (pf.firstTrade === null || pf.firstTrade === undefined || isDate(pf.firstTrade)) &&
-      allOk(pf.history, historyOk);
+      allOk(pf.history, historyOk) && optional(u, "savings", savingsOk) && optional(u, "goal", goalOk);
     if (!ok) throw new Error(NOT_A_COPY);
     return u;
+  }
+
+  // ---------- Månadssparande och mål (ändras under Inställningar) ----------
+  // since = från vilken dag sparandet räknas. Sätts när sparandet slås på (från 0), så att ett nytt sparande
+  // aldrig sätter in pengar för månader innan det fanns. Ett ändrat belopp eller dag behåller since.
+  function setSavings(user, monthlySek, day, iso) {
+    const amt = Math.round(Number(monthlySek));
+    const d = Math.round(Number(day));
+    if (!Number.isFinite(amt) || amt < 0 || amt > 1e9 || !(d >= 1 && d <= 28)) return false;
+    const was = user.savings && user.savings.monthlySek > 0 ? user.savings : null;
+    user.savings = { monthlySek: amt, day: d, since: was && isDate(was.since) ? was.since : (iso || today()) };
+    return true;
+  }
+  function setGoal(user, goal) {
+    if (goal === null) { user.goal = null; return true; }
+    const g = { name: String(goal.name || "").trim().slice(0, 60) || "Mitt mål", amountSek: Math.round(Number(goal.amountSek)), date: goal.date };
+    if (!goalOk(g)) return false;
+    user.goal = g;
+    return true;
   }
 
   // ---------- Färsk marknadsdata ----------
@@ -196,9 +222,13 @@
       },
       rules: copy(now.rules || {}),
       k4: [],
+      // Användarens månadssparande och mål (samma fält som ägarens state.json)
+      savings: user.savings ? copy(user.savings) : null,
+      goal: user.goal ? copy(user.goal) : null,
       proposal
     };
   }
 
-  root.WalterUser = { load, save, storageOk, create, isFresh, firstMove, exportFile, importText, toState, today, unlockOwner, forgetOwner };
+  root.WalterUser = { load, save, storageOk, create, isFresh, firstMove, exportFile, importText, toState, today, unlockOwner, forgetOwner,
+    setSavings, setGoal };
 })(typeof window !== "undefined" ? window : this);

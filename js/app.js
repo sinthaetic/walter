@@ -42,6 +42,13 @@
   const usd = (v) => "$" + nf(0).format(v);
   const MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
   const day = (iso) => { const d = new Date(iso.slice(0, 10) + "T12:00:00"); return d.getDate() + " " + MONTHS[d.getMonth()]; };
+  const MONTHS_LONG = ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"];
+  const monthYear = (iso) => `${MONTHS_LONG[+iso.slice(5, 7) - 1]} ${iso.slice(0, 4)}`;
+  const addMonthsIso = (iso, n) => {
+    const d = new Date(iso + "T12:00:00");
+    d.setMonth(d.getMonth() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const pad = (n) => String(n).padStart(2, "0");
   // "22.10 · 20:11" (statusraden) och "22 okt 20:11" (löptext)
@@ -98,7 +105,9 @@
   const start = pf.start;
   // Insättningar = startkapital + manuella påfyllningar (capitalChange.manualTopUp). Bara det som är över
   // insättningarna är marknadsvinst – den räknas för vinst, upplåsning och OPTIMERAT.
-  const topUp = (pf.capitalChange && pf.capitalChange.manualTopUp) || 0;
+  // Månadssparandet (historikrader med note "månadssparande") är också insättningar, aldrig vinst.
+  const savedIn = (pf.history || []).reduce((t, h) => t + (h && h.note === "månadssparande" && h.flow > 0 ? h.flow : 0), 0);
+  const topUp = ((pf.capitalChange && pf.capitalChange.manualTopUp) || 0) + savedIn;
   const deposits = start + topUp;
   const marketGain = pf.value - deposits;
   const marketPct = deposits > 0 ? (marketGain / deposits) * 100 : 0;
@@ -215,6 +224,10 @@
     </div>`;
 
   // ---------- Portfölj ----------
+  // Nästa månadssparande (när det är påslaget): "Nästa sparande 25 nov: 1 000 kr."
+  const isoToday = (() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
+  const nextSave = E && S.savings ? E.nextSavings(S.savings, pf.history, isoToday) : null;
+  const saveLine = nextSave ? `Nästa sparande ${nextSave === isoToday ? "i dag" : day(nextSave)}: ${kr(S.savings.monthlySek)}.` : "";
   const avk = Math.abs(marketPct) < 0.005 ? "±0,00 %" : pct(marketPct, 2);
   $("pf").innerHTML = `
     <div class="pf-top">
@@ -225,7 +238,29 @@
         <div><span>INVESTERAT</span><strong title="${AUTO ? "Autopilotens mål" : `Tak på Level ${S.level}`}">${nf(0).format(invested * 100)} / ${nf(0).format((AUTO ? 1 - apCash : levelCap) * 100)} %</strong></div>
       </div>
     </div>
+    ${saveLine ? `<p class="pf-save"><span class="dot teal" aria-hidden="true"></span>${esc(saveLine)}</p>` : ""}
     <div class="pf-foot"><a href="#wc">BITCOIN · W-CIPHER ↓</a><a href="#siffror">SIFFRORNA →</a></div>`;
+
+  // ---------- Målet (valfritt): hur långt kvar, och hur mycket Walter redan flyttat till kontanter ----------
+  (() => {
+    const el = $("goal-card"), g = S.goal;
+    if (!el) return;
+    if (!g || !(g.amountSek > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(g.date || "")) { el.hidden = true; return; }
+    const f = S.proposal && typeof S.proposal.glide === "number" ? S.proposal.glide : E ? E.glideFactor(g, S.updatedAt) : 1;
+    const share = pf.value > 0 ? pf.value / g.amountSek : 0;
+    const glideTxt = f >= 1 ? `Walter börjar flytta gradvis till kontanter i ${monthYear(addMonthsIso(g.date, -24))}, 24 månader före.`
+      : f <= 0 ? "Datumet är nått: Walter håller allt som kontanter."
+      : `Walter flyttar gradvis till kontanter: nu ${nf(0).format(f * 100)} % av vanliga andelar.`;
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="panel-head"><span>MÅL · ${esc(String(g.name || "Mitt mål").toUpperCase())}</span><span class="num">${esc(monthYear(g.date).toUpperCase())}</span></div>
+      <p class="goal-line">Mål: ${esc(g.name || "Mitt mål")} – ${kr(g.amountSek)} till ${esc(monthYear(g.date))}. Just nu ${kr(pf.value)} (${nf(0).format(share * 100)} %). ${esc(glideTxt)}</p>
+      <div class="goal-track" role="progressbar" aria-label="Del av målet" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(1, share) * 100)}">
+        <span class="fill" style="width:${(Math.min(1, share) * 100).toFixed(1)}%"></span>
+      </div>
+      <div class="goal-legend"><span>0 KR</span><span>${f >= 1 ? "FULLA ANDELAR" : f <= 0 ? "ALLT KONTANT" : `ANDELAR ${nf(0).format(f * 100)} %`}</span><span>${esc(kr(g.amountSek).toUpperCase())}</span></div>
+      <p class="explain">Inget löfte om att nå målet. Pengar du behöver en viss dag ska inte ligga med full kryptorisk när dagen kommer. <a href="#installningar">Ändra målet →</a></p>`;
+  })();
 
   // ---------- W-Cipher under hjälten ----------
   // Samma graf som cipher.html i CIPHER-läget (js/cipher-chart.js), plus Walters lampor (data/pulse.js + market.js-loggen)
@@ -818,14 +853,16 @@
   // ================================================================
   // INSTÄLLNINGAR – din plan, uttag, avgifter, PAPER/LIVE. Allt sparas bara i den här webbläsaren.
   // ================================================================
-  const GOALS = [10, 20, 50, 100];
-  const TIMES = [[6, "6 MÅN"], [12, "1 ÅR"], [36, "3 ÅR"], [60, "5 ÅR"]];
-  const QUICK = [5000, 25000, 100000, deposits, 1000000].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
-  const plan = Object.assign({ start: deposits, goal: 1, time: 1 }, store.get(own("plan"), {}));
-  if (!(plan.start > 0)) plan.start = deposits;
-  if (!GOALS[plan.goal]) plan.goal = 1;
-  if (!TIMES[plan.time]) plan.time = 1;
-  const stepOf = (v) => (v >= 500000 ? 100000 : v >= 100000 ? 25000 : v >= 25000 ? 5000 : v >= 5000 ? 1000 : 500);
+  // Målet med datum och månadssparandet ersätter den gamla planen (walter.plan: startsumma, +% och tidslinje).
+  // En gammal plan fyller bara i målformuläret – målet slås på först när man sparar (det ändrar Walters affärer).
+  const GOALS = [10, 20, 50, 100], TIMES = [6, 12, 36, 60];
+  const oldPlan = S.goal ? null : store.get(own("plan"), null);
+  const addMonths = addMonthsIso;
+  const goalDraft = S.goal ? Object.assign({}, S.goal)
+    : oldPlan && oldPlan.start > 0 && GOALS[oldPlan.goal] && TIMES[oldPlan.time]
+      ? { name: "Mitt mål", amountSek: Math.round(oldPlan.start * (1 + GOALS[oldPlan.goal] / 100)), date: addMonths(isoToday, TIMES[oldPlan.time]), fromPlan: true }
+      : { name: "", amountSek: "", date: "" };
+  const savingsNow = S.savings && S.savings.monthlySek > 0 ? S.savings : null;
 
   const PURPOSES = { bil: ["Bil", "en bil"], husinsats: ["Husinsats", "en husinsats"], resa: ["Resa", "en resa"], rakningar: ["Räkningar", "räkningar"], buffert: ["Buffert", "en buffert"], annat: ["Annat", "ditt mål"] };
   const HORIZONS = { "1v": [7, "1 vecka"], "1m": [30, "1 månad"], "3m": [91, "3 månader"], "6m": [182, "6 månader"] };
@@ -840,38 +877,58 @@
     : "Jag hittar inte din börs i listan, så avgifterna är Walters standard. Tomt fält = standard.";
 
   $("view-installningar").innerHTML = `
-    <p class="kicker">INSTÄLLNINGAR · DIN PLAN</p>
-    <div class="title-row"><h1>DIN PLAN</h1></div>
-    <p class="intro">Välj hur mycket du börjar med, vad du vill nå och hur lång tid du ger det. Allt mäts i procent. Planen är en räknesnurra – den ändrar inget i Walter.</p>
-    <div class="plan">
-      <div class="panel">
-        <div class="field-head"><span>STARTSUMMA</span><em>VALFRI SUMMA</em></div>
-        <div class="stepper">
-          <button type="button" id="plan-minus" aria-label="Sänk startsumman">−</button>
-          <input id="plan-start" class="num" type="number" min="1" step="1" inputmode="numeric" aria-label="Startsumma i kronor">
-          <button type="button" id="plan-plus" aria-label="Höj startsumman">+</button>
-        </div>
-        <div class="seg full sm" role="group" aria-label="Snabbval startsumma">${QUICK.map((v) =>
-          `<button type="button" data-start="${v}">${v >= 1000000 ? nf(0).format(v / 1000000) + " MKR" : nf(0).format(v)}</button>`).join("")}</div>
-        <div class="field-head"><span>SPARMÅL</span><em>MARKNADSVINST, INTE INSÄTTNINGAR</em></div>
-        <div class="seg full" role="group" aria-label="Sparmål i procent">${GOALS.map((v, i) => `<button type="button" data-goal="${i}">+${v} %</button>`).join("")}</div>
-        <div class="field-head"><span>TIDSLINJE</span><em>TID ATT NÅ MÅLET</em></div>
-        <div class="seg full" role="group" aria-label="Tidslinje">${TIMES.map(([, t], i) => `<button type="button" data-time="${i}">${t}</button>`).join("")}</div>
+    <p class="kicker">INSTÄLLNINGAR · DITT MÅL</p>
+    <div class="title-row"><h1>DITT MÅL</h1></div>
+    <p class="intro">Ett mål med ett datum, och ett sparande varje månad. Båda är valfria. Allt är låtsaspengar (PAPER).</p>
+    <div class="plan sv-plan">
+      <section class="panel" aria-label="Mål">
+        <h3>MÅL MED DATUM</h3>
+        <form id="goal-form" class="sv-form" novalidate>
+          <label class="field wide"><span>VAD SPARAR DU TILL?</span>
+            <input class="input" name="name" type="text" maxlength="60" autocomplete="off" placeholder="Till exempel Studio"></label>
+          <div class="form-grid">
+            <label class="field"><span>BELOPP (KR)</span>
+              <input class="input num" name="amountSek" type="number" min="1" step="1" inputmode="numeric" placeholder="300 000"></label>
+            <label class="field"><span>DATUM</span>
+              <input class="input num" name="date" type="date"></label>
+          </div>
+          <p class="plain sv-explain">De sista 24 månaderna före datumet flyttar Walter gradvis till kontanter, en bit vid varje söndagskoll. Pengar du behöver en viss dag ska inte ligga med full kryptorisk när dagen kommer – ett krypto-fall på 50 % strax före går inte att vänta ut.</p>
+          <p class="small sv-glide" id="goal-glide" aria-live="polite"></p>
+          <p class="small">Inget löfte: Walter kan inte lova att du når målet. Han minskar bara risken när datumet närmar sig.</p>
+          <div class="form-actions start">
+            <button type="submit" class="btn btn-primary">SPARA MÅLET</button>
+            <button type="button" class="btn" id="goal-remove"${S.goal ? "" : " hidden"}>TA BORT MÅLET</button>
+          </div>
+          <p class="small msg" id="goal-msg" aria-live="polite">${goalDraft.fromPlan ? "Förifyllt från din gamla plan. Spara för att slå på målet." : ""}</p>
+        </form>
+      </section>
+      <section class="panel" aria-label="Månadssparande">
+        <h3>MÅNADSSPARANDE</h3>
+        <form id="savings-form" class="sv-form" novalidate>
+          <div class="form-grid">
+            <label class="field"><span>BELOPP PER MÅNAD (KR)</span>
+              <input class="input num" name="monthlySek" type="number" min="0" step="1" inputmode="numeric" placeholder="0 = av"></label>
+            <label class="field"><span>DAG I MÅNADEN</span>
+              <select name="day">${Array.from({ length: 28 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("")}</select></label>
+          </div>
+          <p class="plain sv-explain">Den dagen sätter Walter in beloppet och köper direkt efter sina andelar – bara med de nya pengarna, han säljer inget. Var sidan stängd gör han det nästa gång han räknar, en gång per månad.</p>
+          <p class="sv-honest"><b>PAPER</b><span>Låtsasinsättning – inga riktiga pengar flyttas.</span></p>
+          <div class="form-actions start"><button type="submit" class="btn btn-primary">SPARA SPARANDET</button></div>
+          <p class="small msg" id="savings-msg" aria-live="polite"></p>
+        </form>
         <div class="fixed">
           <span class="label">FASTA REGLER · GÅR INTE ATT ÄNDRA</span>
           <div><span>Max investerat</span><span class="num">${nf(0).format(S.rules.maxInvested * 100)} %</span></div>
           <div><span>Kontant, alltid minst</span><span class="num">${nf(0).format(S.rules.minCash * 100)} %</span></div>
-          <div><span>Walter vilar vid</span><span class="num">${S.rules.parkeraAtRed} / ${total} röda</span></div>
+          <div><span>Insättningar räknas som vinst</span><span class="num">aldrig</span></div>
         </div>
-      </div>
-      <div class="panel" style="display:flex;flex-direction:column">
-        <div class="plan-kpis" id="plan-kpis"></div>
-        <div class="panel-head" style="margin-top:24px"><span>TIDSLINJE</span><span>VÄG MOT MÅLET · RÄKNEEXEMPEL</span></div>
-        <svg class="plan-chart" id="plan-chart" viewBox="0 0 660 280" preserveAspectRatio="none" role="img"></svg>
-        <div class="plan-legend" id="plan-legend"></div>
-        <p class="small" style="margin-top:14px">Ett mål är en riktning, inte ett löfte. Walter vilar hellre än jagar. Insättningar räknas aldrig som vinst och låser inte upp något.</p>
-      </div>
+      </section>
     </div>
+    ${isUser ? "" : `<div class="panel sv-owner" id="owner-snippet" hidden>
+      <h3>ÄGARENS WALTER · DATA/STATE.JSON</h3>
+      <p class="plain">Din Walter läser målet och sparandet från <b>data/state.json</b> – sidan kan inte skriva där. Byt raderna <b>"savings"</b> och <b>"goal"</b> i state.json mot de här, kör <b>fetcher/walter_vault.py las</b> och sedan hämtaren.</p>
+      <pre class="sv-pre" id="owner-snippet-text"></pre>
+    </div>`}
 
     <div class="section-title"><h2>UTTAG</h2><span class="small">Vad du kan ta ut, och när.</span></div>
     <div class="panel" style="margin-top:20px" id="goal">
@@ -968,45 +1025,66 @@
       </section>` : ""}
     </div>`;
 
-  // ---------- Din plan ----------
-  const renderPlan = () => {
-    const gPct = GOALS[plan.goal], [months] = TIMES[plan.time];
-    const target = plan.start * (1 + gPct / 100);
-    const yr = (Math.pow(1 + gPct / 100, 12 / months) - 1) * 100;
-    const mo = (Math.pow(1 + gPct / 100, 1 / months) - 1) * 100;
-    $("plan-start").value = plan.start;
-    document.querySelectorAll("[data-start]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.start === plan.start)));
-    document.querySelectorAll("[data-goal]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.goal === plan.goal)));
-    document.querySelectorAll("[data-time]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.time === plan.time)));
-    $("plan-kpis").innerHTML = `
-      <div><span>DITT MÅL</span><strong class="num">${kr(target)}</strong><em>+${kr(target - plan.start)} marknadsvinst</em></div>
-      <div><span>PER ÅR, I SNITT</span><strong class="num">${nf(1).format(yr)} %</strong><em>ränta på ränta</em></div>
-      <div><span>PER MÅNAD, I SNITT</span><strong class="num">${nf(2).format(mo)} %</strong><em>${months} månader</em></div>`;
-    // Kurvan: jämn tillväxt från start till mål. Markeringar där Level 2 och Level 3 skulle låsas upp.
-    const X0 = 40, X1 = 620, Y0 = 250, Y1 = 30, n = 40;
-    const frac = (p) => Math.log(1 + p / 100) / Math.log(1 + gPct / 100);
-    const yOf = (p) => Y0 - (p / gPct) * (Y0 - Y1);
-    const pts = Array.from({ length: n + 1 }, (_, i) => { const f = i / n; return [X0 + f * (X1 - X0), yOf((Math.pow(1 + gPct / 100, f) - 1) * 100)]; });
-    const d = pts.map((p, k) => (k ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
-    const marks = AUTO ? [] : [[lv2Gain, "ETH"], [lv3 ? lv3.gainPct : null, "GULD"]].filter(([p]) => p != null && p <= gPct);
-    const when = (p) => { const mm = Math.round(frac(p) * months); return mm < 1 ? "direkt" : mm >= 12 ? nf(1).format(mm / 12) + " år" : mm + " mån"; };
-    $("plan-chart").setAttribute("aria-label", `Kurva från ${kr(plan.start)} till ${kr(target)} på ${months} månader`);
-    $("plan-chart").innerHTML = `
-      <line class="axis" x1="${X0}" y1="${Y0}" x2="${X1}" y2="${Y0}"/>
-      <line class="goal-line" x1="${X0}" y1="${Y1}" x2="${X1}" y2="${Y1}"/>
-      <path class="area" d="${d} L ${X1} ${Y0} L ${X0} ${Y0} Z"/>
-      <path class="curve" d="${d}" vector-effect="non-scaling-stroke"/>
-      ${marks.map(([p]) => { const x = X0 + frac(p) * (X1 - X0), y = yOf(p); return `<line class="l2" x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${Y0}" vector-effect="non-scaling-stroke"/><circle class="l2dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`; }).join("")}`;
-    $("plan-legend").innerHTML = `<span>START · ${kr(plan.start)}</span>${marks.map(([p, a]) => `<span class="l2t">${a} VID +${p} % · ${when(p)}</span>`).join("")}<span>MÅL +${gPct} % · ${kr(target)}</span>`;
-    store.set(own("plan"), plan);
+  // ---------- Mål och månadssparande ----------
+  // Användaren: sparas i walter.user (WalterUser.setGoal / setSavings) och gäller från nästa gång Walter räknar.
+  // Ägaren: state.json (top-level goal / savings) – sidan visar raderna att klistra in.
+  const gf = $("goal-form"), svf = $("savings-form");
+  gf.elements.name.value = goalDraft.name || "";
+  gf.elements.amountSek.value = goalDraft.amountSek || "";
+  gf.elements.date.value = goalDraft.date || "";
+  svf.elements.monthlySek.value = savingsNow ? savingsNow.monthlySek : "";
+  svf.elements.day.value = String((S.savings && S.savings.day) || 25);
+  const glideText = () => {
+    const d = gf.elements.date.value;
+    if (!E || !/^\d{4}-\d{2}-\d{2}$/.test(d)) { $("goal-glide").textContent = ""; return; }
+    const f = E.glideFactor({ date: d }, isoToday);
+    $("goal-glide").textContent = f >= 1 ? `Med det datumet: full andel tills ${monthYear(addMonths(d, -24))}, sedan gradvis mot kontanter.`
+      : f <= 0 ? "Med det datumet: allt som kontanter vid nästa koll."
+      : `Med det datumet: nu ${nf(0).format(f * 100)} % av vanliga andelar.`;
   };
-  $("plan-minus").addEventListener("click", () => { plan.start = Math.max(500, plan.start - stepOf(plan.start - 1)); renderPlan(); });
-  $("plan-plus").addEventListener("click", () => { plan.start = Math.min(100000000, plan.start + stepOf(plan.start)); renderPlan(); });
-  $("plan-start").addEventListener("change", (e) => { const v = Math.round(+e.target.value); if (v > 0) plan.start = v; renderPlan(); });
-  document.querySelectorAll("[data-start]").forEach((b) => b.addEventListener("click", () => { plan.start = +b.dataset.start; renderPlan(); }));
-  document.querySelectorAll("[data-goal]").forEach((b) => b.addEventListener("click", () => { plan.goal = +b.dataset.goal; renderPlan(); }));
-  document.querySelectorAll("[data-time]").forEach((b) => b.addEventListener("click", () => { plan.time = +b.dataset.time; renderPlan(); }));
-  renderPlan();
+  gf.elements.date.addEventListener("input", glideText);
+  glideText();
+  const U = window.WalterUser;
+  const ownerSnippet = (goal, savings) => {
+    const lines = [];
+    if (savings) lines.push(`"savings": ${JSON.stringify(savings)},`);
+    lines.push(`"goal": ${JSON.stringify(goal === undefined ? (S.goal || null) : goal)},`);
+    $("owner-snippet-text").textContent = lines.join("\n");
+    $("owner-snippet").hidden = false;
+    $("owner-snippet").scrollIntoView({ block: "nearest" });
+  };
+  // Användarens Walter läses, ändras och sparas – sedan ritas sidan om med det nya målet/sparandet
+  const saveUser = (change, msgEl) => {
+    const user = U.load();
+    if (!user) { msgEl.textContent = "Jag hittar ingen sparad Walter att ändra."; return; }
+    if (!change(user)) { msgEl.textContent = "Kontrollera fälten – något stämmer inte."; return; }
+    if (!U.save(user)) { msgEl.textContent = "Din webbläsare låter mig inte spara."; return; }
+    try { window.localStorage.removeItem(own("plan")); } catch { /* lagring blockerad */ }
+    location.reload();
+  };
+  const readGoal = () => ({ name: gf.elements.name.value, amountSek: Math.round(+gf.elements.amountSek.value), date: gf.elements.date.value });
+  gf.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const g = readGoal();
+    if (!(g.amountSek > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(g.date)) { $("goal-msg").textContent = "Skriv ett belopp och välj ett datum."; return; }
+    if (isUser) { saveUser((u) => U.setGoal(u, g), $("goal-msg")); return; }
+    ownerSnippet({ name: String(g.name).trim().slice(0, 60) || "Mitt mål", amountSek: g.amountSek, date: g.date });
+    $("goal-msg").textContent = "Klistra in raden under formulären i state.json.";
+  });
+  $("goal-remove").addEventListener("click", () => {
+    if (isUser) { saveUser((u) => U.setGoal(u, null), $("goal-msg")); return; }
+    ownerSnippet(null);
+    $("goal-msg").textContent = "Klistra in raden under formulären i state.json.";
+  });
+  svf.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const amt = Math.round(+svf.elements.monthlySek.value || 0), d = +svf.elements.day.value;
+    if (!(amt >= 0) || !(d >= 1 && d <= 28)) { $("savings-msg").textContent = "Skriv ett belopp (0 = av)."; return; }
+    if (isUser) { saveUser((u) => U.setSavings(u, amt, d, isoToday), $("savings-msg")); return; }
+    const since = savingsNow && savingsNow.since ? savingsNow.since : isoToday;
+    ownerSnippet(undefined, { monthlySek: amt, day: d, since });
+    $("savings-msg").textContent = "Klistra in raden under formulären i state.json.";
+  });
 
   // ---------- Uttag: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
   // Brutto = det som måste säljas för att netto ska landa på banken i SEK:

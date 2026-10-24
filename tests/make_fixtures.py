@@ -79,7 +79,8 @@ def engine_cases():
         out.append({"name": name, "row": row, "user": {"mode": mode, "level": level, "portfolio": pf},
                     "expect": {"mode": prop["mode"], "valueSek": prop["valueSek"], "trades": prop["trades"],
                                "portfolio": raw["portfolio"]}})
-    doc = {"rules": rules, "exchange": PARITY_EXCHANGE, "cases": out, "autopilot": autopilot_cases(rules)}
+    doc = {"rules": rules, "exchange": PARITY_EXCHANGE, "cases": out, "autopilot": autopilot_cases(rules),
+           "savingsGoal": savings_goal_cases(rules)}
     (FIX / "engine-cases.json").write_text(json.dumps(doc, indent=1, ensure_ascii=False), encoding="utf-8")
 
 
@@ -145,6 +146,68 @@ def autopilot_cases(lamp_rules):
                                "waiting": prop["waiting"], "missing": prop["missing"],
                                "entryCheck": bool(entry and entry.get("check")),
                                "portfolio": raw["portfolio"]}})
+    return {"rules": rules, "cases": out}
+
+
+def savings_goal_cases(lamp_rules):
+    """Månadssparande och målläge (autopiloten): samma indata i Python och JS, Python är facit."""
+    rules = dict(lamp_rules, strategy="autopilot", decision={"weekday": "söndag", "bandPp": 5})
+    sun, fri = "2026-10-25", "2026-10-23"
+    px = walter_paper.prices_sek(_market(20, False, False))
+    near = {"BTC": (0.034, 34000), "ETH": (0.52, 19000), "GOLD": (0.55, 20000)}
+    near_cash = 100000 - sum(round(u * px[a], 2) for a, (u, _c) in near.items())
+    heavy = {"BTC": (0.042, 34000), "ETH": (0.52, 19000), "GOLD": (0.30, 20000)}
+    checked = [{"date": "2026-10-19", "check": True}]
+    # Exakt på andelarna 35/20/20/25 av 100 000 kr: en insättning på 1 000 kr blir köp för 350/200/200 kr
+    onw = {a: (round(w * 100000 / px[a], 8), w * 100000) for a, w in (("BTC", 0.35), ("ETH", 0.2), ("GOLD", 0.2))}
+    onw_cash = round(100000 - sum(round(u * px[a], 2) for a, (u, _c) in onw.items()), 2)
+    sv = lambda day, since="2026-10-01", amt=1000: {"monthlySek": amt, "day": day, "since": since}  # noqa: E731
+    done_oct = {"date": "2026-10-20", "value": 100000, "cash": 25000, "flow": 1000, "note": "månadssparande",
+                "month": "2026-10"}
+    cases = [  # namn, dag, portfölj, journal, savings, goal, extra historik, guldpris finns
+        ("sv_deposit_day", fri, _pf(onw_cash, onw), checked, sv(23), None, [], True),
+        ("sv_missed_day_next_day", fri, _pf(onw_cash, onw), checked, sv(22), None, [], True),
+        ("sv_two_months_missed", fri, _pf(onw_cash, onw), checked, sv(20, "2026-09-01"), None, [], True),
+        ("sv_cash_below_floor", fri, _pf(near_cash, near), checked, sv(23), None, [], True),
+        ("sv_amount_zero", fri, _pf(near_cash, near), checked, sv(23, amt=0), None, [], True),
+        ("sv_month_already_done", fri, _pf(near_cash, near), checked, sv(20), None, [done_oct], True),
+        ("sv_before_since", fri, _pf(near_cash, near), checked, sv(10, "2026-10-15"), None, [], True),
+        ("sv_sunday_with_rebalance", sun, _pf(near_cash, heavy), [], sv(25), None, [], True),
+        ("sv_first_trade", fri, _pf(100000), [], sv(23), None, [], True),
+        ("sv_gold_price_missing", fri, _pf(onw_cash, onw), checked, sv(23), None, [], False),
+        ("gl_far_full_weights", sun, _pf(near_cash, near), [], None, {"name": "Hus", "amountSek": 300000, "date": "2029-01-01"}, [], True),
+        ("gl_12_months_half", sun, _pf(near_cash, near), [], None, {"name": "Studio", "amountSek": 300000, "date": "2027-10-25"}, [], True),
+        ("gl_goal_date_all_cash", sun, _pf(near_cash, near), [], None, {"name": "Bil", "amountSek": 90000, "date": sun}, [], True),
+        ("gl_after_goal_date", sun, _pf(near_cash, near), [], None, {"name": "Bil", "amountSek": 90000, "date": "2026-01-01"}, [], True),
+        ("gl_with_savings", fri, _pf(onw_cash, onw), checked, sv(23), {"name": "Studio", "amountSek": 300000, "date": "2027-04-23"}, [], True),
+    ]
+    out = []
+    for name, day, pf, journal, savings, goal, extra, gold in cases:
+        pf = copy.deepcopy(pf)
+        pf["history"] += extra
+        m = _market(15, False, False)
+        if not gold:
+            m["gold"] = {"value": None}
+        state = {"rules": rules, "market": m, "portfolio": copy.deepcopy(pf), "mode": "NORMAL", "level": 1,
+                 "journal": copy.deepcopy(journal), "lampScore": {"source": "data", "red": 3}}
+        raw = {"portfolio": copy.deepcopy(pf), "rules": rules, "mode": "NORMAL", "updatedAt": day,
+               "journal": copy.deepcopy(journal), "k4": []}
+        user = {"mode": "NORMAL", "level": 1, "portfolio": pf, "journal": journal}
+        if savings is not None:
+            state["savings"] = raw["savings"] = user["savings"] = savings
+        if goal is not None:
+            state["goal"] = raw["goal"] = user["goal"] = goal
+        prop = walter_paper.propose(state, today=day)
+        entry = walter_paper.apply(raw, prop, day) if prop["ready"] and prop["needsApproval"] else None
+        row = {"date": day, "ready": True, "red": 3, "px": walter_paper.prices_sek(m),
+               "ethBtcAbove30dMa": False, "vix": 15, "spxBelowMa": False}
+        out.append({"name": name, "row": row, "exchange": PARITY_EXCHANGE, "user": user,
+                    "expect": {"ready": prop["ready"], "valueSek": prop["valueSek"], "trades": prop["trades"],
+                               "plain": prop["plain"], "glide": prop.get("glide"), "weights": prop.get("weights"),
+                               "savings": prop.get("savings"), "needsApproval": prop["needsApproval"],
+                               "decisionDay": prop.get("decisionDay"), "check": prop.get("check"),
+                               "entryPlain": entry and entry["plain"], "entryFacts": entry and entry["facts"],
+                               "portfolio": raw["portfolio"] if entry else None}})
     return {"rules": rules, "cases": out}
 
 

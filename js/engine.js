@@ -80,22 +80,103 @@
     const d = new Date(ms(iso));
     return `${DAY_WORDS[weekday(iso)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
   }
-  function weightsFor(rules, exchange) {
+  function weightsFor(rules, exchange, glide) {
     const caps = rules.caps || {}, w = {}, missing = [];
+    const g = glide == null ? 1 : glide;
     for (const a of ASSETS) {
-      w[a] = Number(caps[a] || 0);
+      w[a] = Number(caps[a] || 0) * g;
       if (!exchange.assets || exchange.assets[a] !== true) { missing.push(a); w[a] = 0; }
     }
     return { w, missing };
   }
-  function rebalanceTrades(pf, px, hold, total, w, rules, fee) {
+
+  // ---------- Målläge (som glide_factor i Python) ----------
+  // Från 24 månader före målets datum skalas andelarna med f = dagar kvar / 730,5 (0..1, 4 decimaler).
+  const GLIDE_DAYS = 730.5;
+  const isIso = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(ms(v)) &&
+    new Date(ms(v)).toISOString().slice(0, 10) === v;
+  function glideFactor(goal, iso) {
+    if (!goal || typeof goal !== "object" || !isIso(goal.date)) return 1;
+    const days = Math.round((ms(goal.date) - ms(iso)) / 864e5);
+    return round(Math.min(1, Math.max(0, days / GLIDE_DAYS)), 4);
+  }
+
+  // ---------- Månadssparande (som savings_plan / savings_due / savings_trades i Python) ----------
+  const SAVINGS_NOTE = "månadssparande";
+  function savingsPlan(s) {
+    if (!s || typeof s !== "object") return null;
+    const amt = s.monthlySek, d = s.day == null ? 25 : s.day;
+    if (typeof amt !== "number" || !isFinite(amt) || amt <= 0) return null;
+    if (!Number.isInteger(d) || d < 1 || d > 28) return null;
+    return { each: amt, day: d };
+  }
+  function savingsDue(s, history, iso) {
+    const plan = savingsPlan(s);
+    if (!plan) return [];
+    const since = isIso(s.since) ? s.since : null;
+    let done = "";
+    for (const h of history || []) if (h && h.note === SAVINGS_NOTE && typeof h.month === "string" && h.month > done) done = h.month;
+    let y = Number((since || iso).slice(0, 4)), m = Number((since || iso).slice(5, 7));
+    const ty = Number(iso.slice(0, 4)), tm = Number(iso.slice(5, 7)), out = [];
+    while (y < ty || (y === ty && m <= tm)) {
+      const key = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}`;
+      const when = `${key}-${String(plan.day).padStart(2, "0")}`;
+      if (when <= iso && (since === null || when >= since) && key > done) out.push(key);
+      if (m === 12) { y += 1; m = 1; } else m += 1;
+    }
+    return out;
+  }
+  function savingsTrades(px, hold, total, w, rules, fee, deposit) {
+    const free = Math.min(deposit, hold.CASH - rules.minCash * total);
+    const minTrade = rules.paper.minTradePct / 100 * deposit;
+    const gaps = {}, waiting = [];
+    for (const a of ASSETS) {
+      const gap = w[a] * total - hold[a];
+      if (w[a] > 0 && gap > 0) { if (px[a] === null) waiting.push(a); else gaps[a] = gap; }
+    }
+    let g = 0;
+    for (const a of ASSETS) if (a in gaps) g += gaps[a];
+    if (free <= 0 || g <= 0) return { trades: [], waiting };
+    const scale = Math.min(1, free / g), trades = [];
+    for (const a of ASSETS) {
+      if (!(a in gaps)) continue;
+      const sek = gaps[a] * scale;
+      if (sek < minTrade) continue;
+      trades.push({ asset: a, side: "köp", units: sek * (1 - fee) / px[a], priceSek: px[a], sek, feeSek: sek * fee });
+    }
+    return { trades, waiting };
+  }
+  function savingsText(sav, past) {
+    const months = sav.months.map((k) => MONTHS[Number(k.slice(5, 7)) - 1]);
+    let s = `Månadssparande: ${num(sav.sek)} kr in` + (sav.months.length > 1 ? ` (${list(months)}).` : ".");
+    const buys = sav.trades.map((t) => `${NAMES[t.asset]} för ${num(t.sek)} kr`);
+    if (buys.length) s += ` Jag ${past ? "köpte" : "köper"} ${list(buys)}.`;
+    else if (!sav.waiting.length) s += " Pengarna ligger som kontanter tills vidare.";
+    if (sav.waiting.length) s += ` Jag väntar på pris för ${list(sav.waiting.map((a) => NAMES[a]))}, så den delen ligger som kontanter.`;
+    return s;
+  }
+  // Nästa sparandedag (för översikten): i dag om något ska in, annars nästa sparandedag efter i dag. null = av.
+  function nextSavings(s, history, iso) {
+    const plan = savingsPlan(s);
+    if (!plan) return null;
+    if (savingsDue(s, history, iso).length) return iso;
+    let y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7));
+    for (let i = 0; i < 3; i++) {
+      const when = `${y}-${String(m).padStart(2, "0")}-${String(plan.day).padStart(2, "0")}`;
+      if (when > iso && (!isIso(s.since) || when >= s.since)) return when;
+      if (m === 12) { y += 1; m = 1; } else m += 1;
+    }
+    return null;
+  }
+
+  function rebalanceTrades(pf, px, hold, total, w, rules, fee, sellAll) {
     const band = Math.max(rules.paper.minTradePct, decision(rules).bandPp) / 100 * total;
     const minTrade = rules.paper.minTradePct / 100 * total;
     let cashFree = hold.CASH - rules.minCash * total;
     const pos = pf.positions || {}, trades = [], waiting = [];
     for (const a of ASSETS) {
       const target = w[a] * total;
-      if (hold[a] > target + band) {
+      if (hold[a] > target + (sellAll && target === 0 ? 0 : band)) {
         if (px[a] === null) { waiting.push(a); continue; }
         const units = target === 0 ? pos[a].units : (hold[a] - target) / px[a];
         const gross = units * px[a];
@@ -149,7 +230,7 @@
       for (const t of trades) {
         const a = t.asset, share = total ? round(hold[a] / total * 100, 0) : 0, pct = round(w[a] * 100, 0);
         if (t.side === "sälj") parts.push(`${NAMES[a]} har vuxit till ${share} % – jag säljer för ${num(t.sek)} kr, tillbaka till ${pct} %.`);
-        else if (hold[a] <= 0) fresh.push(`${NAMES[a]} för ${num(t.sek)} kr (${pct} %)`);
+        else if (hold[a] <= 0 || share === 0) fresh.push(`${NAMES[a]} för ${num(t.sek)} kr (${pct} %)`);
         else parts.push(`${NAMES[a]} ligger på ${share} % – jag köper för ${num(t.sek)} kr, tillbaka till ${pct} %.`);
       }
       if (fresh.length) parts.push(`jag köper ${list(fresh)}.`);
@@ -170,8 +251,11 @@
     const red = row.ready ? row.red : null, mode = row.ready ? suggestMode(red, current, r) : current;
     const px = {};
     for (const a of ASSETS) px[a] = (row.px && row.px[a]) || null;
-    const { w, missing } = weightsFor(r, exchange);
-    if (ASSETS.some((a) => w[a] > 0) && ASSETS.every((a) => !(w[a] > 0) || px[a] === null)) {
+    // Målläget: andelarna krymper mot kontanter de sista 24 månaderna före målets datum
+    const glide = glideFactor(user.goal, row.date);
+    const { w, missing } = weightsFor(r, exchange, glide);
+    const wanted = ASSETS.filter((a) => Number((r.caps || {})[a] || 0) > 0 && !missing.includes(a));
+    if (wanted.length && wanted.every((a) => px[a] === null)) {
       return { ready: false, strategy: "autopilot", red, mode: current, currentMode: current, trades: [], valueSek: null,
         missing, waiting: [], plain: "Jag väntar på priser innan jag gör något." };
     }
@@ -179,17 +263,33 @@
     const journal = user.journal || [];
     const { due, first, catchUp } = isDue(row.date, r, pf, journal);
     const fee = (exchange.takerPct + exchange.slippagePct + (exchange.quote !== "SEK" ? exchange.fxPct : 0)) / 100;
-    const { trades, waiting } = due ? rebalanceTrades(pf, px, hold, total, w, r, fee) : { trades: [], waiting: [] };
-    for (const t of trades) {
+    // Månadssparandet: in som kontanter, köp direkt med bara de nya pengarna, sedan söndagens vanliga koll.
+    const months = savingsDue(user.savings, pf.history, row.date);
+    let sav = null, sTrades = [], hold2 = hold, total2 = total;
+    if (months.length) {
+      const each = savingsPlan(user.savings).each, dep = each * months.length;
+      hold2 = Object.assign({}, hold, { CASH: hold.CASH + dep });
+      total2 = total + dep;
+      const st = savingsTrades(px, hold2, total2, w, r, fee, dep);
+      sTrades = st.trades;
+      for (const t of sTrades) { hold2[t.asset] += t.units * px[t.asset]; hold2.CASH -= t.sek; }
+      total2 = sum(hold2);
+      sav = { months, eachSek: each, sek: dep, valueBefore: round(total, 2), trades: sTrades, waiting: st.waiting };
+    }
+    const { trades, waiting } = due ? rebalanceTrades(pf, px, hold2, total2, w, r, fee, glide === 0) : { trades: [], waiting: [] };
+    for (const t of sTrades.concat(trades)) {
       t.sek = round(t.sek, 2); t.feeSek = round(t.feeSek, 2); t.priceSek = round(t.priceSek, 2);
       t.units = round(t.units, 8);
     }
     const wantedMissing = missing.filter((a) => ((r.caps || {})[a] || 0) > 0);
-    const plain = autopilotPlain(trades, hold, total, w, first, due, row.date, r, waiting, wantedMissing,
+    let plain = autopilotPlain(trades, hold2, total2, w, first, due, row.date, r, waiting, wantedMissing,
       catchUp, lastCheck(journal, pf) === row.date && !first);
-    return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades, valueSek: round(total, 2),
-      plain, missing, waiting, decisionDay: due, check: due && !waiting.length,
-      needsApproval: trades.length > 0 || mode !== current || (due && (!catchUp || !waiting.length)), nextCheck: nextCheck(row.date, r), weights: w };
+    const plainAuto = plain;
+    if (sav) plain = savingsText(sav, false) + " " + (due ? plain : `Nästa koll ${dayText(nextCheck(row.date, r))}.`);
+    return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades: sTrades.concat(trades), valueSek: round(total, 2),
+      plain, plainAuto, missing, waiting, decisionDay: due, check: due && !waiting.length,
+      needsApproval: trades.length > 0 || !!sav || mode !== current || (due && (!catchUp || !waiting.length)), nextCheck: nextCheck(row.date, r), weights: w,
+      glide, savings: sav };
   }
 
   // ---------- Förslag ----------
@@ -272,6 +372,18 @@
     const pf = user.portfolio, pos = pf.positions || (pf.positions = {});
     const facts = [];
     user.trades = user.trades || [];
+    const hist = pf.history || (pf.history = []);
+    const sav = prop.savings || null;
+    if (sav) { // månadssparandet: en historikrad med flow per månad, före affärerna
+      if (hist.length && hist[hist.length - 1].date === date && !hist[hist.length - 1].flow) hist.pop();
+      let cash = pf.holdings.CASH;
+      sav.months.forEach((mth, i) => {
+        cash = round(cash + sav.eachSek, 2);
+        hist.push({ date, value: round(sav.valueBefore + sav.eachSek * (i + 1), 2), cash, flow: sav.eachSek, note: SAVINGS_NOTE, month: mth });
+        facts.push(`Månadssparande ${mth}: +${num(sav.eachSek)} kr (låtsasinsättning)`);
+      });
+      pf.holdings.CASH = cash;
+    }
     for (const t of prop.trades) {
       const a = t.asset, p = pos[a] || (pos[a] = { units: 0, costSek: 0, since: date });
       if (t.side === "köp") {
@@ -300,7 +412,6 @@
     pf.peak = Math.max(pf.peak, pf.value);
     if (prop.trades.length && !pf.firstTrade) pf.firstTrade = date;
     const note = [...new Set(prop.trades.map((t) => t.side))].sort().join("/") || "läge";
-    const hist = pf.history || (pf.history = []);
     if (hist.length && hist[hist.length - 1].date === date && !hist[hist.length - 1].flow) hist.pop();
     hist.push({ date, value: pf.value, cash: pf.holdings.CASH, note });
 
@@ -308,11 +419,14 @@
     const auto = prop.strategy === "autopilot";
     if (prop.red != null) facts.push(auto ? `Marknaden ${MOODS[prop.mode]}: ${prop.red}/10 varningar` : `${prop.red}/10 röda lampor → ${WORDS[prop.mode]}`);
     if (auto) facts.push("Autopilot: " + ASSETS.map((a) => `${a} ${round(prop.weights[a] * 100, 0)} %`).join(" · "));
+    if (auto && prop.glide != null && prop.glide < 1) facts.push(`Målläge: ${round(prop.glide * 100, 0)} % av vanliga andelar`);
     facts.push(`Kontant ${num(pf.holdings.CASH)} kr av ${num(pf.value)} kr`);
-    const done = prop.trades.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
+    const rest = sav ? prop.trades.slice(sav.trades.length) : prop.trades;
+    const done = rest.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
     const waitText = (prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "";
     const plain = auto
-      ? (done.length ? `Jag ${done.join(" och ")}. Autopiloten justerade andelarna. ` : prop.decisionDay ? `${prop.plain} ` : "") +
+      ? (sav ? savingsText(sav, true) + " " : "") +
+        (done.length ? `Jag ${done.join(" och ")}. Autopiloten justerade andelarna. ` : prop.decisionDay ? `${prop.plainAuto != null ? prop.plainAuto : prop.plain} ` : "") +
         (prop.red != null ? `Marknaden är ${MOODS[prop.mode]} (${prop.red} av 10 varningar) – det ändrar inte vad jag gör. ` : "") +
         `${num(pf.holdings.CASH)} kr ligger som kontanter.` + (done.length ? waitText : "")
       : (done.length ? `Jag ${done.join(" och ")}. ` : "") +
@@ -320,6 +434,7 @@
     const entry = { date, mode: prop.mode, red: prop.red, plain, facts,
       trades: prop.trades.map((t) => ({ asset: t.asset, side: t.side, sek: t.sek })) };
     if (auto && prop.check) entry.check = true; // autopilotens koll är gjord i dag (se isDue)
+    if (sav) entry.savings = { sek: sav.sek, months: sav.months.slice() };
     (user.journal || (user.journal = [])).unshift(entry);
     return entry;
   }
@@ -420,9 +535,11 @@
       s = `Medan du var borta handlade jag inget. Läget är nu ${WORDS[events[events.length - 1].mode]}.`;
     }
     if (unlocked.length) s += ` ${list(unlocked)} är upplåst.`;
+    const saved = events.reduce((t, e) => t + ((e.savings && e.savings.sek) || 0), 0);
+    if (saved > 0) s += ` Månadssparandet satte in ${num(saved)} kr (låtsaspengar).`;
     return s;
   }
 
   root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, MOODS, NAMES,
-    strategyOf, nextCheck, dayText };
+    strategyOf, nextCheck, dayText, glideFactor, savingsPlan, savingsDue, nextSavings, SAVINGS_NOTE };
 })(typeof window !== "undefined" ? window : this);

@@ -33,6 +33,13 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
   En klar koll skrivs som journalpost med `check: true` (senaste sådan = senaste kollen); väntar en tillgång på pris görs kollen
   om nästa dag, tyst (ingen journalpost på ikapp-dagar utan affär). Autopiloten handlar på priserna även när lamporna inte är klara.
   Samma kod i `walter_paper.propose`, `js/engine.js` och `backtest/sim.autopilot()` (paritetstest).
+- Månadssparande (`savings: {monthlySek, day 1..28, since}`, top-level i state.json / i `walter.user`; 0 = av): på dagen,
+  eller första körningen efter, en gång per månad (missade månader var för sig) sätts beloppet in som historikrad
+  `{"flow", "note": "månadssparande", "month"}` och köps direkt mot andelarna med bara de nya pengarna (inga sälj,
+  minCash håller, minTradePct räknas på insättningen). Insättningar är aldrig vinst (app, K4, Sharpe räknar bort dem).
+- Målläge (`goal: {name, amountSek, date}` eller null): de sista 24 månaderna skalas andelarna med
+  f = clamp(dagar kvar / 730,5, 0, 1); på datumet säljs allt på söndagskollen. Ersätter gamla `walter.plan`.
+  Samma kod i `walter_paper` och `js/engine.js` (paritet: `tests/make_fixtures.py` → savingsGoal). Historik: docs/BACKTEST.md.
 - Lamporna och läget räknas och visas fortfarande ("Walters väderrapport", journalens `mode`), men i autopiloten ÄNDRAR DE INGA AFFÄRER
   och Levels låser ingenting. Allt nedan om lägen, ETH-villkor, guldsignal och Levels gäller bara `"strategy": "lamps"`.
 - Läge från röda lampor (`rules.modes`): 0–2 = Köper (OFFENSIV, fulla tak), 3–4 = Köper lite (NORMAL, halva taken), 5–6 = Avvaktar (rör inget), 7+ = Vilar (PARKERA, säljer till kontant).
@@ -56,7 +63,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Boot (`js/boot.js`): `data/state.js` finns → ägare lokalt. Annars `walter.ownerKey` i localStorage (skrivs in under Inställningar) → dekryptera `owner.enc` → ägarens Walter. Annars landning (`js/landing.js`) → användarens Walter eller intro (`js/intro.js`).
 
 ## Walter som app (användare, steg 9)
-- Allt sparas i webbläsaren: `walter.user` (state), `walter.user.goal`, `walter.user.plan`, `walter.ownerKey`. Inget skickas någonstans. Säkerhetskopia/inläsning finns i Inställningar (`js/user-state.js`).
+- Allt sparas i webbläsaren: `walter.user` (state, inkl. `savings`/`goal`), `walter.user.goal` (uttagsräknaren), `walter.ownerKey`. Inget skickas någonstans. Säkerhetskopia/inläsning finns i Inställningar (`js/user-state.js`).
 - `js/engine.js` = trade-motorn i JS (samma regler som `walter_paper.py`), `catchUp` spelar upp missade loggdagar från `market.js` → `log` och visar en ikapp-notis. Ny användare: Walter gör sitt första drag samma dag.
 - `js/exchanges.js`: 5 MiCA-börser (Bitstamp, Bybit EU, Kraken, OKX Europe, Safello) med avgift, tillstånd och källa/datum. Alla avgifter är paper, inga riktiga pengar.
 - `js/vault.js` = dekryptering i webbläsaren (samma format som `walter_vault.py`).

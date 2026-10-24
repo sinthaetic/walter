@@ -147,20 +147,132 @@ def day_text(iso):
     return f"{DAY_WORDS[d.weekday()]} {d.day} {MONTHS[d.month - 1]}"
 
 
-def weights_for(rules, assets=None):
-    """Målandelar (rules.caps). Det börsen saknar får andel 0 och ligger som kontanter."""
+def weights_for(rules, assets=None, glide=1.0):
+    """Målandelar (rules.caps) gånger målläget (glide, 0..1). Det börsen saknar får andel 0 och ligger som kontanter."""
     caps = rules.get("caps") or {}
-    w = {a: float(caps.get(a, 0)) for a in ASSETS}
+    w = {a: float(caps.get(a, 0)) * glide for a in ASSETS}
     missing = [a for a in ASSETS if assets is not None and assets.get(a) is not True]
     for a in missing:
         w[a] = 0.0
     return w, missing
 
 
-def rebalance_trades(pf, px, hold, total, weights, rules, fee):
+# ---------- Målläge ----------
+GLIDE_DAYS = 730.5  # 24 månader
+
+
+def _iso(v):
+    try:
+        return date.fromisoformat(v) if isinstance(v, str) and len(v) == 10 else None
+    except ValueError:
+        return None
+
+
+def glide_factor(goal, today):
+    """Målläget: från 24 månader före måldatumet skalas autopilotens andelar med f = dagar kvar / 730,5,
+    begränsat till 0..1 och avrundat till 4 decimaler. Inget mål (eller inget giltigt datum) = 1.
+    Samma kod som js/engine.js glideFactor (paritetstest)."""
+    g = _iso((goal or {}).get("date")) if isinstance(goal, dict) else None
+    if g is None:
+        return 1.0
+    days = (g - date.fromisoformat(today)).days
+    return round(min(1.0, max(0.0, days / GLIDE_DAYS)), 4)
+
+
+# ---------- Månadssparande ----------
+SAVINGS_NOTE = "månadssparande"
+
+
+def savings_plan(s):
+    """(belopp, dag) ur savings = {monthlySek, day 1..28, since}. None = av (belopp 0 eller ogiltigt)."""
+    if not isinstance(s, dict):
+        return None
+    amt, d = s.get("monthlySek"), s.get("day", 25)
+    if isinstance(amt, bool) or not isinstance(amt, (int, float)) or not math.isfinite(amt) or amt <= 0:
+        return None
+    if isinstance(d, float) and d.is_integer():
+        d = int(d)  # 25.0 i JSON är samma dag som 25 (som Number.isInteger i JS)
+    if isinstance(d, bool) or not isinstance(d, int) or not 1 <= d <= 28:
+        return None
+    return float(amt), d
+
+
+def savings_due(s, history, today):
+    """Månader (YYYY-MM) vars sparande ska in i dag: sparandedagen har passerat, inte före savings.since,
+    och månaden finns inte redan som historikrad (note månadssparande, month). Saknas since räknas bara
+    innevarande månad. Två missade månader = två insättningar. Samma kod som js/engine.js savingsDue."""
+    plan = savings_plan(s)
+    if not plan:
+        return []
+    d = plan[1]
+    since = _iso(s.get("since"))
+    done = max((h["month"] for h in history or [] if h.get("note") == SAVINGS_NOTE
+                and isinstance(h.get("month"), str)), default="")
+    t = date.fromisoformat(today)
+    y, m = (since.year, since.month) if since else (t.year, t.month)
+    out = []
+    while (y, m) <= (t.year, t.month):
+        key = f"{y:04d}-{m:02d}"
+        when = f"{key}-{d:02d}"
+        if when <= today and (since is None or when >= since.isoformat()) and key > done:
+            out.append(key)
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def savings_trades(px, hold, total, weights, rules, fee, deposit):
+    """Månadssparandet investeras direkt, bara med de nya pengarna och bara köp: varje tillgång som ligger
+    under sin andel (efter insättningen) får sin lucka fylld, skalat så att minCash håller. Affärer under
+    minTradePct av INSÄTTNINGEN görs inte (av portföljen skulle varje vanligt sparbelopp stanna i kontanter).
+    Saknas pris väntar den tillgången (de pengarna ligger kvar som kontanter). -> (affärer, väntar), oavrundade."""
+    free = min(deposit, hold["CASH"] - rules["minCash"] * total)
+    min_trade = rules["paper"]["minTradePct"] / 100 * deposit
+    gaps, waiting = {}, []
+    for a in ASSETS:
+        gap = weights[a] * total - hold[a]
+        if weights[a] > 0 and gap > 0:
+            if px[a] is None:
+                waiting.append(a)
+            else:
+                gaps[a] = gap
+    g = sum(gaps.values())
+    if free <= 0 or g <= 0:
+        return [], waiting
+    scale = min(1.0, free / g)
+    trades = []
+    for a in ASSETS:
+        if a not in gaps:
+            continue
+        sek = gaps[a] * scale
+        if sek < min_trade:
+            continue
+        trades.append({"asset": a, "side": "köp", "units": sek * (1 - fee) / px[a], "priceSek": px[a],
+                       "sek": sek, "feeSek": sek * fee})
+    return trades, waiting
+
+
+def month_list(months):
+    return _list([MONTHS[int(k[5:7]) - 1] for k in months])
+
+
+def savings_text(sav, past):
+    """Walters ord om månadssparandet. past=True i journalen ("köpte"), annars "köper"."""
+    s = f"Månadssparande: {num(sav['sek'])} kr in" + (f" ({month_list(sav['months'])})." if len(sav["months"]) > 1 else ".")
+    buys = [f"{NAMES[t['asset']]} för {num(t['sek'])} kr" for t in sav["trades"]]
+    if buys:
+        s += f" Jag {'köpte' if past else 'köper'} {_list(buys)}."
+    elif not sav["waiting"]:
+        s += " Pengarna ligger som kontanter tills vidare."
+    if sav["waiting"]:
+        s += f" Jag väntar på pris för {_list([NAMES[a] for a in sav['waiting']])}, så den delen ligger som kontanter."
+    return s
+
+
+def rebalance_trades(pf, px, hold, total, weights, rules, fee, sell_all=False):
     """Autopilotens affärer: en tillgång som glidit MER än bandet (minst minTradePct) från sin andel går hela
     vägen tillbaka till andelen. Sälj först, köp sedan med kontanterna över minCash. Affärer under minTradePct
-    görs inte. Saknas pris väntar den tillgången. Returnerar (affärer, väntar), oavrundade."""
+    görs inte. Saknas pris väntar den tillgången. sell_all (målets datum är nått): allt säljs, även inom bandet.
+    Returnerar (affärer, väntar), oavrundade."""
     band = max(rules["paper"]["minTradePct"], decision(rules)[1]) / 100 * total
     min_trade = rules["paper"]["minTradePct"] / 100 * total
     cash_free = hold["CASH"] - rules["minCash"] * total
@@ -168,7 +280,7 @@ def rebalance_trades(pf, px, hold, total, weights, rules, fee):
     trades, waiting = [], []
     for a in ASSETS:
         target = weights[a] * total
-        if hold[a] > target + band:
+        if hold[a] > target + (0 if sell_all and target == 0 else band):
             if px[a] is None:
                 waiting.append(a); continue
             units = pos[a]["units"] if target == 0 else (hold[a] - target) / px[a]
@@ -212,7 +324,7 @@ def autopilot_plain(trades, hold, total, weights, first, due, today, rules, wait
             if t["side"] == "sälj":
                 parts.append(f"{NAMES[a]} har vuxit till {share} % – jag säljer för {num(t['sek'])} kr, "
                              f"tillbaka till {w} %.")
-            elif hold[a] <= 0:
+            elif hold[a] <= 0 or share == 0:  # inget (eller bara en sparslant) än: "jag köper bitcoin för …"
                 fresh.append(f"{NAMES[a]} för {num(t['sek'])} kr ({w} %)")
             else:
                 parts.append(f"{NAMES[a]} ligger på {share} % – jag köper för {num(t['sek'])} kr, "
@@ -245,8 +357,10 @@ def propose_autopilot(state, today, assets=None):
     red = score["red"] if lamps_ok else None
     mode = suggest_mode(red, current, r) if lamps_ok else current
     px = prices_sek(m)
-    weights, missing = weights_for(r, assets)
-    wanted = [a for a in ASSETS if weights[a] > 0]
+    # Målläget: andelarna krymper mot kontanter de sista 24 månaderna före målets datum
+    glide = glide_factor(state.get("goal"), today)
+    weights, missing = weights_for(r, assets, glide)
+    wanted = [a for a in ASSETS if (r.get("caps") or {}).get(a, 0) > 0 and a not in missing]
     if wanted and all(px[a] is None for a in wanted):  # inga priser alls: vänta (samma som js/engine.js)
         return {"asOf": today, "ready": False, "strategy": "autopilot", "red": red, "mode": current,
                 "currentMode": current, "trades": [], "valueSek": None, "missing": missing, "waiting": [],
@@ -255,23 +369,44 @@ def propose_autopilot(state, today, assets=None):
     journal = state.get("journal") or []
     due, first, catch_up = is_due(today, r, pf, journal)
     fee = (r["withdrawalFees"]["takerPct"] + r["withdrawalFees"]["slippagePct"]) / 100
-    trades, waiting = rebalance_trades(pf, px, hold, total, weights, r, fee) if due else ([], [])
-    for t in trades:
+    # Månadssparandet: in som kontanter, köp direkt med bara de nya pengarna. Sedan söndagens vanliga koll
+    # på portföljen efter sparköpen.
+    months = savings_due(state.get("savings"), pf.get("history"), today)
+    sav, s_trades, hold2, total2 = None, [], hold, total
+    if months:
+        each = savings_plan(state["savings"])[0]
+        dep = each * len(months)
+        hold2 = dict(hold, CASH=hold["CASH"] + dep)
+        total2 = total + dep
+        s_trades, s_wait = savings_trades(px, hold2, total2, weights, r, fee, dep)
+        for t in s_trades:
+            hold2[t["asset"]] += t["units"] * px[t["asset"]]
+            hold2["CASH"] -= t["sek"]
+        total2 = sum(hold2.values())
+        sav = {"months": months, "eachSek": each, "sek": dep, "valueBefore": round(total, 2), "trades": s_trades,
+               "waiting": s_wait}
+    trades, waiting = (rebalance_trades(pf, px, hold2, total2, weights, r, fee, glide == 0 and bool(state.get("goal")))
+                       if due else ([], []))
+    for t in s_trades + trades:
         for k in ("sek", "feeSek", "priceSek"):
             t[k] = round(t[k], 2)
         t["units"] = round(t["units"], 8)
     wanted_missing = [a for a in missing if (r.get("caps") or {}).get(a, 0) > 0]
-    plain = autopilot_plain(trades, hold, total, weights, first, due, today, r, waiting, wanted_missing,
+    plain = autopilot_plain(trades, hold2, total2, weights, first, due, today, r, waiting, wanted_missing,
                             catch_up, last_check(journal, pf) == today and not first)
+    plain_auto = plain
+    if sav:
+        plain = savings_text(sav, False) + " " + (plain if due else f"Nästa koll {day_text(next_check(today, r))}.")
     return {"asOf": today, "ready": True, "strategy": "autopilot", "red": red, "mode": mode, "currentMode": current,
-            "trades": trades, "valueSek": round(total, 2), "plain": plain,
+            "trades": s_trades + trades, "valueSek": round(total, 2), "plain": plain, "plainAuto": plain_auto,
             # Kollen skrivs i journalen på beslutsdagen, och en ikapp-dag bara när kollen blev klar (inget väntar på pris),
             # så att ett prisavbrott efter en missad söndag inte ger en journalpost per dag.
-            "needsApproval": bool(trades) or mode != current or (due and (not catch_up or not waiting)),
+            "needsApproval": bool(trades) or bool(sav) or mode != current or (due and (not catch_up or not waiting)),
             "decisionDay": due,
             # En koll räknas som gjord när inget väntar på pris (annars görs den om nästa dag).
             "check": due and not waiting,
-            "nextCheck": next_check(today, r), "weights": weights, "missing": missing, "waiting": waiting}
+            "nextCheck": next_check(today, r), "weights": weights, "missing": missing, "waiting": waiting,
+            "glide": glide, "savings": sav}
 
 
 def propose_lamps(state, today):
@@ -367,6 +502,18 @@ def apply(raw, prop, today):
     pf, r = raw["portfolio"], raw["rules"]
     pos = pf.setdefault("positions", {})
     facts, k4 = [], raw.setdefault("k4", [])
+    hist = pf.setdefault("history", [])
+    sav = prop.get("savings")
+    if sav:  # månadssparandet: en historikrad med flow per månad, före affärerna
+        if hist and hist[-1]["date"] == today and not hist[-1].get("flow"):
+            hist.pop()
+        cash = pf["holdings"]["CASH"]
+        for i, mth in enumerate(sav["months"]):
+            cash = round(cash + sav["eachSek"], 2)
+            hist.append({"date": today, "value": round(sav["valueBefore"] + sav["eachSek"] * (i + 1), 2), "cash": cash,
+                         "flow": sav["eachSek"], "note": SAVINGS_NOTE, "month": mth})
+            facts.append(f"Månadssparande {mth}: +{num(sav['eachSek'])} kr (låtsasinsättning)")
+        pf["holdings"]["CASH"] = cash
     for t in prop["trades"]:
         a, p = t["asset"], pos.setdefault(t["asset"], {"units": 0, "costSek": 0, "since": today})
         if t["side"] == "köp":
@@ -400,7 +547,6 @@ def apply(raw, prop, today):
     if prop["trades"] and not pf.get("firstTrade"):
         pf["firstTrade"] = today
     note = "/".join(sorted({t["side"] for t in prop["trades"]})) or "läge"
-    hist = pf.setdefault("history", [])
     if hist and hist[-1]["date"] == today and not hist[-1].get("flow"):
         hist.pop()
     hist.append({"date": today, "value": pf["value"], "cash": pf["holdings"]["CASH"], "note": note})
@@ -413,15 +559,19 @@ def apply(raw, prop, today):
                      else f"{prop['red']}/10 röda lampor → {WORDS[prop['mode']]}")
     if auto_pilot:
         facts.append("Autopilot: " + " · ".join(f"{a} {round(w * 100)} %" for a, w in prop["weights"].items()))
+    if auto_pilot and prop.get("glide", 1) < 1:
+        facts.append(f"Målläge: {round(prop['glide'] * 100)} % av vanliga andelar")
     facts.append(f"Kontant {num(pf['holdings']['CASH'])} kr av {num(pf['value'])} kr")
+    rest = prop["trades"][len(sav["trades"]):] if sav else prop["trades"]
     done = " och ".join(f"{'köpte' if t['side'] == 'köp' else 'sålde'} {NAMES[t['asset']]} för {num(t['sek'])} kr"
-                        for t in prop["trades"])
+                        for t in rest)
     if auto_pilot:
         weather = (f"Marknaden är {MOODS[prop['mode']]} ({prop['red']} av 10 varningar) – det ändrar inte vad jag gör. "
                    if prop.get("red") is not None else "")
         said = (f"WALTER {done}. Autopiloten justerade andelarna. " if done
-                else f"{prop['plain']} " if prop.get("decisionDay") else "")
-        plain = said + weather + f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
+                else f"{prop.get('plainAuto', prop['plain'])} " if prop.get("decisionDay") else "")
+        plain = (savings_text(sav, True) + " " if sav else "") + said + weather + \
+            f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
     else:
         plain = (f"WALTER {done}. " if done else "") + \
             f"{prop['red']} av 10 lampor var röda, så läget är {WORDS[prop['mode']]}. " \
@@ -429,6 +579,8 @@ def apply(raw, prop, today):
     entry = {"date": today, "mode": prop["mode"], "red": prop["red"], "plain": plain, "facts": facts}
     if auto_pilot and prop.get("check"):
         entry["check"] = True  # autopilotens koll är gjord i dag (se is_due)
+    if sav:
+        entry["savings"] = {"sek": sav["sek"], "months": list(sav["months"])}
     raw["journal"].insert(0, entry)
     return entry
 

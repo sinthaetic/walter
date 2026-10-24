@@ -286,7 +286,9 @@ def fees_pdf(state, cache, rows, year, path):
     story.append(table(data, [32, 40, 40, 30], right_cols=(1, 2)))
     if cc:
         story.append(Paragraph(f"{cc['text']}. Före {cc['date']}: paper-test. Insättningen är ingen vinst.", SMALL))
-    top_up = (cc or {}).get("manualTopUp", 0)
+    # Insättningar = startkapital + manuella påfyllningar + månadssparandet (historikrader med note månadssparande)
+    top_up = (cc or {}).get("manualTopUp", 0) + sum(h.get("flow", 0) for h in pf.get("history", [])
+                                                    if h.get("note") == "månadssparande")
     deposits = pf["start"] + top_up
     gain = pf["value"] - deposits  # marknadsvinst = det som är över insättningarna
     story.append(Spacer(1, 6))
