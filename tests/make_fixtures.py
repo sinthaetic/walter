@@ -148,10 +148,31 @@ def autopilot_cases(lamp_rules):
     return {"rules": rules, "cases": out}
 
 
+def wcipher_cases():
+    """W-Cipher: 400 dagsljus BTC/USD (Bitstamp, från 2014-04-18, alla tio signalsorter finns med). Python-porten
+    (backtest/wcipher.py) är facit för js/wcipher.js. Ljusen tas från fixturen om den finns, annars från
+    backtest/cache (python -m backtest.candles)."""
+    sys.path.insert(0, str(ROOT))
+    from backtest import wcipher
+    path = FIX / "wcipher-bars.json"
+    if path.exists():
+        bars = json.loads(path.read_text(encoding="utf-8"))["bars"]
+    else:
+        from backtest import candles
+        all_bars = candles.load("1d")
+        s = next(i for i, b in enumerate(all_bars) if candles.day_of(b["time"]) == "2014-04-18")
+        bars = [{k: b[k] for k in ("time", "open", "high", "low", "close")} for b in all_bars[s:s + 400]]
+    r = wcipher.compute(bars)
+    doc = {"source": "Bitstamp BTC/USD 1d, 400 ljus från 2014-04-18", "bars": bars,
+           "expect": {"signals": [[x["i"], x["kind"]] for x in r["signals"]], "wt1": r["wt1"], "wt2": r["wt2"]}}
+    path.write_text(json.dumps(doc), encoding="utf-8")
+
+
 def main():
     FIX.mkdir(parents=True, exist_ok=True)
     vault_sample()
     engine_cases()
+    wcipher_cases()
     print("Fixturer skrivna i", FIX)
 
 

@@ -206,3 +206,78 @@ Historiktestet kör nu Walters egen kod: `sim.autopilot()` anropar `walter_paper
 Skillnaden: del 3b köpte bara om köpet (efter kontantgolvet) var större än bandet. Walter köper när andelen glidit mer än
 bandet och köpet är minst 2 % (minTradePct), också om kontanterna bara räcker en bit. Det ger 10 fler små köp, och
 10 % sämsta är i stort sett densamma. Samma platå som i del 3b.
+
+## Testade vi W-Cipher? Ja. (del 5, 24 okt 2026)
+Frågan: kan W-Ciphers köp- och säljsignaler tjäna pengar i både uppgång och nedgång, efter avgifter och svensk skatt?
+Och ska de styra en liten del (10–20 %) av Walter? Kör om: `.venv\Scripts\python.exe -m backtest.wcipher_run` (några sekunder).
+
+**Kort svar: nej.** Signalerna slog inte autopiloten, och att blanka (tjäna på nedgång) slutade nästan alltid med att
+kontot tömdes. Ingen satellit.
+
+### Vad testades
+- W-Cipher exakt som på sidan: `backtest/wcipher.py` är en kopia av `js/wcipher.js` (paritetstest i `tests/js/wcipher.test.js`).
+  Standardinställningarna, ingen justering. BTC/USD från Bitstamp, dagsljus och 4-timmarsljus, hela vägen från 2011.
+- Signalen på en stapel handlas på **nästa** stapels öppning. Ingen titt framåt.
+- Fyra varianter bestämdes i förväg: *bas* (köp på kop/guld, sälj på salj/blod), *stora* (alla stora signaler),
+  *kop+salj*, och *blod ut* (köp på kop/guld, sälj bara på blod).
+- **Bara köp** (spot, allt i BTC eller allt i kontanter): samma börs som autopiloten (1 % per affär), svensk skatt.
+- **Köp och blanka** (terminer, 1×): lång på köpsignal, kort på säljsignal. 0,1 % per affär, finansiering 0,01 % per
+  8 timmar (ca 11 % per år). En kort position likvideras när priset nästan fördubblas – då är insatsen borta.
+  Förenkling: vinst och förlust på terminer beskattas som krypto (30 %, förluster 70 %). Obs: terminer för privatpersoner
+  finns troligen inte hos MiCA-börserna i Walter (Bitstamp, Bybit EU, Kraken, OKX Europe, Safello).
+- Val på 2014–2019, kontroll oförändrat på 2020–idag, och start varje kvartal 2014–2024 (44 starter).
+
+### Pengatabellen (kr på banken per 100 000 kr)
+| Strategi | 2014–2019 | 2020–idag | Median 44 starter | 10 % sämsta | Största nedgång | Median från 2020 | Affärer | Avgifter | Skatt |
+|---|---|---|---|---|---|---|---|---|---|
+| **Autopiloten (live)** | **1 213 000** | **573 000** | **524 000** | 143 000 | 55 % | 163 000 | 64 | 24 000 | 185 000 |
+| Bästa W-Cipher, bara köp (dag, blod ut) | 942 000 | 623 000 | 590 000 | 170 000 | **78 %** | 248 000 | 16 | 64 000 | 275 000 |
+| Bästa W-Cipher, köp och blanka (dag, blod ut) | 465 000 | 302 000 | 296 000 | 169 000 | **92 %** | 238 000 | 28 | 160 000 | 147 000 |
+| Satellit 10 % W-Cipher + 90 % autopilot | 1 185 000 | 578 000 | 540 000 | 155 000 | 59 % | 174 000 | 80 | 28 000 | 199 000 |
+| Satellit 20 % W-Cipher + 80 % autopilot | 1 158 000 | 583 000 | 550 000 | 157 000 | **64 %** | 186 000 | 80 | 32 000 | 208 000 |
+| Kontroll: 10 % bara BTC + 90 % autopilot | 1 182 000 | 602 000 | 560 000 | 144 000 | 60 % | 165 000 | 66 | 24 000 | 201 000 |
+| Kontroll: 20 % bara BTC + 80 % autopilot | 1 151 000 | 631 000 | 596 000 | 145 000 | **65 %** | 170 000 | 66 | 24 000 | 217 000 |
+| Köp och behåll BTC 100 % | 903 000 | 864 000 | 844 000 | 150 000 | **83 %** | 212 000 | 2 | 26 000 | 324 000 |
+| BTC 35 % ombalanserad | 277 000 | 233 000 | 226 000 | 124 000 | 39 % | 132 000 | 193 | 14 000 | 55 000 |
+
+Avgifter, skatt och affärer är medianen över de 44 starterna. **Fetstil** på nedgång = över 60 %.
+
+### W-Ciphers signaler var för sig (2014–idag, dagsljus / 4 timmar)
+| Variant | Bara köp 2014–2019 | Bara köp 2020– | Rundor/år (in+ut) | Träff | Snitt vinst / förlust | Tid i marknad | Köp och blanka: kontot tömt |
+|---|---|---|---|---|---|---|---|
+| bas, dag | 63 000 | 125 000 | 2 | 52 % | +16 % / −16 % | 38 % | 40 av 44 starter |
+| stora, dag | 63 000 | 137 000 | 2 | 57 % | +15 % / −17 % | 36 % | 40 av 44 |
+| kop+salj, dag | 63 000 | 127 000 | 2 | 50 % | +16 % / −14 % | 40 % | 40 av 44 |
+| blod ut, dag | 942 000 | 623 000 | 1 | 69 % | +156 % / −36 % | 84 % | 2 av 44 |
+| bas, 4 h | 29 000 | 28 000 | 18 | 46 % | +6 % / −7 % | 39 % | 28 av 44 |
+| kop+salj, 4 h | 32 000 | 53 000 | 14 | 54 % | +6 % / −9 % | 46 % | 28 av 44 |
+| blod ut, 4 h | 238 000 | 152 000 | 11 | 40 % | +24 % / −9 % | 70 % | 27 av 44 |
+
+"stora, 4 h" är nästan samma som "bas, 4 h". Även **helt utan avgifter** blev bas-signalerna bara 110 000–147 000 kr
+på 12 år, medan BTC steg ungefär 100 gånger. Signalerna har ingen fördel att äta upp – avgifterna gör det bara värre.
+
+### Vad betyder det för drömmen (tjäna på upp OCH ned)?
+- **Säljsignalen kommer för tidigt i en uppgång.** "Salj" säger att vågen vänt ned från toppen, men i en tjurmarknad
+  fortsätter priset upp. En blankning hålls tills nästa köpsignal längst ner, och hinner ofta se priset fördubblas.
+  Då är kontot borta (nov 2015, dec 2020, jan 2021). 1× hävstång skyddar inte en kort position.
+- Den enda varianten som överlevde, *blod ut*, ligger lång 84–97 % av tiden. Den är i praktiken "köp och behåll BTC"
+  med några få utgångar. Dess blankningar (12 stycken på 12 år) förlorade tillsammans ungefär 40 %.
+- Även i björnår tjänade den inte på nedgången: 2018 −66 % och 2022 −56 % (autopiloten: −34 % och −26 %).
+- *Blod ut* (bara köp) gav mer än autopiloten från 2020 (623 000 mot 573 000 kr), men med 66 % nedgång, och mindre
+  än att bara köpa BTC (864 000). Den vinner bara när BTC-andelen (nästan 100 %) vinner.
+- Det som såg bra ut i satelliten var mer BTC, inte signalerna: samma andel som bara köpt BTC gav lika mycket eller mer
+  (median 560 000 mot 540 000), och lika stora nedgångar.
+
+### Hur säkert?
+- **Ganska säkert att svaret är nej** för W-Cipher med dagens inställningar: 16 varianter (4 signalregler × dag/4 h × bara köp/blanka) pekar åt samma håll,
+  och de som handlar ofta förlorar mest. Det enda plus vi såg (10 % sämsta 155 000 mot 143 000 med satellit) kommer från
+  en variant som nästan aldrig handlar (16 affärer på 12 år), och vilar på några få utgångar 2018 och 2022.
+- Vi provade bara de förbestämda varianterna. Andra inställningar kan se bättre ut i efterhand, men det vore just den
+  sortens jakt på siffror som lurar en. Market Cipher-handlare som visar vinster visar sällan avgifter, skatt och förlusterna.
+- Förenklingar: terminsskatten (som krypto), en fast finansiering, inga avbrott på börsen, Bitstamps pris för W-Cipher men
+  Coin Metrics för autopiloten. Satellitens skatt räknas per del (samma summa så länge ett förlustår är under 100 000 kr).
+
+### Rekommendationen
+**Ingen satellit (0 %).** W-Cipher får fortsätta vara ett verktyg att titta på (`cipher.html`), men den ska inte flytta
+pengar, och Walter ska inte blanka. Autopiloten står kvar oförändrad. Vill ägaren ha mer chans (och mer risk) är en större
+BTC-andel ärligare än signaler – men den höjer nedgångarna över 60 %.
