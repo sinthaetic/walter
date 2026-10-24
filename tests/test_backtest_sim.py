@@ -312,6 +312,28 @@ class Del3Model(unittest.TestCase):
         self.assertGreater(len([t for t in ap.trades if t["why"] == "walter"]), 3)
         self.assertAlmostEqual(ap.final_sek, mx.final_sek, places=2)
 
+    def test_autopilot_monthly_savings_and_goal(self):
+        """Månadssparande: en insättning per månad (dagen efter beslutet), köpt direkt. Målläge: allt kontant
+        på målets datum. Allt via walter_paper.propose."""
+        ds = days("2021-01-04", 70)
+        series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0), "gold": const(ds, 10.0), "eth": const(ds, 5.0)}
+        st = sim.Strategy(name="spar", rules=copy.deepcopy(sim.AUTOPILOT_RULES), savings_sek=1000, savings_day=25)
+        r = sim.run(st, ds[0], ds[-1], FREE, start_sek=10000, series=series)
+        rows = [h for h in r.raw["portfolio"]["history"] if h.get("note") == wp.SAVINGS_NOTE]
+        self.assertEqual([(h["date"], h["month"], h["flow"]) for h in rows],
+                         [("2021-01-26", "2021-01", 1000), ("2021-02-26", "2021-02", 1000)])
+        self.assertEqual(r.deposited_sek, 12000)
+        self.assertAlmostEqual(r.final_sek, 12000, places=2)  # gratis börs, oförändrade priser
+        self.assertTrue([t for t in r.trades if t["date"] == "2021-01-26" and t["side"] == "köp"])
+        ds = days("2021-01-04", 800)
+        series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0), "gold": const(ds, 10.0), "eth": const(ds, 5.0)}
+        g = sim.run(sim.Strategy(name="mål", rules=copy.deepcopy(sim.AUTOPILOT_RULES), goal_date=ds[760]),
+                    ds[0], ds[790], FREE, series=series)
+        walter = [t for t in g.trades if t["why"] == "walter"]
+        self.assertEqual({t["side"] for t in walter if t["date"] < ds[2]}, {"köp"})      # full andel från start
+        self.assertEqual({t["side"] for t in walter if t["date"] > ds[60]}, {"sälj"})    # sedan bara mot kontanter
+        self.assertEqual([t for t in g.trades if t["why"] == "slut"], [])                 # allt kontant före slutet
+
     def test_buy_once_mix_waits_for_eth(self):
         ds = days("2021-01-01", 10)
         series = {"btc": const(ds, 100.0), "usdsek": const(ds, 1.0), "gold": const(ds, 10.0),

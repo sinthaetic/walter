@@ -87,6 +87,10 @@ class Strategy:
     stop_ma_days: int = 200         # ... köp tillbaka när priset korsat upp över N-dagarssnittet (eller ny topp)
     stop_assets: tuple = ("BTC", "ETH")
     emergency_pp: float = 0         # B: mellan beslutsdagarna, justera en tillgång som glidit mer än Y procentenheter
+    # Månadssparande och målläge (bara autopiloten, av = 0/None): samma kod som live (walter_paper.propose)
+    savings_sek: float = 0          # kronor in varje månad (växlas till börsens valuta som startbeloppet)
+    savings_day: int = 25
+    goal_date: str = None           # målets datum: de sista 24 månaderna glider andelarna mot kontanter
 
 
 AUTOPILOT_RULES = dict(copy.deepcopy(DEFAULT_RULES), strategy="autopilot",
@@ -430,6 +434,9 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
           "holdings": {"BTC": 0, "ETH": 0, "GOLD": 0, "CASH": cash0}, "history": []}
     raw = {"rules": rules, "portfolio": pf, "mode": "AVVAKTAR", "level": 3 if strategy.no_levels else 1,
            "journal": [], "k4": [], "updatedAt": ""}
+    if strategy.goal_date:
+        raw["goal"] = {"name": "test", "amountSek": 1, "date": strategy.goal_date}
+    res.deposited_sek = start_sek  # alla insättningar i SEK (start + månadssparande)
     res.level_days[raw["level"]] = days[0]
     tax_out_q = 0.0      # uttaget för skatt (räknas tillbaka i levels: skatt är inte marknadsförlust)
     lv_peak = cash0
@@ -456,7 +463,7 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
     def execute(prop, d, px, why):
         """Gör prop:s affärer till dag d:s pris (antal vid sälj, belopp vid köp) och skriv in via walter_paper.apply."""
         rate = mk.rate(d)
-        cash = pf["holdings"]["CASH"]
+        cash = pf["holdings"]["CASH"] + (prop.get("savings") or {}).get("sek", 0)
         pos = pf.get("positions") or {}
         done = []
         for t in prop["trades"]:
@@ -482,6 +489,11 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
                          "priceSek": round(p, 2), "sek": round(sek, 2), "feeSek": round(sek * fee, 2)})
             cash -= sek
         ex = dict(prop, trades=done)
+        sav = prop.get("savings")
+        if sav:  # månadssparandet når börsen i dag (beloppet räknades om till börsens valuta i går)
+            n = len(sav["months"])
+            res.deposited_sek += strategy.savings_sek * n
+            res.fees_sek += strategy.savings_sek * n - sav["sek"] * rate
         wp.apply(raw, ex, d)
         for t in done:
             if t["side"] == "köp":
@@ -589,6 +601,9 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
         # ---------- Beslut för i morgon ----------
         if strategy.weights is None and wp.strategy_of(rules) == "autopilot":
             # Live-koden: samma propose som Walter. Lamporna handlar inte, så de räknas inte här.
+            if strategy.savings_sek and not overlay:  # sparbeloppet i börsens valuta till dagens kurs
+                raw["savings"] = {"monthlySek": exchange.deposit(strategy.savings_sek, mk.rate(d)),
+                                  "day": strategy.savings_day, "since": days[0]}
             if overlay:
                 prop = overlay_decision(d, px, hold, total)
                 if prop is None:
@@ -596,8 +611,8 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
                     continue
             else:
                 prop = wp.propose(dict(raw, market=mk.build(d), lampScore={"source": None}), today=d)
-            if prop["trades"]:
-                pending = prop  # kollen skrivs i journalen när affärerna genomförs i morgon
+            if prop["trades"] or prop.get("savings"):
+                pending = prop  # kollen (och sparandet) skrivs i journalen när affärerna genomförs i morgon
             elif prop.get("check"):
                 raw["journal"].insert(0, {"date": d, "check": True})  # kollen gjord, inget att göra
             res.modes[d] = "AUTOPILOT"

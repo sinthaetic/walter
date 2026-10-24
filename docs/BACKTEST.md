@@ -338,3 +338,32 @@ Affärer, avgifter och skatt = medianen över de 44 starterna. En enda körning:
 ### Beslutet
 **Nej.** Autopiloten står kvar oförändrad: koll en gång i veckan, 5 %-band, ingen broms. Bromsen betalar för skyddet med just de
 rusningar ägaren var rädd att missa. Ingenting byggs live.
+
+## Månadssparande och målläge (24 okt 2026)
+
+Två nya val i Walter (Inställningar → Ditt mål). **Månadssparande:** en fast summa in varje månad (låtsaspengar), som
+Walter köper för direkt efter sina andelar – bara med de nya pengarna, han säljer inget. **Målläge:** ett mål med datum;
+de sista 24 månaderna krymper andelarna med f = månader kvar / 24, så att allt är kontanter på datumet (söndagens koll
+och 5 %-bandet gör flytten). Historiktestet kör samma kod som live (`walter_paper.propose`), Kraken-lik börs, svensk
+skatt. Kör om: `python -m backtest.savings_run` (`backtest/cache/sparande.json`).
+
+**1 000 kr i månaden** (start 1 000 kr, insättning den 25:e, till 22 okt 2026, allt sålt och uttaget):
+
+| Från | Insatt | På banken efter skatt | Skatt | Avgifter |
+|---|---|---|---|---|
+| 2018 | 106 000 kr | 292 985 kr | 82 579 kr | 12 489 kr |
+| 2021 | 70 000 kr | 99 002 kr | 13 292 kr | 3 815 kr |
+
+**Målläget, 3-årsmål** (100 000 kr in, mål 3 år senare, start den 1:a varje månad 2014-01–2023-10, 118 starter):
+
+| | 10 % sämsta | Median | Sämsta | Största nedgång (median) |
+|---|---|---|---|---|
+| Utan glidning | 148 660 kr | 252 411 kr | 121 766 kr | 39 % |
+| Med glidning | 117 362 kr | 201 542 kr | 97 693 kr | 32 % |
+
+**Vad betyder det?** Glidningen gjorde resan lugnare (mindre nedgång), men i den här historiken skyddade den inte
+det sämsta utfallet – den sänkte det. Krypto steg oftast under de sista två åren före ett mål, så kontanterna kostade
+mer än de skyddade; glidningen gav mer på banken i bara 25 % av starterna, och sämsta starten hamnade under insatsen.
+Tolva år är en enda, mycket stark period för krypto, så siffran är ingen garanti åt något håll. Målläget är ett val
+för den som inte tål en stor nedgång strax före datumet – inte ett sätt att få mer pengar. Det står ärligt i appen:
+inget löfte om att nå målet.
