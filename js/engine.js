@@ -422,7 +422,9 @@
     if (auto && prop.glide != null && prop.glide < 1) facts.push(`Målläge: ${round(prop.glide * 100, 0)} % av vanliga andelar`);
     facts.push(`Kontant ${num(pf.holdings.CASH)} kr av ${num(pf.value)} kr`);
     const rest = sav ? prop.trades.slice(sav.trades.length) : prop.trades;
-    const done = rest.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
+    // "köpte bitcoin för 350 kr, ethereum för 200 kr och guld för 200 kr" – ett verb per sida
+    const done = [["sälj", "sålde"], ["köp", "köpte"]].filter(([s]) => rest.some((t) => t.side === s))
+      .map(([s, verb]) => verb + " " + list(rest.filter((t) => t.side === s).map((t) => `${NAMES[t.asset]} för ${num(t.sek)} kr`)));
     const waitText = (prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "";
     const plain = auto
       ? (sav ? savingsText(sav, true) + " " : "") +

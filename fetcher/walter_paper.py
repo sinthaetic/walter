@@ -563,8 +563,9 @@ def apply(raw, prop, today):
         facts.append(f"Målläge: {round(prop['glide'] * 100)} % av vanliga andelar")
     facts.append(f"Kontant {num(pf['holdings']['CASH'])} kr av {num(pf['value'])} kr")
     rest = prop["trades"][len(sav["trades"]):] if sav else prop["trades"]
-    done = " och ".join(f"{'köpte' if t['side'] == 'köp' else 'sålde'} {NAMES[t['asset']]} för {num(t['sek'])} kr"
-                        for t in rest)
+    # "köpte bitcoin för 350 kr, ethereum för 200 kr och guld för 200 kr" – ett verb per sida
+    done = " och ".join(verb + " " + _list([f"{NAMES[t['asset']]} för {num(t['sek'])} kr" for t in rest if t["side"] == side])
+                        for side, verb in (("sälj", "sålde"), ("köp", "köpte")) if any(t["side"] == side for t in rest))
     if auto_pilot:
         weather = (f"Marknaden är {MOODS[prop['mode']]} ({prop['red']} av 10 varningar) – det ändrar inte vad jag gör. "
                    if prop.get("red") is not None else "")
