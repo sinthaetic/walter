@@ -28,6 +28,8 @@ ASSETS = ("BTC", "ETH", "GOLD")
 NAMES = {"BTC": "bitcoin", "ETH": "ethereum", "GOLD": "guld"}
 K4_NAMES = {"BTC": "Bitcoin (BTC)", "ETH": "Ethereum (ETH)", "GOLD": "Guld (PAXG)"}
 WORDS = {"PARKERA": "Vilar", "AVVAKTAR": "Avvaktar", "NORMAL": "Köper lite", "OFFENSIV": "Köper"}
+# Autopiloten: lamporna säger hur marknaden mår, inte vad Walter gör
+MOODS = {"PARKERA": "mycket orolig", "AVVAKTAR": "orolig", "NORMAL": "blandad", "OFFENSIV": "lugn"}
 SHARPE_DAYS = 30
 
 
@@ -407,14 +409,15 @@ def apply(raw, prop, today):
     raw["updatedAt"] = max(raw["updatedAt"], today)
     auto_pilot = prop.get("strategy") == "autopilot"
     if prop.get("red") is not None:
-        facts.append(f"{prop['red']}/10 röda lampor → {WORDS[prop['mode']]}" + (" (väderrapport)" if auto_pilot else ""))
+        facts.append(f"Marknaden {MOODS[prop['mode']]}: {prop['red']}/10 varningar" if auto_pilot
+                     else f"{prop['red']}/10 röda lampor → {WORDS[prop['mode']]}")
     if auto_pilot:
         facts.append("Autopilot: " + " · ".join(f"{a} {round(w * 100)} %" for a, w in prop["weights"].items()))
     facts.append(f"Kontant {num(pf['holdings']['CASH'])} kr av {num(pf['value'])} kr")
     done = " och ".join(f"{'köpte' if t['side'] == 'köp' else 'sålde'} {NAMES[t['asset']]} för {num(t['sek'])} kr"
                         for t in prop["trades"])
     if auto_pilot:
-        weather = (f"Väderrapport: {prop['red']} av 10 lampor röda ({WORDS[prop['mode']]}). "
+        weather = (f"Marknaden är {MOODS[prop['mode']]} ({prop['red']} av 10 varningar) – det ändrar inte vad jag gör. "
                    if prop.get("red") is not None else "")
         said = (f"WALTER {done}. Autopiloten justerade andelarna. " if done
                 else f"{prop['plain']} " if prop.get("decisionDay") else "")

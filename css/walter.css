@@ -169,9 +169,6 @@ details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 
 .mode-name { font-size: 52px; font-weight: 300; letter-spacing: .26em; line-height: 1; white-space: nowrap; }
 .quote { margin-top: 18px; height: 64px; overflow: hidden; font-size: 20px; line-height: 1.6; color: var(--soft); }
 .quote.auto { height: 96px; } /* autopiloten: andelarna + nästa koll, fast höjd */
-/* Autopiloten: läget är vädret – mindre ord med "VÄDER" framför, samma fasta höjd */
-.mode-name.weather { font-size: 40px; display: flex; align-items: center; gap: .5em; }
-.mode-pre { font-size: 12px; letter-spacing: .3em; color: var(--muted); font-weight: 400; }
 .ring-panel { margin-top: 28px; height: 420px; padding: 28px; display: flex; align-items: center; gap: 32px; }
 .ring { position: relative; width: 300px; height: 300px; flex: none; }
 .ring svg { display: block; width: 100%; height: 100%; }
@@ -436,8 +433,6 @@ body.pro .explain { display: none; }
   .mode-name { font-size: clamp(26px, 9vw, 40px); letter-spacing: .3em; }
   .quote { margin-top: 14px; height: 77px; font-size: 17px; line-height: 1.5; }
   .quote.auto { height: 102px; }
-  .mode-name.weather { font-size: clamp(20px, 6.5vw, 30px); }
-  .mode-pre { font-size: 10px; }
   .mode-explain { height: 4.5em; font-size: 13px; }
   .lamp-grid .explain { min-height: 0; }
   .ring-panel { margin-top: 12px; padding: 16px; gap: 18px; border-radius: 22px; }

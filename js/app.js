@@ -126,7 +126,7 @@
 
   // Taket på nuvarande level = summan av upplåsta tak (Level 1: 35 %, Level 3: 75 %)
   // Autopiloten (rules.strategy, standard sedan 23 okt 2026): fasta andelar, koll en dag i veckan.
-  // Lamporna och läget är bara Walters väderrapport, och Levels låser inget.
+  // Lamporna och läget säger bara hur marknaden mår, och Levels låser inget.
   const AUTO = (S.rules.strategy || "autopilot") === "autopilot";
   const unlocked = AUTO ? { BTC: true, ETH: true, GOLD: true } : { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
   const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
@@ -142,7 +142,7 @@
   const apNext = (S.proposal && S.proposal.nextCheck) || (E && S.updatedAt ? E.nextCheck(S.updatedAt, S.rules) : null);
   const apNextText = apNext && E ? E.dayText(apNext) : null;
   const apCash = 1 - ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (apWeights[k] || 0), 0);
-  const autoLine = "Autopilot: " + ["BTC", "ETH", "GOLD"].filter((k) => apWeights[k] > 0)
+  const autoLine = "Jag håller kursen: " + ["BTC", "ETH", "GOLD"].filter((k) => apWeights[k] > 0)
     .map((k) => `${nf(0).format(apWeights[k] * 100)} % ${AP_NAMES[k]}`).concat(`${nf(0).format(apCash * 100)} % kontant`).join(" · ") +
     `. Jag justerar på ${apDay}ar om något glidit mer än ${apBand} procentenheter.`;
 
@@ -171,9 +171,11 @@
   // ================================================================
   // ÖVERSIKT
   // ================================================================
-  $("status-line").textContent = (AUTO ? "WALTERS VÄDERRAPPORT · " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
-  $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
-    <h1 class="mode-name${AUTO ? " weather" : ""}">${AUTO ? '<span class="mode-pre">VÄDER</span>' : ""}${esc(MODE.word)}</h1>`;
+  // Autopiloten: det stora ordet är vad Walter gör. Lamporna säger hur marknaden mår.
+  const MOOD = (E && E.MOODS && E.MOODS[S.mode]) || "okänd";
+  $("status-line").textContent = (AUTO ? "AUTOPILOT · " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
+  $("mode").innerHTML = `<span class="mode-light" style="color: var(--${AUTO ? "teal" : MODE.acc})" aria-hidden="true"><i></i><b></b></span>
+    <h1 class="mode-name">${AUTO ? "AUTOPILOT" : esc(MODE.word)}</h1>`;
   // Ägarens läge byts via journalen, som Walter skriver själv i Actionen: säg rakt ut när lamporna redan pekar på något annat
   const Pnow = S.proposal || {};
   const pending = !AUTO && !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
@@ -184,7 +186,7 @@
       ? ` Lamporna säger nu ${modeOf(Pnow.mode).word} – Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`
       : "");
   $("mode-explain").textContent = AUTO
-    ? "Lamporna visar vädret men handlar inte. Jag säljer det som stigit och köper det som fallit – få affärer, låga avgifter och lite skatt."
+    ? `Marknaden är just nu ${MOOD} (${red} av ${total} varningar). Det ändrar inte vad jag gör: jag säljer det som stigit och köper det som fallit – få affärer, låga avgifter och lite skatt.`
     : "Röd lampa = varning, grön = lugnt. Få varningar och Walter köper, många varningar och han vilar i kontanter. Han köper aldrig för att lamporna är röda.";
 
   // ---------- Ringen: tio bågar, en per lampa ----------
@@ -207,7 +209,7 @@
       <span><i class="r"></i>${nRed} röda = varning</span>
       <span><i class="g"></i>${nGreen} gröna = lugnt</span>
       <span><i class="w"></i>${nWait} väntar</span>
-      <span class="note">${AUTO ? "BARA VÄDER · HANDLAR INTE" : parked
+      <span class="note">${AUTO ? `MARKNADEN: ${MOOD.toUpperCase()} · STYR INTE KÖPEN` : parked
         ? (red <= S.rules.wakeAtRed ? `LAMPORNA SÄGER VAKNA` : `VAKNAR VID ${S.rules.wakeAtRed}/${total}`)
         : `VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}`}</span>
     </div>`;
@@ -295,7 +297,7 @@
       ? `${confirmed} av ${total} lampor har data här. Walter väntar på resten innan han gör något.`
       : `${confirmed} av ${total} lampor har data här. Poängen kommer från journalen tills datahämtningen är på plats.`
     : AUTO
-      ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}). Lamporna är väderrapporten – de ändrar inga affärer.`
+      ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}). Lamporna visar hur marknaden mår – de styr inte affärerna.`
     : !P.ready || P.mode === S.mode
       ? `Poängen räknas från hämtad data (${day(S.lampScore.asOf)}).`
       : isUser
@@ -322,7 +324,7 @@
   $("proposal").innerHTML = `
     <h3>WALTER GJORDE</h3>
     <div class="kv">
-      <div><span>${AUTO ? "VÄDERRAPPORT" : "LÄGE ENLIGT LAMPORNA"}</span><strong>${P.ready && P.mode ? esc(modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
+      <div><span>${AUTO ? "MARKNADEN" : "LÄGE ENLIGT LAMPORNA"}</span><strong>${P.ready && P.mode ? esc(AUTO ? ((E && E.MOODS[P.mode]) || "–").toUpperCase() : modeOf(P.mode).word) : "VÄNTAR"}</strong></div>
       ${AUTO
         ? `<div><span>NÄSTA KOLL</span><strong>${apNextText ? esc(apNextText.toUpperCase()) : "–"}</strong></div>`
         : `<div><span>RÖDA LAMPOR</span><strong>${P.ready ? `${P.red}/${total}` : "–"}</strong></div>`}
@@ -345,7 +347,7 @@
     <h3>STATUS</h3>
     <div class="kv">
       <div><span>SENAST HÄMTAD</span><strong id="status-time">${stamp(S.fetchedAt)}</strong></div>
-      <div><span>${AUTO ? "VÄDER" : "WALTER"}</span><strong>${esc(MODE.word)} · ${red}/${total}</strong></div>
+      <div><span>${AUTO ? "MARKNADEN" : "WALTER"}</span><strong>${esc(AUTO ? MOOD.toUpperCase() : MODE.word)} · ${red}/${total}</strong></div>
       <div><span>MARKNADSVINST</span><strong class="${marketGain < 0 ? "down" : marketGain > 0 ? "up" : ""}">${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))}</strong></div>
     </div>
     ${S.notis && S.notis.text ? `<p class="plain">${esc(S.notis.text)}${notisOld ? ` <span class="small">(från ${day(S.notis.at)})</span>` : ""}</p>` : ""}
@@ -1245,7 +1247,7 @@
     document.querySelectorAll(".nav [data-view]").forEach((a) => {
       if (a.dataset.view === page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
-    document.title = page === "oversikt" ? `WALTER · ${MODE.word}` : `WALTER · ${page === "installningar" ? "INSTÄLLNINGAR" : page.toUpperCase()}`;
+    document.title = page === "oversikt" ? `WALTER · ${AUTO ? "AUTOPILOT" : MODE.word}` : `WALTER · ${page === "installningar" ? "INSTÄLLNINGAR" : page.toUpperCase()}`;
     if (PAGES.includes(h)) window.scrollTo(0, 0);
   };
   window.addEventListener("hashchange", route);

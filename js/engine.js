@@ -7,6 +7,8 @@
   const ASSETS = ["BTC", "ETH", "GOLD"];
   const NAMES = { BTC: "bitcoin", ETH: "ethereum", GOLD: "guld" };
   const WORDS = { PARKERA: "Vilar", AVVAKTAR: "Avvaktar", NORMAL: "Köper lite", OFFENSIV: "Köper" };
+  // Autopiloten: lamporna säger hur marknaden mår, inte vad Walter gör
+  const MOODS = { PARKERA: "mycket orolig", AVVAKTAR: "orolig", NORMAL: "blandad", OFFENSIV: "lugn" };
   const LAMPS = 10;
 
   // Pythons round(): närmaste decimal på flyttalets exakta värde, exakt lika avstånd → jämn siffra.
@@ -304,14 +306,14 @@
 
     user.mode = prop.mode;
     const auto = prop.strategy === "autopilot";
-    if (prop.red != null) facts.push(`${prop.red}/10 röda lampor → ${WORDS[prop.mode]}` + (auto ? " (väderrapport)" : ""));
+    if (prop.red != null) facts.push(auto ? `Marknaden ${MOODS[prop.mode]}: ${prop.red}/10 varningar` : `${prop.red}/10 röda lampor → ${WORDS[prop.mode]}`);
     if (auto) facts.push("Autopilot: " + ASSETS.map((a) => `${a} ${round(prop.weights[a] * 100, 0)} %`).join(" · "));
     facts.push(`Kontant ${num(pf.holdings.CASH)} kr av ${num(pf.value)} kr`);
     const done = prop.trades.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
     const waitText = (prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "";
     const plain = auto
       ? (done.length ? `Jag ${done.join(" och ")}. Autopiloten justerade andelarna. ` : prop.decisionDay ? `${prop.plain} ` : "") +
-        (prop.red != null ? `Väderrapport: ${prop.red} av 10 lampor röda (${WORDS[prop.mode]}). ` : "") +
+        (prop.red != null ? `Marknaden är ${MOODS[prop.mode]} (${prop.red} av 10 varningar) – det ändrar inte vad jag gör. ` : "") +
         `${num(pf.holdings.CASH)} kr ligger som kontanter.` + (done.length ? waitText : "")
       : (done.length ? `Jag ${done.join(" och ")}. ` : "") +
         `${prop.red} av 10 lampor var röda, så läget är ${WORDS[prop.mode]}. ${num(pf.holdings.CASH)} kr ligger som kontanter.` + waitText;
@@ -421,6 +423,6 @@
     return s;
   }
 
-  root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, NAMES,
+  root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, MOODS, NAMES,
     strategyOf, nextCheck, dayText };
 })(typeof window !== "undefined" ? window : this);

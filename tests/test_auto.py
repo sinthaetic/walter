@@ -312,7 +312,7 @@ class NotisAutoTest(unittest.TestCase):
 
     def test_autopilot_lamps_are_weather(self):
         text = wn.text_for(self.ap_state([]), "kvall", "22:05", today=TODAY)
-        self.assertIn("Väder: 3/10 lampor röda (Köper lite).", text)
+        self.assertIn("Marknaden: blandad (3 av 10 varningar).", text)
         self.assertNotIn("Walter håller", text)
         self.assertIn("Autopilot: inget att göra i dag. Nästa koll söndag 25 okt.", text)
 

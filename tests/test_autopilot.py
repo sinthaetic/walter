@@ -124,7 +124,7 @@ class AutopilotTest(unittest.TestCase):
         prop = wp.propose(state(p), today=FRIDAY)
         entry = wp.apply(raw, prop, FRIDAY)
         self.assertTrue(entry["plain"].startswith("WALTER köpte bitcoin för 35 000 kr"))
-        self.assertIn("Väderrapport: 3 av 10 lampor röda (Köper lite).", entry["plain"])
+        self.assertIn("Marknaden är blandad (3 av 10 varningar)", entry["plain"])
         self.assertEqual(raw["portfolio"]["firstTrade"], FRIDAY)
         self.assertEqual(raw["portfolio"]["holdings"]["CASH"], 25000.0)
         self.assertEqual(raw["mode"], "NORMAL")

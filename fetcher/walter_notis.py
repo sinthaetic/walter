@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from walter_fetch import BASE, HTTP, build, load_caches, num, pct, save_caches  # noqa: E402
-from walter_paper import WORDS, day_text  # noqa: E402
+from walter_paper import MOODS, WORDS, day_text  # noqa: E402
 
 TZ = ZoneInfo("Europe/Stockholm")
 SLOTS = {(8, 13): "morgon", (22, 5): "kvall"}
@@ -74,9 +74,9 @@ def text_for(state, slot, when, today=None):
         money = f"Cash {num(cash)} kr vilar" if cash >= value else f"Cash {num(cash)} kr, {num(value - cash)} kr investerat"
         btc = state["market"].get("btc", {})
         btc_txt = "BTC väntar på data" if btc.get("value") is None else f"BTC ${num(btc['value'])}"
-        # Lamporna är vädret, inte vad Walter gör
+        # Lamporna säger hur marknaden mår, inte vad Walter gör
         return (f"{LABEL[slot]} {when}: {money}, {btc_txt}, totalt {num(value)} kr. "
-                f"Väder: {s['red']}/{s['total']} lampor röda ({WORDS.get(state['mode'], state['mode'])})."
+                f"Marknaden: {MOODS.get(state['mode'], 'okänd')} ({s['red']} av {s['total']} varningar)."
                 + autopilot_sentence(state, today))
     pf, m = state["portfolio"], state["market"]
     value, cash = pf["value"], pf["holdings"]["CASH"]
