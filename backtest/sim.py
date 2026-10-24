@@ -82,6 +82,11 @@ class Strategy:
     # Jämförelser utan lampor: fasta andelar {"BTC": 0.35, ...}
     weights: dict = None
     rebalance: bool = True          # True: tillbaka till andelarna när de glidit mer än minTradePct; False: köp en gång
+    # Del 6, bara autopiloten (av = 0): krasch-broms och nödjustering, kollas varje dag på dagens stängning
+    stop_pct: float = 0             # A: sälj en tillgång som fallit X % från högsta stängning sedan senaste affären
+    stop_ma_days: int = 200         # ... köp tillbaka när priset korsat upp över N-dagarssnittet (eller ny topp)
+    stop_assets: tuple = ("BTC", "ETH")
+    emergency_pp: float = 0         # B: mellan beslutsdagarna, justera en tillgång som glidit mer än Y procentenheter
 
 
 AUTOPILOT_RULES = dict(copy.deepcopy(DEFAULT_RULES), strategy="autopilot",
@@ -284,6 +289,59 @@ def filter_trades(prop, pf, total, rules, fee, band_pp=0, no_partial_sells=False
     return dict(prop, trades=sells + kept)
 
 
+def overlay_trades(pf, px, hold, total, weights, rules, fee, bands, force_out=()):
+    """Som walter_paper.rebalance_trades men med eget band per tillgång (bands[a] i procentenheter, None = rör inte).
+    force_out: sälj hela innehavet oavsett band (krasch-bromsen). Sälj först, köp med kontanterna över minCash."""
+    min_pct = rules["paper"]["minTradePct"]
+    min_trade = min_pct / 100 * total
+    cash_free = hold["CASH"] - rules["minCash"] * total
+    pos = pf.get("positions") or {}
+    sells, buys = [], []
+    for a in wp.ASSETS:
+        units = (pos.get(a) or {}).get("units", 0)
+        if px[a] is None or not units:
+            continue
+        target = weights[a] * total
+        b = bands.get(a)
+        if a in force_out or (b is not None and hold[a] > target + max(min_pct, b) / 100 * total):
+            u = units if (a in force_out or target == 0) else (hold[a] - target) / px[a]
+            sells.append({"asset": a, "side": "sälj", "units": u, "priceSek": px[a], "sek": u * px[a],
+                          "feeSek": u * px[a] * fee})
+            cash_free += u * px[a] * (1 - fee)
+    for a in wp.ASSETS:
+        b = bands.get(a)
+        if px[a] is None or b is None or a in force_out:
+            continue
+        target = weights[a] * total
+        if target > hold[a] + max(min_pct, b) / 100 * total:
+            sek = min(target - hold[a], cash_free)
+            if sek < min_trade:
+                continue
+            buys.append({"asset": a, "side": "köp", "units": sek * (1 - fee) / px[a], "priceSek": px[a],
+                         "sek": sek, "feeSek": sek * fee})
+            cash_free -= sek
+    out = sells + buys
+    for t in out:
+        for k in ("sek", "feeSek", "priceSek"):
+            t[k] = round(t[k], 2)
+        t["units"] = round(t["units"], 8)
+    return out
+
+
+class _Trend:
+    """Glidande snitt av en dagserie (USD), bara data <= dagen. None om historiken är kortare än N dagar."""
+
+    def __init__(self, s):
+        self.k = sorted(s)
+        self.pre = [0.0]
+        for d in self.k:
+            self.pre.append(self.pre[-1] + s[d])
+
+    def ma(self, d, n):
+        i = bisect_right(self.k, d)
+        return None if i < n else (self.pre[i] - self.pre[i - n]) / n
+
+
 # ---------- Körningen ----------
 class _Market:
     def __init__(self, series, exchange):
@@ -386,6 +444,14 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
     min_trade_pct = rules["paper"]["minTradePct"] / 100
     red = 0
     last_year = int(days[0][:4])
+    # Del 6: krasch-broms (stop_pct) och nödjustering (emergency_pp), bara för autopiloten
+    usd = {"BTC": mk.btc, "ETH": mk.eth}
+    overlay = strategy.weights is None and wp.strategy_of(rules) == "autopilot" and bool(
+        strategy.stop_pct or strategy.emergency_pp)
+    trend = {a: _Trend(usd[a]) for a in strategy.stop_assets} if strategy.stop_pct else {}
+    peak = {}      # tillgång -> högsta stängning (USD) sedan senaste affären
+    stopped = {}   # tillgång -> {"peak": toppen före bromsen, "below": varit under snittet sedan bromsen}
+    res.stops = []  # (beslutsdag, tillgång, "ut" | "in"); affären sker nästa dag
 
     def execute(prop, d, px, why):
         """Gör prop:s affärer till dag d:s pris (antal vid sälj, belopp vid köp) och skriv in via walter_paper.apply."""
@@ -424,6 +490,8 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
                 book.sell(d, t["asset"], t["units"], (t["sek"] - t["feeSek"]) * rate)
             res.fees_sek += t["feeSek"] * rate
             res.trades.append(dict(t, date=d, why=why))
+            if why == "walter" and t["asset"] in usd and usd[t["asset"]].get(d):
+                peak[t["asset"]] = usd[t["asset"]][d]  # krasch-bromsen räknar från senaste affären
 
     def sell_pro_rata(d, px, need_q, why):
         """Sälj lika stor del av varje innehav så att kontanterna räcker till need_q."""
@@ -454,6 +522,51 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
         res.taxes[year] = tax
         res.fees_sek += need * rate - tax
 
+    def overlay_decision(d, px, hold, total):
+        """Dag d:s stängning -> förslag för i morgon (eller None). Krasch-bromsen och nödjusteringen kollas varje
+        dag; på beslutsdagen gör live-koden (walter_paper.propose) resten, med andel 0 för bromsade tillgångar."""
+        pos = pf.get("positions") or {}
+        new_stop, back = [], []
+        for a in trend:
+            p = usd[a].get(d)
+            if p is None:
+                continue
+            if a in stopped:
+                st, ma = stopped[a], trend[a].ma(d, strategy.stop_ma_days)
+                if ma is not None and p <= ma:
+                    st["below"] = True
+                if (st["below"] and ma is not None and p > ma) or p > st["peak"]:
+                    del stopped[a]
+                    back.append(a)
+                    peak[a] = p
+                    res.stops.append((d, a, "in"))
+            elif (pos.get(a) or {}).get("units"):
+                peak[a] = max(peak.get(a, p), p)
+                if p <= peak[a] * (1 - strategy.stop_pct / 100):
+                    ma = trend[a].ma(d, strategy.stop_ma_days)
+                    stopped[a] = {"peak": peak[a], "below": ma is not None and p <= ma}
+                    new_stop.append(a)
+                    res.stops.append((d, a, "ut"))
+        caps = dict(rules.get("caps") or {})
+        for a in stopped:
+            caps[a] = 0.0
+        r_eff = dict(rules, caps=caps)
+        prop = wp.propose(dict(raw, rules=r_eff, market=mk.build(d), lampScore={"source": None}), today=d)
+        if prop.get("decisionDay"):
+            have = {t["asset"] for t in prop["trades"]}
+            extra = overlay_trades(pf, px, hold, total, prop["weights"], rules, fee, {},
+                                   [a for a in new_stop if a not in have])
+            return dict(prop, trades=extra + prop["trades"])
+        weights, _ = wp.weights_for(r_eff)
+        bands = {a: (strategy.emergency_pp or None) for a in wp.ASSETS}
+        for a in back:
+            bands[a] = 0  # tillbaka in: köp till andelen direkt (minst minTradePct)
+        trades = overlay_trades(pf, px, hold, total, weights, rules, fee, bands, new_stop)
+        if not trades:
+            return None
+        return {"asOf": d, "ready": True, "strategy": "autopilot", "red": None, "mode": raw["mode"],
+                "trades": trades, "weights": weights, "decisionDay": False, "check": False, "plain": ""}
+
     for i, d in enumerate(days):
         px = mk.px(d)
         if pending is not None:
@@ -476,7 +589,13 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
         # ---------- Beslut för i morgon ----------
         if strategy.weights is None and wp.strategy_of(rules) == "autopilot":
             # Live-koden: samma propose som Walter. Lamporna handlar inte, så de räknas inte här.
-            prop = wp.propose(dict(raw, market=mk.build(d), lampScore={"source": None}), today=d)
+            if overlay:
+                prop = overlay_decision(d, px, hold, total)
+                if prop is None:
+                    res.modes[d] = "AUTOPILOT"
+                    continue
+            else:
+                prop = wp.propose(dict(raw, market=mk.build(d), lampScore={"source": None}), today=d)
             if prop["trades"]:
                 pending = prop  # kollen skrivs i journalen när affärerna genomförs i morgon
             elif prop.get("check"):

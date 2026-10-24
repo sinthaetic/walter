@@ -281,3 +281,60 @@ på 12 år, medan BTC steg ungefär 100 gånger. Signalerna har ingen fördel at
 **Ingen satellit (0 %).** W-Cipher får fortsätta vara ett verktyg att titta på (`cipher.html`), men den ska inte flytta
 pengar, och Walter ska inte blanka. Autopiloten står kvar oförändrad. Vill ägaren ha mer chans (och mer risk) är en större
 BTC-andel ärligare än signaler – men den höjer nedgångarna över 60 %.
+
+## Krasch-broms och nödjustering (del 6, 24 okt 2026)
+Frågan: förlorar en koll i veckan för mycket i en kryptokrasch, eller missar den en rusning? Två idéer som aldrig testats.
+Kör om: `.venv\Scripts\python.exe -m backtest.krasch_run` (ca en minut, alla kärnor).
+
+**Kort svar: nej.** Ingen av dem ersätter autopiloten. Krasch-bromsen gör nedgångarna mindre, men kostar ungefär en
+femtedel av pengarna i medianen. Nödjusteringen gör nästan ingenting.
+
+### Vad testades (bestämt innan något kördes)
+- **A. Krasch-broms:** faller BTC eller ETH (var för sig) X % från sin högsta stängning sedan senaste affären, säljs den
+  till kontanter. Den köps tillbaka när priset stänger över sitt N-dagarssnitt efter att ha varit under det (eller över
+  den gamla toppen). X = 15, 20, 25, 30, 40 %, N = 50, 100, 200 dagar.
+- **B. Nödjustering:** söndagens 5 %-band kvar, men glider en andel mer än Y procentenheter någon annan dag justeras den
+  direkt. Y = 10, 15, 20.
+- **C. Båda,** hela rutnätet (45 celler).
+- Kollas varje kväll på dagens stängning, affären görs nästa dag till nästa dags pris. Samma avgifter (Kraken-lik), växling,
+  svensk skatt och närmaste avrundning som förut. Testerna i `tests/test_backtest_crash.py` visar att framtida priser inte
+  ändrar några tidigare affärer.
+- **Val bara på 2014–2019** (20 kvartalsstarter 2014–2018, slut 31 dec 2019). Kontroll oförändrad på 2020–idag
+  (20 kvartalsstarter 2020–2024, slut idag) och de vanliga 44 starterna. Platå = alla grannar inom 15 %.
+
+### Pengatabellen (kr på banken per 100 000 kr)
+| Strategi | Median 2014–19 | 10 % sämsta 2014–19 | Median 2020– | 10 % sämsta 2020– | Median 44 starter | 10 % sämsta 44 | Största nedgång | Affärer | Avgifter | Skatt |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Autopiloten (live)** | **607 000** | 99 000 | 163 000 | 117 000 | **524 000** | **143 000** | 55 % | 64 | 24 000 | 185 000 |
+| A: broms 25 %, snitt 50 (bästa platån) | 509 000 | 100 000 | 170 000 | 116 000 | 411 000 | 137 000 | 44 % | 108 | 57 000 | 178 000 |
+| B: nödjustering 20 pp (alla Y lika) | 607 000 | 99 000 | 163 000 | 117 000 | 524 000 | 143 000 | 55 % | 64 | 24 000 | 185 000 |
+| C: broms 25 %, snitt 200 + nöd 10 pp | 421 000 | 105 000 | 153 000 | 112 000 | 313 000 | 131 000 | 37 % | 93 | 37 000 | 115 000 |
+
+Affärer, avgifter och skatt = medianen över de 44 starterna. En enda körning: autopiloten 1 213 000 kr (2014–2019) och
+573 000 kr (2020–idag), A 841 000 / 521 000, C 550 000 / 376 000.
+
+### I kraschen (en körning från 2014, fall från topp till botten och dagar tills värdet var tillbaka)
+| Krasch | Autopiloten | A: broms 25 %/50 | C: broms + nöd |
+|---|---|---|---|
+| 2018 (topp dec 2017) | −49 %, 529 dagar | −27 %, 371 dagar | −11 %, 22 dagar* |
+| Mars 2020 | −25 %, **71 dagar** | −19 %, 169 dagar | −20 %, 185 dagar |
+| 2022 (topp nov 2021) | −37 %, 823 dagar | −25 %, 590 dagar | −19 %, 519 dagar |
+
+\*C sålde redan i dec 2017 och var i stort sett ute under 2018. B är samma som autopiloten i alla tre.
+
+### Vad betyder det?
+- **Bromsen skyddar i en lång björnmarknad** (2018, 2022): nedgången blev ungefär en tredjedel mindre.
+- **Men den säljer också i varje vanlig dipp.** BTC faller 25 % flera gånger om året i en uppgång. Bromsen sålde ungefär
+  30 gånger (median över starterna) och fick ofta köpa tillbaka högre. I mars 2020 sålde den nära botten och köpte tillbaka i april – därför tog
+  det 169 dagar att komma tillbaka i stället för 71. Fler affärer gav dubbelt så höga avgifter.
+- **Resultat:** sämre median i inställningsperioden (509 000 mot 607 000, −16 %) och för alla 44 starter
+  (411 000 mot 524 000, −22 %). Bara 2020– var den lika bra (median +4 %, 10 % sämsta −1 %, mindre nedgång).
+  Regeln kräver båda perioderna, så A faller.
+- Den enda bromsen som vann tydligt efter 2020 (20 %, snitt 200: median 179 000) var bland de sämsta 2014–2019
+  (374 000) och står inte på en platå. Den hade vi aldrig valt utan att titta på facit.
+- **Nödjusteringen:** en andel glider sällan 10 procentenheter på mindre än en vecka (BTC måste stiga eller falla
+  ungefär 40 % på några dagar). Det hände några gånger på 12 år, och då kom söndagen ändå strax efter. Ingen skillnad.
+
+### Beslutet
+**Nej.** Autopiloten står kvar oförändrad: koll en gång i veckan, 5 %-band, ingen broms. Bromsen betalar för skyddet med just de
+rusningar ägaren var rädd att missa. Ingenting byggs live.
