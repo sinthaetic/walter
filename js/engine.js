@@ -113,11 +113,34 @@
     }
     return { trades, waiting };
   }
-  function autopilotPlain(trades, hold, total, w, first, due, iso, rules, waiting, wantedMissing) {
+  // Som last_check / is_due i Python: senaste kollen = nyaste journalpost med check, annars första affären.
+  function lastCheck(journal, pf) {
+    for (const e of journal || []) if (e && e.check) return e.date;
+    return pf.firstTrade || null;
+  }
+  // Beslutsdag? Första affären: alltid. Annars beslutsveckodagen, eller första dagen efter en missad beslutsdag.
+  function isDue(iso, rules, pf, journal) {
+    if (!pf.firstTrade) return { due: true, first: true, catchUp: false };
+    const wd = decision(rules).wd, lc = lastCheck(journal, pf);
+    if (lc === iso) return { due: false, first: false, catchUp: false };
+    if (weekday(iso) === wd) return { due: true, first: false, catchUp: false };
+    const lastDd = new Date(ms(iso) - ((weekday(iso) - wd + 7) % 7) * 864e5).toISOString().slice(0, 10);
+    const missed = lc === null || lc < lastDd;
+    return { due: missed, first: false, catchUp: missed };
+  }
+  // Har raden pris för allt autopiloten ska äga? (Då räcker raden, även om alla lampor inte är klara.)
+  function pricesFor(row, rules, exchange) {
+    const { w } = weightsFor(rules, exchange);
+    const want = ASSETS.filter((a) => w[a] > 0);
+    return !!row && want.length > 0 && want.every((a) => row.px && row.px[a]);
+  }
+  function autopilotPlain(trades, hold, total, w, first, due, iso, rules, waiting, wantedMissing, catchUp, checkedToday) {
     const wd = decision(rules).wd;
     const nxt = `Nästa koll ${dayText(nextCheck(iso, rules))}.`;
+    const todayWord = DAY_WORDS[weekday(iso)];
+    const head = first ? "Första dagen" : catchUp ? `${cap(todayWord)} (${DAY_WORDS[wd]}ens koll)` : cap(todayWord);
     let s;
-    if (!due) s = `Jag handlar bara på ${DAY_WORDS[wd]}ar. ${nxt}`;
+    if (!due) s = checkedToday ? `Dagens koll är gjord. ${nxt}` : `Jag handlar bara på ${DAY_WORDS[wd]}ar. ${nxt}`;
     else if (trades.length) {
       let parts = [];
       const fresh = [];
@@ -129,23 +152,27 @@
       }
       if (fresh.length) parts.push(`jag köper ${list(fresh)}.`);
       parts = [parts[0]].concat(parts.slice(1).map(cap));
-      const head = first ? "Första dagen" : cap(DAY_WORDS[weekday(iso)]);
       s = `${head}: ${parts.join(" ")} ${nxt}`;
     } else if (first) s = "Jag börjar så fort jag har priserna.";
-    else s = `${cap(DAY_WORDS[wd])}: allt ligger inom marginalen. Jag rör ingenting. ${nxt}`;
+    else s = `${head}: allt ligger inom marginalen. Jag rör ingenting. ${nxt}`;
     if (waiting.length) s += ` Jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}.`;
     for (const a of wantedMissing) s += ` ${cap(NAMES[a])} finns inte på din börs, så den delen ligger kvar som kontanter.`;
     return s;
   }
   function proposeAutopilot(user, row, rules, exchange) {
     const r = rules, pf = user.portfolio, current = user.mode;
-    const red = row.red, mode = suggestMode(red, current, r);
+    // Lamporna är bara vädret: är raden inte klar står läget kvar, men autopiloten handlar på priserna.
+    const red = row.ready ? row.red : null, mode = row.ready ? suggestMode(red, current, r) : current;
     const px = {};
     for (const a of ASSETS) px[a] = (row.px && row.px[a]) || null;
-    const { hold, total } = valuation(pf, px);
     const { w, missing } = weightsFor(r, exchange);
-    const first = !pf.firstTrade;
-    const due = first || weekday(row.date) === decision(r).wd;
+    if (ASSETS.some((a) => w[a] > 0) && ASSETS.every((a) => !(w[a] > 0) || px[a] === null)) {
+      return { ready: false, strategy: "autopilot", red, mode: current, currentMode: current, trades: [], valueSek: null,
+        missing, waiting: [], plain: "Jag väntar på priser innan jag gör något." };
+    }
+    const { hold, total } = valuation(pf, px);
+    const journal = user.journal || [];
+    const { due, first, catchUp } = isDue(row.date, r, pf, journal);
     const fee = (exchange.takerPct + exchange.slippagePct + (exchange.quote !== "SEK" ? exchange.fxPct : 0)) / 100;
     const { trades, waiting } = due ? rebalanceTrades(pf, px, hold, total, w, r, fee) : { trades: [], waiting: [] };
     for (const t of trades) {
@@ -153,15 +180,16 @@
       t.units = round(t.units, 8);
     }
     const wantedMissing = missing.filter((a) => ((r.caps || {})[a] || 0) > 0);
-    const plain = autopilotPlain(trades, hold, total, w, first, due, row.date, r, waiting, wantedMissing);
+    const plain = autopilotPlain(trades, hold, total, w, first, due, row.date, r, waiting, wantedMissing,
+      catchUp, lastCheck(journal, pf) === row.date && !first);
     return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades, valueSek: round(total, 2),
-      plain, missing, waiting, decisionDay: due, nextCheck: nextCheck(row.date, r), weights: w };
+      plain, missing, waiting, decisionDay: due, check: due && !waiting.length, nextCheck: nextCheck(row.date, r), weights: w };
   }
 
   // ---------- Förslag ----------
   function propose(user, row, rules, exchange) {
-    // En loggrad som inte är klar räknas aldrig (catchUp och firstMove hoppar också över den).
-    if (row && row.ready && strategyOf(rules) === "autopilot") return proposeAutopilot(user, row, rules, exchange);
+    // Autopiloten behöver bara priserna; lamp-strategin väntar på en klar rad (alla tio lampor).
+    if (row && strategyOf(rules) === "autopilot") return proposeAutopilot(user, row, rules, exchange);
     const current = user.mode;
     if (!row || !row.ready) {
       return { ready: false, red: row ? row.red : null, mode: current, currentMode: current, trades: [],
@@ -278,13 +306,14 @@
     const done = prop.trades.map((t) => `${t.side === "köp" ? "köpte" : "sålde"} ${NAMES[t.asset]} för ${num(t.sek)} kr`);
     const waitText = (prop.waiting || []).length ? ` Jag väntar på pris för ${list(prop.waiting.map((a) => NAMES[a]))}, så den delen rör jag inte än.` : "";
     const plain = auto
-      ? (done.length ? `Jag ${done.join(" och ")}. Autopiloten justerade andelarna. ` : "") +
+      ? (done.length ? `Jag ${done.join(" och ")}. Autopiloten justerade andelarna. ` : prop.decisionDay ? `${prop.plain} ` : "") +
         (prop.red != null ? `Väderrapport: ${prop.red} av 10 lampor röda (${WORDS[prop.mode]}). ` : "") +
-        `${num(pf.holdings.CASH)} kr ligger som kontanter.` + waitText
+        `${num(pf.holdings.CASH)} kr ligger som kontanter.` + (done.length ? waitText : "")
       : (done.length ? `Jag ${done.join(" och ")}. ` : "") +
         `${prop.red} av 10 lampor var röda, så läget är ${WORDS[prop.mode]}. ${num(pf.holdings.CASH)} kr ligger som kontanter.` + waitText;
     const entry = { date, mode: prop.mode, red: prop.red, plain, facts,
       trades: prop.trades.map((t) => ({ asset: t.asset, side: t.side, sek: t.sek })) };
+    if (auto && prop.check) entry.check = true; // autopilotens koll är gjord i dag (se isDue)
     (user.journal || (user.journal = [])).unshift(entry);
     return entry;
   }
@@ -334,7 +363,9 @@
     const newest = (log || []).reduce((m, r) => (r && typeof r.date === "string" && r.date > m ? r.date : m), "");
     for (const date of Object.keys(byDate).sort()) {
       const row = byDate[date];
-      if (!row.ready) {
+      // Autopiloten handlar på priserna: en rad med pris för allt den ska äga räcker, även om lamporna inte är klara.
+      const auto = strategyOf(rules) === "autopilot";
+      if (!row.ready && !(auto && pricesFor(row, rules, exchange))) {
         if (row.date < newest) user.lastDay = row.date;
         continue;
       }
@@ -346,7 +377,7 @@
       pf.peak = Math.max(pf.peak || 0, pf.value);
 
       // Autopiloten har inga Levels: allt köps från dag 1, så ingen upplåsning räknas.
-      const lv = strategyOf(rules) === "autopilot" ? (user.level || 1) : Math.max(user.level || 1, levelFor(user, row, rules, levels));
+      const lv = auto ? (user.level || 1) : Math.max(user.level || 1, levelFor(user, row, rules, levels));
       if (lv > (user.level || 1)) {
         const entry = { date: row.date, mode: user.mode, red: row.red,
           plain: `Level ${lv} är upplåst: ${UNLOCK_TEXT[lv]}`,
@@ -357,7 +388,7 @@
       }
 
       const prop = propose(user, row, rules, exchange);
-      if (prop.trades.length || prop.mode !== user.mode) {
+      if (prop.trades.length || prop.mode !== user.mode || (auto && prop.decisionDay)) {
         events.push(apply(user, prop, row.date));
       } else {
         // Ingen affär: dagens värde sparas ändå (en riktig loggdag), så att historiken stämmer.

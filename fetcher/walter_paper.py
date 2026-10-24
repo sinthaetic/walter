@@ -116,6 +116,30 @@ def next_check(today, rules):
     return (t + timedelta(days=(decision(rules)[0] - t.weekday()) % 7 or 7)).isoformat()
 
 
+def last_check(journal, pf):
+    """Senaste autopilot-kollen: nyaste journalpost med "check": true, annars första affären (eller None)."""
+    for e in journal or []:
+        if e.get("check"):
+            return e["date"]
+    return pf.get("firstTrade")
+
+
+def is_due(today, rules, pf, journal):
+    """Beslutsdag? Första affären någonsin: alltid. Annars beslutsveckodagen, eller första dagen efter en missad
+    beslutsdag (senaste kollen före den senaste beslutsdagen). Redan kollat i dag: nej. -> (due, first, catch_up)"""
+    if not pf.get("firstTrade"):
+        return True, True, False
+    t, wd = date.fromisoformat(today), decision(rules)[0]
+    lc = last_check(journal, pf)
+    if lc == today:
+        return False, False, False
+    if t.weekday() == wd:
+        return True, False, False
+    last_dd = (t - timedelta(days=(t.weekday() - wd) % 7)).isoformat()
+    missed = lc is None or lc < last_dd
+    return missed, False, missed
+
+
 def day_text(iso):
     d = date.fromisoformat(iso)
     return f"{DAY_WORDS[d.weekday()]} {d.day} {MONTHS[d.month - 1]}"
@@ -168,12 +192,16 @@ def _list(xs):
     return xs[0] if len(xs) < 2 else ", ".join(xs[:-1]) + " och " + xs[-1]
 
 
-def autopilot_plain(trades, hold, total, weights, first, due, today, rules, waiting, wanted_missing):
+def autopilot_plain(trades, hold, total, weights, first, due, today, rules, waiting, wanted_missing,
+                    catch_up=False, checked_today=False):
     """Walters egna ord om autopiloten. Samma text som js/engine.js (paritetstest)."""
     wd = decision(rules)[0]
     nxt = f"Nästa koll {day_text(next_check(today, rules))}."
+    today_word = DAY_WORDS[date.fromisoformat(today).weekday()]
+    head = ("Första dagen" if first else
+            f"{today_word.capitalize()} ({DAY_WORDS[wd]}ens koll)" if catch_up else today_word.capitalize())
     if not due:
-        s = f"Jag handlar bara på {DAY_WORDS[wd]}ar. {nxt}"
+        s = f"Dagens koll är gjord. {nxt}" if checked_today else f"Jag handlar bara på {DAY_WORDS[wd]}ar. {nxt}"
     elif trades:
         parts, fresh = [], []
         for t in trades:
@@ -190,12 +218,11 @@ def autopilot_plain(trades, hold, total, weights, first, due, today, rules, wait
         if fresh:
             parts.append(f"jag köper {_list(fresh)}.")
         parts = [parts[0]] + [p[0].upper() + p[1:] for p in parts[1:]]
-        head = "Första dagen" if first else DAY_WORDS[date.fromisoformat(today).weekday()].capitalize()
         s = f"{head}: {' '.join(parts)} {nxt}"
     elif first:
         s = "Jag börjar så fort jag har priserna."
     else:
-        s = f"{DAY_WORDS[wd].capitalize()}: allt ligger inom marginalen. Jag rör ingenting. {nxt}"
+        s = f"{head}: allt ligger inom marginalen. Jag rör ingenting. {nxt}"
     if waiting:
         s += f" Jag väntar på pris för {_list([NAMES[a] for a in waiting])}."
     for a in wanted_missing:
@@ -213,10 +240,15 @@ def propose_autopilot(state, today, assets=None):
     red = score["red"] if lamps_ok else None
     mode = suggest_mode(red, current, r) if lamps_ok else current
     px = prices_sek(m)
-    hold, total = valuation(pf, px)
     weights, missing = weights_for(r, assets)
-    first = not pf.get("firstTrade")
-    due = first or date.fromisoformat(today).weekday() == decision(r)[0]
+    wanted = [a for a in ASSETS if weights[a] > 0]
+    if wanted and all(px[a] is None for a in wanted):  # inga priser alls: vänta (samma som js/engine.js)
+        return {"asOf": today, "ready": False, "strategy": "autopilot", "red": red, "mode": current,
+                "currentMode": current, "trades": [], "valueSek": None, "missing": missing, "waiting": [],
+                "plain": "Jag väntar på priser innan jag gör något.", "needsApproval": False}
+    hold, total = valuation(pf, px)
+    journal = state.get("journal") or []
+    due, first, catch_up = is_due(today, r, pf, journal)
     fee = (r["withdrawalFees"]["takerPct"] + r["withdrawalFees"]["slippagePct"]) / 100
     trades, waiting = rebalance_trades(pf, px, hold, total, weights, r, fee) if due else ([], [])
     for t in trades:
@@ -224,10 +256,13 @@ def propose_autopilot(state, today, assets=None):
             t[k] = round(t[k], 2)
         t["units"] = round(t["units"], 8)
     wanted_missing = [a for a in missing if (r.get("caps") or {}).get(a, 0) > 0]
-    plain = autopilot_plain(trades, hold, total, weights, first, due, today, r, waiting, wanted_missing)
+    plain = autopilot_plain(trades, hold, total, weights, first, due, today, r, waiting, wanted_missing,
+                            catch_up, last_check(journal, pf) == today and not first)
     return {"asOf": today, "ready": True, "strategy": "autopilot", "red": red, "mode": mode, "currentMode": current,
             "trades": trades, "valueSek": round(total, 2), "plain": plain,
-            "needsApproval": bool(trades) or mode != current, "decisionDay": due,
+            "needsApproval": bool(trades) or mode != current or due, "decisionDay": due,
+            # En koll räknas som gjord när inget väntar på pris (annars görs den om nästa dag).
+            "check": due and not waiting,
             "nextCheck": next_check(today, r), "weights": weights, "missing": missing, "waiting": waiting}
 
 
@@ -375,13 +410,16 @@ def apply(raw, prop, today):
     if auto_pilot:
         weather = (f"Väderrapport: {prop['red']} av 10 lampor röda ({WORDS[prop['mode']]}). "
                    if prop.get("red") is not None else "")
-        plain = (f"WALTER {done}. Autopiloten justerade andelarna. " if done else "") + weather + \
-            f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
+        said = (f"WALTER {done}. Autopiloten justerade andelarna. " if done
+                else f"{prop['plain']} " if prop.get("decisionDay") else "")
+        plain = said + weather + f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
     else:
         plain = (f"WALTER {done}. " if done else "") + \
             f"{prop['red']} av 10 lampor var röda, så läget är {WORDS[prop['mode']]}. " \
             f"{num(pf['holdings']['CASH'])} kr ligger som kontanter."
     entry = {"date": today, "mode": prop["mode"], "red": prop["red"], "plain": plain, "facts": facts}
+    if auto_pilot and prop.get("check"):
+        entry["check"] = True  # autopilotens koll är gjord i dag (se is_due)
     raw["journal"].insert(0, entry)
     return entry
 

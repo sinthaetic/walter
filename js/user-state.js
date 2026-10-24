@@ -108,7 +108,9 @@
   function firstMove(user, market, day) {
     const now = market && market.now;
     const exchange = (root.WALTER_EXCHANGES || []).find((x) => x.id === user.exchangeId) || null;
-    if (!now || !now.ready || !now.rules || !now.levels || !exchange || !isDate(now.date) || !root.WalterEngine) return null;
+    // Autopiloten behöver bara priserna (propose säger ready:false utan pris); lamp-strategin en klar rad.
+    const autoOk = !!root.WalterEngine && !!now && !!now.rules && root.WalterEngine.strategyOf(now.rules) === "autopilot";
+    if (!now || !(now.ready || autoOk) || !now.rules || !now.levels || !exchange || !isDate(now.date) || !root.WalterEngine) return null;
     // Gammal marknadsdata, eller en marknadsdag före starten, är aldrig "dagens" drag.
     if (!isFresh(now, day || today()) || now.date < user.startDate) return null;
     const prop = root.WalterEngine.propose(user, now, now.rules, exchange);

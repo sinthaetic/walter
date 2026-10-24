@@ -478,7 +478,9 @@ def run(strategy, start, end, exchange, start_sek=100000, series=None, lamp_cach
             # Live-koden: samma propose som Walter. Lamporna handlar inte, så de räknas inte här.
             prop = wp.propose(dict(raw, market=mk.build(d), lampScore={"source": None}), today=d)
             if prop["trades"]:
-                pending = prop
+                pending = prop  # kollen skrivs i journalen när affärerna genomförs i morgon
+            elif prop.get("check"):
+                raw["journal"].insert(0, {"date": d, "check": True})  # kollen gjord, inget att göra
             res.modes[d] = "AUTOPILOT"
             continue
         if strategy.weights is not None:

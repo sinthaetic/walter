@@ -192,23 +192,29 @@ test("catchup_old_not_ready_day_is_passed", () => {
 
 // ---------- Autopiloten (paritet mot Python: tests/make_fixtures.py → engine-cases.json → autopilot) ----------
 const AP = ["ap_sunday_within_band", "ap_sunday_outside_band", "ap_weekday_waits", "ap_first_trade_weekday",
-  "ap_missing_gold_on_exchange", "ap_missing_price"];
+  "ap_missing_gold_on_exchange", "ap_missing_price", "ap_lamps_not_ready", "ap_missed_sunday", "ap_checked_today", "ap_no_prices"];
 for (const name of AP) {
   test("parity_" + name, async () => {
     const fx = await fixtures();
     const c = fx.autopilot.cases.find((x) => x.name === name);
     if (!c) throw new Error("fallet saknas i fixturen");
-    const user = Object.assign(newUser(0, 100000), clone(c.user), { journal: [], trades: [] });
+    const user = Object.assign(newUser(0, 100000), clone(c.user), { trades: [] });
     const p = E().propose(user, c.row, fx.autopilot.rules, c.exchange);
     eq(p.strategy, "autopilot");
+    eq(p.ready, c.expect.ready);
+    eq(p.red, c.expect.red);
     eq(p.mode, c.expect.mode);
     eq(p.valueSek, c.expect.valueSek);
     same(p.trades, c.expect.trades);
     eq(p.plain, c.expect.plain);
-    eq(p.nextCheck, c.expect.nextCheck);
     eq(p.waiting, c.expect.waiting);
     eq(p.missing, c.expect.missing);
-    E().apply(user, p, c.row.date);
+    if (!c.expect.ready) return;
+    eq(p.nextCheck, c.expect.nextCheck);
+    eq(p.decisionDay, c.expect.decisionDay);
+    eq(p.check, c.expect.check);
+    const entry = E().apply(user, p, c.row.date);
+    eq(!!entry.check, c.expect.entryCheck);
     same(user.portfolio.holdings, c.expect.portfolio.holdings);
     same(user.portfolio.positions, c.expect.portfolio.positions);
     eq(user.portfolio.value, c.expect.portfolio.value);
@@ -241,4 +247,30 @@ test("autopilot_missing_rules_strategy_is_default", () => {
   const p = E().propose(newUser(100000, 100000), row("2026-10-23", 9), rules, EX);
   eq(p.strategy, "autopilot");
   eq(p.trades.length, 3);
+});
+test("autopilot_catchup_trades_on_prices_when_lamps_not_ready", () => {
+  const user = newUser(100000, 100000);
+  const r = E().catchUp(user, [row("2026-10-01", 4, { ready: false })], AP_RULES, LEVELS, EX);
+  eq(r.user.trades.length, 3);          // priserna räcker
+  eq(r.user.mode, "AVVAKTAR");          // vädret väntar, läget står kvar
+  eq(r.user.lastDay, "2026-10-01");
+  eq(r.user.journal[0].check, true);
+  // Utan pris och utan klara lampor händer inget, och nyaste dagen kan spelas upp senare
+  const u2 = newUser(100000, 100000);
+  E().catchUp(u2, [row("2026-10-01", 4, { ready: false, px: { BTC: null, ETH: null, GOLD: null } })], AP_RULES, LEVELS, EX);
+  eq(u2.trades.length, 0);
+  eq(u2.lastDay, "2026-09-30");
+});
+
+test("autopilot_catchup_missed_sunday_once", () => {
+  // Fredag 23 okt första köp. Söndag 25 okt saknas i loggen. BTC fördubblas måndag 26 okt.
+  const user = newUser(100000, 100000, { lastDay: "2026-10-22", startDate: "2026-10-23" });
+  const big = { BTC: 2100000, ETH: 38000, GOLD: 37000 };
+  const log = [row("2026-10-23", 3), row("2026-10-26", 3, { px: big }), row("2026-10-27", 3, { px: big }),
+    row("2026-10-28", 3, { px: { BTC: 4200000, ETH: 38000, GOLD: 37000 } })];
+  const r = E().catchUp(user, log, AP_RULES, LEVELS, EX);
+  eq([...new Set(r.user.trades.map((t) => t.date))], ["2026-10-23", "2026-10-26"]);
+  const mon = r.user.journal.find((j) => j.date === "2026-10-26");
+  if (!/^Jag sålde bitcoin/.test(mon.plain)) throw new Error("plain: " + mon.plain);
+  eq(r.user.journal.filter((j) => j.check).map((j) => j.date), ["2026-10-26", "2026-10-23"]);
 });

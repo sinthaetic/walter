@@ -68,7 +68,7 @@ class AutopilotTest(unittest.TestCase):
         self.assertAlmostEqual(prop["trades"][1]["sek"], 10000, places=2)
 
     def test_weekday_waits_for_sunday(self):
-        p = pf(25000, {"BTC": 50000, "ETH": 15000, "GOLD": 10000})
+        p = pf(25000, {"BTC": 50000, "ETH": 15000, "GOLD": 10000}, first="2026-10-19")
         prop = wp.propose(state(p), today=FRIDAY)
         self.assertEqual(prop["trades"], [])
         self.assertIn("Nästa koll söndag 25 okt.", prop["plain"])
@@ -128,6 +128,49 @@ class AutopilotTest(unittest.TestCase):
         self.assertEqual(raw["portfolio"]["firstTrade"], FRIDAY)
         self.assertEqual(raw["portfolio"]["holdings"]["CASH"], 25000.0)
         self.assertEqual(raw["mode"], "NORMAL")
+
+    def heavy(self):
+        return pf(25000, {"BTC": 50000, "ETH": 15000, "GOLD": 10000})
+
+    def test_missed_sunday_checks_first_day_after(self):
+        # Senaste koll 11 okt, söndag 18 okt missades -> fredag 23 okt gör söndagens koll
+        s = state(self.heavy())
+        s["journal"] = [{"date": "2026-10-20", "auto": True, "mode": "NORMAL"}, {"date": "2026-10-11", "check": True}]
+        prop = wp.propose(s, today=FRIDAY)
+        self.assertTrue(prop["decisionDay"])
+        self.assertEqual([t["side"] for t in prop["trades"]], ["sälj", "köp"])
+        self.assertTrue(prop["plain"].startswith("Fredag (söndagens koll): bitcoin har vuxit till 50 %"))
+
+    def test_missed_sunday_only_once(self):
+        s = state(self.heavy())
+        s["journal"] = [{"date": "2026-10-21", "check": True}]  # koll gjord onsdag efter söndag 18 okt
+        prop = wp.propose(s, today=FRIDAY)
+        self.assertFalse(prop["decisionDay"])
+        self.assertEqual(prop["trades"], [])
+
+    def test_checked_today_not_again(self):
+        s = state(self.heavy())
+        s["journal"] = [{"date": SUNDAY, "check": True}]
+        prop = wp.propose(s, today=SUNDAY)
+        self.assertFalse(prop["decisionDay"])
+        self.assertFalse(prop["needsApproval"])
+        self.assertEqual(prop["plain"], "Dagens koll är gjord. Nästa koll söndag 1 nov.")
+
+    def test_check_without_trades_is_journaled(self):
+        p = pf(26000, {"BTC": 38000, "ETH": 18000, "GOLD": 18000})
+        prop = wp.propose(state(p, mode="NORMAL"), today=SUNDAY)
+        self.assertTrue(prop["needsApproval"])  # Actionen skriver kollen, så att en missad söndag märks
+        raw = {"portfolio": copy.deepcopy(p), "rules": RULES, "mode": "NORMAL", "updatedAt": SUNDAY,
+               "journal": [], "k4": []}
+        entry = wp.apply(raw, prop, SUNDAY)
+        self.assertTrue(entry["check"])
+        self.assertTrue(entry["plain"].startswith("Söndag: allt ligger inom marginalen."))
+        self.assertEqual(wp.last_check(raw["journal"], raw["portfolio"]), SUNDAY)
+
+    def test_waiting_price_is_not_a_finished_check(self):
+        prop = wp.propose(state(pf(100000, first="2026-10-19"), gold=False), today=SUNDAY)
+        self.assertTrue(prop["decisionDay"])
+        self.assertFalse(prop["check"])  # guldet väntar -> kollen görs om nästa dag
 
     def test_next_check(self):
         self.assertEqual(wp.next_check("2026-10-25", RULES), "2026-11-01")

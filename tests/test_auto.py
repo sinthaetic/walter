@@ -97,6 +97,17 @@ class AutoTest(unittest.TestCase):
         self.assertIsNone(self.run_auto(p))
         self.assertFalse(self.enc.exists())
 
+    def test_autopilot_check_without_trades_is_written(self):
+        # Söndagens koll utan affär skrivs ändå (auto + check), så att en missad söndag märks nästa dag
+        p = {"asOf": TODAY, "ready": True, "strategy": "autopilot", "red": 3, "mode": "AVVAKTAR",
+             "currentMode": "AVVAKTAR", "trades": [], "valueSek": 1000.0, "decisionDay": True, "check": True,
+             "plain": "Söndag: allt ligger inom marginalen. Jag rör ingenting.", "needsApproval": True,
+             "weights": {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2}}
+        entry = self.run_auto(p)
+        self.assertTrue(entry["auto"] and entry["check"])
+        self.assertTrue(entry["plain"].startswith("Söndag: allt ligger inom marginalen."))
+        self.assertIsNone(self.run_auto(p))  # en gång per dag
+
     def test_no_key_does_not_trade(self):
         before = self.state.read_text(encoding="utf-8")
         with patch.object(v, "owner_key", lambda: None):
@@ -274,6 +285,36 @@ class NotisAutoTest(unittest.TestCase):
               "plain": "3 av 10 lampor var röda, så läget är Köper lite. 900 kr ligger som kontanter."}]
         text = wn.text_for(self.state(j), "morgon", "08:13", today=TODAY)
         self.assertIn("Walter bytte själv läge till Köper lite", text)
+
+    def ap_state(self, journal, **prop):
+        s = self.state(journal)
+        s["proposal"] = dict({"strategy": "autopilot", "ready": True, "trades": [], "decisionDay": False,
+                              "nextCheck": "2026-10-25"}, **prop)
+        return s
+
+    def test_autopilot_lamps_are_weather(self):
+        text = wn.text_for(self.ap_state([]), "kvall", "22:05", today=TODAY)
+        self.assertIn("Väder: 3/10 lampor röda (Köper lite).", text)
+        self.assertNotIn("Walter håller", text)
+        self.assertIn("Autopilot: inget att göra i dag. Nästa koll söndag 25 okt.", text)
+
+    def test_autopilot_within_band_and_trade_today(self):
+        sun = "2026-10-25"
+        j = [{"date": sun, "auto": True, "check": True, "mode": "NORMAL",
+              "plain": "Söndag: allt ligger inom marginalen. Jag rör ingenting."}]
+        text = wn.text_for(self.ap_state(j, nextCheck="2026-11-01"), "kvall", "22:05", today=sun)
+        self.assertIn("Autopilot: dagens koll är gjord, allt inom marginalen. Nästa koll söndag 1 nov.", text)
+        j = [{"date": sun, "auto": True, "check": True, "mode": "NORMAL",
+              "plain": "WALTER köpte guld för 8 684 kr. Autopiloten justerade andelarna."}]
+        text = wn.text_for(self.ap_state(j, nextCheck="2026-11-01"), "kvall", "22:05", today=sun)
+        self.assertIn("Autopilot: Walter köpte guld för 8 684 kr i dag, helt själv.", text)
+
+    def test_autopilot_pending_and_waiting(self):
+        text = wn.text_for(self.ap_state([], trades=[{"asset": "BTC"}], decisionDay=True), "morgon", "08:13",
+                           today=TODAY)
+        self.assertIn("Autopilot: justerar andelarna vid nästa körning.", text)
+        self.assertIn("Autopilot: väntar på priser.", wn.text_for(self.ap_state([], ready=False), "morgon", "08:13",
+                                                                   today=TODAY))
 
     def test_quiet_without_auto_today(self):
         old = [{"date": "2026-10-22", "auto": True, "mode": "NORMAL", "plain": "WALTER köpte bitcoin för 100 kr."}]

@@ -93,31 +93,49 @@ def autopilot_cases(lamp_rules):
     near_cash = 100000 - sum(round(u * px[a], 2) for a, (u, _c) in near.items())
     heavy = {"BTC": (0.042, 34000), "ETH": (0.52, 19000), "GOLD": (0.30, 20000)}  # BTC ≈ 42 %, guld ≈ 11 %
     no_gold = {"BTC": True, "ETH": True}
-    cases = [  # namn, dag, röda, läge, portfölj, börsens tillgångar, guldpris finns
-        ("ap_sunday_within_band", sun, 3, "NORMAL", _pf(near_cash, near), None, True),
-        ("ap_sunday_outside_band", sun, 3, "NORMAL", _pf(near_cash, heavy), None, True),
-        ("ap_weekday_waits", fri, 3, "NORMAL", _pf(near_cash, heavy), None, True),
-        ("ap_first_trade_weekday", fri, 8, "AVVAKTAR", _pf(100000), None, True),
-        ("ap_missing_gold_on_exchange", fri, 1, "AVVAKTAR", _pf(100000), no_gold, True),
-        ("ap_missing_price", sun, 3, "NORMAL", _pf(100000), None, False),
+    checked = [{"date": "2026-10-19", "check": True}]  # kollen efter söndag 18 okt är gjord
+    cases = [  # namn, dag, röda, läge, portfölj, börsens tillgångar, {journal, ready, gold, prices}
+        ("ap_sunday_within_band", sun, 3, "NORMAL", _pf(near_cash, near), None, {}),
+        ("ap_sunday_outside_band", sun, 3, "NORMAL", _pf(near_cash, heavy), None, {}),
+        ("ap_weekday_waits", fri, 3, "NORMAL", _pf(near_cash, heavy), None, {"journal": checked}),
+        ("ap_first_trade_weekday", fri, 8, "AVVAKTAR", _pf(100000), None, {}),
+        ("ap_missing_gold_on_exchange", fri, 1, "AVVAKTAR", _pf(100000), no_gold, {}),
+        ("ap_missing_price", sun, 3, "NORMAL", _pf(100000), None, {"gold": False}),
+        # Lamporna inte klara: autopiloten handlar på priserna, läget står kvar (vädret väntar)
+        ("ap_lamps_not_ready", fri, 3, "AVVAKTAR", _pf(100000), None, {"ready": False}),
+        # Söndag 18 okt missades (senaste koll 11 okt): fredag 23 okt gör kollen en gång
+        ("ap_missed_sunday", fri, 3, "NORMAL", _pf(near_cash, heavy), None,
+         {"journal": [{"date": "2026-10-11", "check": True}]}),
+        ("ap_checked_today", sun, 3, "NORMAL", _pf(near_cash, heavy), None,
+         {"journal": [{"date": sun, "check": True}]}),
+        ("ap_no_prices", sun, 3, "NORMAL", _pf(near_cash, heavy), None, {"prices": False, "ready": False}),
     ]
     out = []
-    for name, day, red, mode, pf, assets, gold in cases:
+    for name, day, red, mode, pf, assets, o in cases:
         m = _market(15, False, False)
-        if not gold:
+        if not o.get("gold", True):
             m["gold"] = {"value": None}
+        if not o.get("prices", True):
+            m["btc"], m["gold"] = {"value": None}, {"value": None}
+        ready, journal = o.get("ready", True), o.get("journal", [])
         state = {"rules": rules, "market": m, "portfolio": copy.deepcopy(pf), "mode": mode, "level": 1,
-                 "lampScore": {"source": "data", "red": red}}
+                 "journal": copy.deepcopy(journal),
+                 "lampScore": {"source": "data" if ready else "journal", "red": red}}
         prop = walter_paper.propose(state, today=day, assets=assets)
-        raw = {"portfolio": copy.deepcopy(pf), "rules": rules, "mode": mode, "updatedAt": day, "journal": [], "k4": []}
-        walter_paper.apply(raw, prop, day)
+        raw = {"portfolio": copy.deepcopy(pf), "rules": rules, "mode": mode, "updatedAt": day,
+               "journal": copy.deepcopy(journal), "k4": []}
+        entry = walter_paper.apply(raw, prop, day) if prop["ready"] else None
         ex = dict(PARITY_EXCHANGE, assets=assets or PARITY_EXCHANGE["assets"])
-        row = {"date": day, "ready": True, "red": red, "px": walter_paper.prices_sek(m),
+        row = {"date": day, "ready": ready, "red": red, "px": walter_paper.prices_sek(m),
                "ethBtcAbove30dMa": False, "vix": 15, "spxBelowMa": False}
-        out.append({"name": name, "row": row, "exchange": ex, "user": {"mode": mode, "level": 1, "portfolio": pf},
-                    "expect": {"mode": prop["mode"], "valueSek": prop["valueSek"], "trades": prop["trades"],
-                               "plain": prop["plain"], "nextCheck": prop["nextCheck"],
+        out.append({"name": name, "row": row, "exchange": ex,
+                    "user": {"mode": mode, "level": 1, "portfolio": pf, "journal": journal},
+                    "expect": {"ready": prop["ready"], "mode": prop["mode"], "red": prop["red"],
+                               "valueSek": prop["valueSek"], "trades": prop["trades"],
+                               "plain": prop["plain"], "nextCheck": prop.get("nextCheck"),
+                               "decisionDay": prop.get("decisionDay"), "check": prop.get("check"),
                                "waiting": prop["waiting"], "missing": prop["missing"],
+                               "entryCheck": bool(entry and entry.get("check")),
                                "portfolio": raw["portfolio"]}})
     return {"rules": rules, "cases": out}
 

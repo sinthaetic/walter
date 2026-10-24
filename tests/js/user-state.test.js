@@ -201,11 +201,17 @@ test("first_move_on_creation_day", () => {
     eq(JSON.stringify(u), before);
     // Kopian av en Walter efter första draget går att läsa in
     eq(WU().importText(JSON.stringify(u)).journal.length, 1);
-    // Utan klar data väntar Walter
+    // Lamporna inte klara men priserna finns: autopiloten gör första draget, läget (vädret) står kvar
     const m2 = fakeMarket(); m2.now.ready = false;
     const u2 = WU().create(100000, "kraken", "2026-10-22");
-    eq(WU().firstMove(u2, m2, "2026-10-22"), null);
-    eq(u2.journal.length, 0);
+    if (!WU().firstMove(u2, m2, "2026-10-22")) throw new Error("inget drag på priserna");
+    eq(u2.mode, "AVVAKTAR");
+    if (!(u2.portfolio.holdings.BTC > 0)) throw new Error("köpte ingen bitcoin");
+    // Utan priser väntar Walter
+    const m3 = fakeMarket(); m3.now.ready = false; m3.now.px = { BTC: null, ETH: null, GOLD: null };
+    const u3 = WU().create(100000, "kraken", "2026-10-22");
+    eq(WU().firstMove(u3, m3, "2026-10-22"), null);
+    eq(u3.journal.length, 0);
   } finally { window.WALTER_MARKET = saved; }
 });
 

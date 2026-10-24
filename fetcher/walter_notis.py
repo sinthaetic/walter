@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from walter_fetch import BASE, HTTP, build, load_caches, num, pct, save_caches  # noqa: E402
-from walter_paper import WORDS  # noqa: E402
+from walter_paper import WORDS, day_text  # noqa: E402
 
 TZ = ZoneInfo("Europe/Stockholm")
 SLOTS = {(8, 13): "morgon", (22, 5): "kvall"}
@@ -48,8 +48,36 @@ def auto_sentence(state, today):
     return f" Walter bytte själv läge till {WORDS.get(e.get('mode'), e.get('mode'))} i dag."
 
 
+def autopilot_sentence(state, today):
+    """Vad autopiloten gjorde i dag eller gör härnäst, i vanliga ord."""
+    p, e = state.get("proposal") or {}, (state.get("journal") or [None])[0] or {}
+    nxt = f" Nästa koll {day_text(p['nextCheck'])}." if p.get("nextCheck") else ""
+    plain = e.get("plain", "")
+    if e.get("date") == today and e.get("auto") and plain.startswith("WALTER "):
+        return f" Autopilot: Walter {plain[len('WALTER '):].split('. ')[0].rstrip('.')} i dag, helt själv.{nxt}"
+    if e.get("date") == today and e.get("check"):
+        return f" Autopilot: dagens koll är gjord, allt inom marginalen.{nxt}"
+    if not p.get("ready"):
+        return " Autopilot: väntar på priser."
+    if p.get("trades"):
+        return f" Autopilot: justerar andelarna vid nästa körning.{nxt}"
+    if p.get("decisionDay"):
+        return f" Autopilot: allt inom marginalen.{nxt}"
+    return f" Autopilot: inget att göra i dag.{nxt}"
+
+
 def text_for(state, slot, when, today=None):
     today = today or datetime.now(TZ).date().isoformat()
+    if (state.get("proposal") or {}).get("strategy") == "autopilot":
+        pf, s = state["portfolio"], state["lampScore"]
+        value, cash = pf["value"], pf["holdings"]["CASH"]
+        money = f"Cash {num(cash)} kr vilar" if cash >= value else f"Cash {num(cash)} kr, {num(value - cash)} kr investerat"
+        btc = state["market"].get("btc", {})
+        btc_txt = "BTC väntar på data" if btc.get("value") is None else f"BTC ${num(btc['value'])}"
+        # Lamporna är vädret, inte vad Walter gör
+        return (f"{LABEL[slot]} {when}: {money}, {btc_txt}, totalt {num(value)} kr. "
+                f"Väder: {s['red']}/{s['total']} lampor röda ({WORDS.get(state['mode'], state['mode'])})."
+                + autopilot_sentence(state, today))
     pf, m = state["portfolio"], state["market"]
     value, cash = pf["value"], pf["holdings"]["CASH"]
     money = f"Cash {num(cash)} kr vilar" if cash >= value else f"Cash {num(cash)} kr, {num(value - cash)} kr investerat"
