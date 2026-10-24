@@ -105,7 +105,7 @@
   const SAVINGS_NOTE = "månadssparande";
   function savingsPlan(s) {
     if (!s || typeof s !== "object") return null;
-    const amt = s.monthlySek, d = s.day == null ? 25 : s.day;
+    const amt = s.monthlySek, d = s.day === undefined ? 25 : s.day; // saknas = 25, null = av (som Python)
     if (typeof amt !== "number" || !isFinite(amt) || amt <= 0) return null;
     if (!Number.isInteger(d) || d < 1 || d > 28) return null;
     return { each: amt, day: d };

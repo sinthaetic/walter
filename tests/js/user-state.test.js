@@ -314,3 +314,20 @@ test("set_goal_and_to_state", () => {
   WU().setGoal(u, null);
   eq(WU().toState(u, fakeMarket(), "2026-10-22").goal, null);
 });
+
+test("savings_goal_strict_dates_and_since_floor", () => {
+  const base = WU().create(10000, "kraken", "2026-10-23");
+  const bad = [{ goal: { name: "x", amountSek: 1000, date: "2027-02-30" } },
+    { savings: { monthlySek: 1000, day: 25, since: "2026-13-01" } },
+    { savings: { monthlySek: 1000, day: 25, since: "2026-10-01" } }];  // före startDate
+  for (const b of bad) {
+    let threw = false;
+    try { WU().importText(JSON.stringify(Object.assign({}, base, b))); } catch (e) { threw = true; }
+    if (!threw) throw new Error("släppte igenom " + JSON.stringify(b));
+  }
+  WU().importText(JSON.stringify(Object.assign({}, base, { savings: { monthlySek: 1000, day: 25, since: "2026-10-23" } })));
+  const u = WU().create(10000, "kraken", "2026-10-23");
+  WU().setSavings(u, 1000, 25, "2026-10-01");
+  eq(u.savings.since, "2026-10-23");
+  eq(WU().setGoal(u, { name: "x", amountSek: 1000, date: "2027-02-30" }), false);
+});

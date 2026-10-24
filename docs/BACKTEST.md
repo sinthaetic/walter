@@ -365,5 +365,6 @@ skatt. Kör om: `python -m backtest.savings_run` (`backtest/cache/sparande.json`
 det sämsta utfallet – den sänkte det. Krypto steg oftast under de sista två åren före ett mål, så kontanterna kostade
 mer än de skyddade; glidningen gav mer på banken i bara 25 % av starterna, och sämsta starten hamnade under insatsen.
 Tolva år är en enda, mycket stark period för krypto, så siffran är ingen garanti åt något håll. Målläget är ett val
-för den som inte tål en stor nedgång strax före datumet – inte ett sätt att få mer pengar. Det står ärligt i appen:
-inget löfte om att nå målet.
+för den som inte tål en stor nedgång strax före datumet – inte ett sätt att få mer pengar. Appen säger det rakt ut
+(målkortet och Inställningar): "I historiken gav det en lugnare resa men oftast mindre pengar – det är ett val för den
+som inte tål ett stort fall strax före datumet."

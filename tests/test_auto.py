@@ -73,6 +73,15 @@ class AutoTest(unittest.TestCase):
         self.assertEqual(v.decrypt(json.loads(self.enc.read_text(encoding="utf-8")), KEY), raw)
         self.assertEqual(len(self.built), 1)  # state.js byggdes om
 
+    def test_default_day_is_stockholm(self):
+        # Utan today räknar Actionen (UTC-klocka) med svenskt datum – samma dag som sparandet och söndagen gäller
+        seen = []
+        with patch.object(wpaper, "stockholm_today", lambda: "2026-10-25"), \
+                patch.object(wpaper, "propose", lambda s, **k: seen.append(k.get("today")) or proposal()):
+            entry = wpaper.auto(wf)
+        self.assertEqual(seen, ["2026-10-25"])
+        self.assertEqual(entry["date"], "2026-10-25")
+
     def test_only_once_per_day(self):
         self.assertIsNotNone(self.run_auto(proposal()))
         self.assertIsNone(self.run_auto(proposal()))

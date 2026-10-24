@@ -595,7 +595,7 @@ def auto(wf, today=None, say=lambda s: None):
     """Walter handlar själv (bara i GitHub Actionen, steget "Walter handlar själv").
     Högst en automatisk handel per dag: är journal[0] redan dagens och automatisk görs inget.
     Skriver state.json, låser state.enc och bygger om state.js. Returnerar journalposten eller None."""
-    today = today or date.today().isoformat()
+    today = today or stockholm_today()
     raw = wf.read_json(wf.BASE, None)
     if raw is None:
         say("Hittar inte data/state.json – Walter handlar inte.")
@@ -648,7 +648,7 @@ def main():
         print("Inget ändrat.")
         return
     raw = wf.read_json(wf.BASE, None)
-    entry = apply(raw, prop, date.today().isoformat())
+    entry = apply(raw, prop, stockholm_today())
     wf.BASE.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     wf.write_js(rebuild(wf))
     if walter_vault.owner_key():

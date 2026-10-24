@@ -169,6 +169,8 @@ def savings_goal_cases(lamp_rules):
         ("sv_missed_day_next_day", fri, _pf(onw_cash, onw), checked, sv(22), None, [], True),
         ("sv_two_months_missed", fri, _pf(onw_cash, onw), checked, sv(20, "2026-09-01"), None, [], True),
         ("sv_cash_below_floor", fri, _pf(near_cash, near), checked, sv(23), None, [], True),
+        ("sv_day_null_is_off", fri, _pf(onw_cash, onw), checked, {"monthlySek": 1000, "day": None, "since": "2026-10-01"}, None, [], True),
+        ("sv_day_missing_is_25", "2026-10-26", _pf(onw_cash, onw), checked, {"monthlySek": 1000, "since": "2026-10-01"}, None, [], True),
         ("sv_amount_zero", fri, _pf(near_cash, near), checked, sv(23, amt=0), None, [], True),
         ("sv_month_already_done", fri, _pf(near_cash, near), checked, sv(20), None, [done_oct], True),
         ("sv_before_since", fri, _pf(near_cash, near), checked, sv(10, "2026-10-15"), None, [], True),

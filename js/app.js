@@ -226,7 +226,7 @@
   // ---------- Portfölj ----------
   // Nästa månadssparande (när det är påslaget): "Nästa sparande 25 nov: 1 000 kr."
   const isoToday = (() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
-  const nextSave = E && S.savings ? E.nextSavings(S.savings, pf.history, isoToday) : null;
+  const nextSave = AUTO && E && S.savings ? E.nextSavings(S.savings, pf.history, isoToday) : null;
   const saveLine = nextSave ? `Nästa sparande ${nextSave === isoToday ? "i dag" : day(nextSave)}: ${kr(S.savings.monthlySek)}.` : "";
   const avk = Math.abs(marketPct) < 0.005 ? "±0,00 %" : pct(marketPct, 2);
   $("pf").innerHTML = `
@@ -245,7 +245,7 @@
   (() => {
     const el = $("goal-card"), g = S.goal;
     if (!el) return;
-    if (!g || !(g.amountSek > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(g.date || "")) { el.hidden = true; return; }
+    if (!AUTO || !g || !(g.amountSek > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(g.date || "")) { el.hidden = true; return; }
     const f = S.proposal && typeof S.proposal.glide === "number" ? S.proposal.glide : E ? E.glideFactor(g, S.updatedAt) : 1;
     const share = pf.value > 0 ? pf.value / g.amountSek : 0;
     const glideTxt = f >= 1 ? `Walter börjar flytta gradvis till kontanter i ${monthYear(addMonthsIso(g.date, -24))}, 24 månader före.`
@@ -259,7 +259,7 @@
         <span class="fill" style="width:${(Math.min(1, share) * 100).toFixed(1)}%"></span>
       </div>
       <div class="goal-legend"><span>0 KR</span><span>${f >= 1 ? "FULLA ANDELAR" : f <= 0 ? "ALLT KONTANT" : `ANDELAR ${nf(0).format(f * 100)} %`}</span><span>${esc(kr(g.amountSek).toUpperCase())}</span></div>
-      <p class="explain">Inget löfte om att nå målet. Pengar du behöver en viss dag ska inte ligga med full kryptorisk när dagen kommer. <a href="#installningar">Ändra målet →</a></p>`;
+      <p class="explain">Inget löfte om att nå målet. I historiken gav det en lugnare resa men oftast mindre pengar – det är ett val för den som inte tål ett stort fall strax före datumet. <a href="#installningar">Ändra målet →</a></p>`;
   })();
 
   // ---------- W-Cipher under hjälten ----------
@@ -880,7 +880,8 @@
     <p class="kicker">INSTÄLLNINGAR · DITT MÅL</p>
     <div class="title-row"><h1>DITT MÅL</h1></div>
     <p class="intro">Ett mål med ett datum, och ett sparande varje månad. Båda är valfria. Allt är låtsaspengar (PAPER).</p>
-    <div class="plan sv-plan">
+    ${AUTO ? "" : '<p class="warn">Målet och månadssparandet fungerar bara med autopiloten. Walter kör nu lamp-strategin (rules.strategy = "lamps"), så de ändrar inget.</p>'}
+    <div class="plan sv-plan"${AUTO ? "" : " hidden"}>
       <section class="panel" aria-label="Mål">
         <h3>MÅL MED DATUM</h3>
         <form id="goal-form" class="sv-form" novalidate>
@@ -892,9 +893,9 @@
             <label class="field"><span>DATUM</span>
               <input class="input num" name="date" type="date"></label>
           </div>
-          <p class="plain sv-explain">De sista 24 månaderna före datumet flyttar Walter gradvis till kontanter, en bit vid varje söndagskoll. Pengar du behöver en viss dag ska inte ligga med full kryptorisk när dagen kommer – ett krypto-fall på 50 % strax före går inte att vänta ut.</p>
+          <p class="plain sv-explain">De sista 24 månaderna före datumet flyttar Walter gradvis till kontanter, en bit vid varje söndagskoll. Ett krypto-fall på 50 % strax före datumet går inte att vänta ut. I historiken gav det en lugnare resa men oftast mindre pengar – det är ett val för den som inte tål ett stort fall strax före datumet.</p>
           <p class="small sv-glide" id="goal-glide" aria-live="polite"></p>
-          <p class="small">Inget löfte: Walter kan inte lova att du når målet. Han minskar bara risken när datumet närmar sig.</p>
+          <p class="small">Inget löfte: Walter kan inte lova att du når målet. Han minskar bara svängningarna när datumet närmar sig, inte nödvändigtvis det sämsta utfallet.</p>
           <div class="form-actions start">
             <button type="submit" class="btn btn-primary">SPARA MÅLET</button>
             <button type="button" class="btn" id="goal-remove"${S.goal ? "" : " hidden"}>TA BORT MÅLET</button>
@@ -926,7 +927,7 @@
     </div>
     ${isUser ? "" : `<div class="panel sv-owner" id="owner-snippet" hidden>
       <h3>ÄGARENS WALTER · DATA/STATE.JSON</h3>
-      <p class="plain">Din Walter läser målet och sparandet från <b>data/state.json</b> – sidan kan inte skriva där. Byt raderna <b>"savings"</b> och <b>"goal"</b> i state.json mot de här, kör <b>fetcher/walter_vault.py las</b> och sedan hämtaren.</p>
+      <p class="plain">Din Walter läser målet och sparandet från <b>data/state.json</b> – sidan kan inte skriva där. Byt ut hela blocken <b>"savings": {…}</b> och <b>"goal": …</b> i state.json (de går över flera rader) mot raderna nedan och kör sedan <b>walter deploy</b> – den låser state.enc och skickar den till main. Först då ser Walter i GitHub Actionen ändringen; hämtaren ensam når aldrig dit.</p>
       <pre class="sv-pre" id="owner-snippet-text"></pre>
     </div>`}
 
