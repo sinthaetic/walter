@@ -80,7 +80,7 @@ def engine_cases():
                     "expect": {"mode": prop["mode"], "valueSek": prop["valueSek"], "trades": prop["trades"],
                                "portfolio": raw["portfolio"]}})
     doc = {"rules": rules, "exchange": PARITY_EXCHANGE, "cases": out, "autopilot": autopilot_cases(rules),
-           "savingsGoal": savings_goal_cases(rules)}
+           "savingsGoal": savings_goal_cases(rules), "deposit": deposit_cases(rules)}
     (FIX / "engine-cases.json").write_text(json.dumps(doc, indent=1, ensure_ascii=False), encoding="utf-8")
 
 
@@ -211,6 +211,49 @@ def savings_goal_cases(lamp_rules):
                                "entryPlain": entry and entry["plain"], "entryFacts": entry and entry["facts"],
                                "portfolio": raw["portfolio"] if entry else None}})
     return {"rules": rules, "cases": out}
+
+
+def deposit_cases(lamp_rules):
+    """Sätt in pengar: samma indata i Python (propose_deposit/apply_deposit) och JS (proposeDeposit/applyDeposit)."""
+    rules = dict(lamp_rules, strategy="autopilot", decision={"weekday": "söndag", "bandPp": 5})
+    fri = "2026-10-23"
+    px = walter_paper.prices_sek(_market(20, False, False))
+    onw = {a: (round(w * 100000 / px[a], 8), w * 100000) for a, w in (("BTC", 0.35), ("ETH", 0.2), ("GOLD", 0.2))}
+    onw_cash = round(100000 - sum(round(u * px[a], 2) for a, (u, _c) in onw.items()), 2)
+    heavy = {"BTC": (0.042, 34000), "ETH": (0.52, 19000), "GOLD": (0.30, 20000)}
+    heavy_cash = 100000 - sum(round(u * px[a], 2) for a, (u, _c) in heavy.items())
+    cases = [  # namn, portfölj, belopp, regler, guldpris finns, börsens tillgångar, mål
+        ("dep_on_weights", _pf(onw_cash, onw), 500, rules, True, None, None),
+        ("dep_big_from_cash", _pf(100000), 123457, rules, True, None, None),
+        ("dep_heavy_btc", _pf(heavy_cash, heavy), 5000, rules, True, None, None),
+        ("dep_minimum_100", _pf(onw_cash, onw), 100, rules, True, None, None),
+        ("dep_gold_missing", _pf(onw_cash, onw), 1000, rules, False, None, None),
+        ("dep_no_gold_on_exchange", _pf(onw_cash, onw), 1000, rules, True, {"BTC": True, "ETH": True}, None),
+        ("dep_with_goal", _pf(onw_cash, onw), 2000, rules, True, None,
+         {"name": "Studio", "amountSek": 300000, "date": "2027-10-23"}),
+        ("dep_lamps", _pf(onw_cash, onw), 500, lamp_rules, True, None, None),
+    ]
+    out = []
+    for name, pf, sek, r, gold, assets, goal in cases:
+        m = _market(15, False, False)
+        if not gold:
+            m["gold"] = {"value": None}
+        state = {"rules": r, "market": m, "portfolio": copy.deepcopy(pf), "mode": "NORMAL", "level": 1,
+                 "journal": [], "lampScore": {"source": "data", "red": 3}}
+        user = {"mode": "NORMAL", "level": 1, "portfolio": copy.deepcopy(pf), "journal": []}
+        if goal:
+            state["goal"] = user["goal"] = goal
+        prop = walter_paper.propose_deposit(state, fri, sek, assets)
+        raw = {"portfolio": copy.deepcopy(pf), "rules": r, "mode": "NORMAL", "updatedAt": fri, "journal": [], "k4": []}
+        entry = walter_paper.apply_deposit(raw, prop, fri)
+        ex = dict(PARITY_EXCHANGE, assets=assets or PARITY_EXCHANGE["assets"])
+        row = {"date": fri, "ready": True, "red": 3, "px": walter_paper.prices_sek(m),
+               "ethBtcAbove30dMa": False, "vix": 15, "spxBelowMa": False}
+        out.append({"name": name, "row": row, "exchange": ex, "rules": r, "user": user, "sek": sek,
+                    "expect": {"trades": prop["trades"], "deposit": prop["deposit"], "plain": prop["plain"],
+                               "entryPlain": entry["plain"], "entryFacts": entry["facts"],
+                               "portfolio": raw["portfolio"]}})
+    return {"cases": out}
 
 
 def wcipher_cases():

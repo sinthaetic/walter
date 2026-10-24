@@ -5662,5 +5662,1910 @@
     }
    }
   ]
+ },
+ "deposit": {
+  "cases": [
+   {
+    "name": "dep_on_weights",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 500,
+    "expect": {
+     "trades": [
+      {
+       "asset": "BTC",
+       "side": "köp",
+       "units": 0.00016567,
+       "priceSek": 1050000.37,
+       "sek": 175.0,
+       "feeSek": 1.05
+      },
+      {
+       "asset": "ETH",
+       "side": "köp",
+       "units": 0.0026079,
+       "priceSek": 38115.01,
+       "sek": 100.0,
+       "feeSek": 0.6
+      },
+      {
+       "asset": "GOLD",
+       "side": "köp",
+       "units": 0.00268645,
+       "priceSek": 37000.5,
+       "sek": 100.0,
+       "feeSek": 0.6
+      }
+     ],
+     "deposit": {
+      "sek": 500.0,
+      "valueBefore": 100000.0,
+      "trades": [
+       {
+        "asset": "BTC",
+        "side": "köp",
+        "units": 0.00016567,
+        "priceSek": 1050000.37,
+        "sek": 175.0,
+        "feeSek": 1.05
+       },
+       {
+        "asset": "ETH",
+        "side": "köp",
+        "units": 0.0026079,
+        "priceSek": 38115.01,
+        "sek": 100.0,
+        "feeSek": 0.6
+       },
+       {
+        "asset": "GOLD",
+        "side": "köp",
+        "units": 0.00268645,
+        "priceSek": 37000.5,
+        "sek": 100.0,
+        "feeSek": 0.6
+       }
+      ],
+      "waiting": [],
+      "invest": true
+     },
+     "plain": "Insättning: 500 kr in. Jag köper bitcoin för 175 kr, ethereum för 100 kr och guld för 100 kr.",
+     "entryPlain": "Insättning: 500 kr in. Jag köpte bitcoin för 175 kr, ethereum för 100 kr och guld för 100 kr.",
+     "entryFacts": [
+      "Insättning: +500 kr (låtsasinsättning)",
+      "Köp: 0,00016567 BTC à 1 050 000 kr = 175,00 kr, avgift 1,05 kr",
+      "Köp: 0,00260790 ETH à 38 115 kr = 100,00 kr, avgift 0,60 kr",
+      "Köp: 0,00268645 GOLD à 37 000 kr = 100,00 kr, avgift 0,60 kr",
+      "Kontant 25 125 kr av 100 498 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 100497.75,
+      "peak": 100497.75,
+      "holdings": {
+       "BTC": 35173.95,
+       "ETH": 20099.4,
+       "GOLD": 20099.4,
+       "CASH": 25125.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03349899,
+        "costSek": 35175.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52733551,
+        "costSek": 20100.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54321969,
+        "costSek": 20100.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100500.0,
+        "cash": 25500.0,
+        "flow": 500.0,
+        "note": "insättning"
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100497.75,
+        "cash": 25125.0,
+        "note": "köp"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "dep_big_from_cash",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000,
+      "peak": 100000,
+      "holdings": {
+       "BTC": 0,
+       "ETH": 0,
+       "GOLD": 0,
+       "CASH": 100000
+      },
+      "positions": {},
+      "firstTrade": null,
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 123457,
+    "expect": {
+     "trades": [
+      {
+       "asset": "BTC",
+       "side": "köp",
+       "units": 0.05454054,
+       "priceSek": 1050000.37,
+       "sek": 57613.27,
+       "feeSek": 345.68
+      },
+      {
+       "asset": "ETH",
+       "side": "köp",
+       "units": 0.85856812,
+       "priceSek": 38115.01,
+       "sek": 32921.87,
+       "feeSek": 197.53
+      },
+      {
+       "asset": "GOLD",
+       "side": "köp",
+       "units": 0.88442955,
+       "priceSek": 37000.5,
+       "sek": 32921.87,
+       "feeSek": 197.53
+      }
+     ],
+     "deposit": {
+      "sek": 123457.0,
+      "valueBefore": 100000,
+      "trades": [
+       {
+        "asset": "BTC",
+        "side": "köp",
+        "units": 0.05454054,
+        "priceSek": 1050000.37,
+        "sek": 57613.27,
+        "feeSek": 345.68
+       },
+       {
+        "asset": "ETH",
+        "side": "köp",
+        "units": 0.85856812,
+        "priceSek": 38115.01,
+        "sek": 32921.87,
+        "feeSek": 197.53
+       },
+       {
+        "asset": "GOLD",
+        "side": "köp",
+        "units": 0.88442955,
+        "priceSek": 37000.5,
+        "sek": 32921.87,
+        "feeSek": 197.53
+       }
+      ],
+      "waiting": [],
+      "invest": true
+     },
+     "plain": "Insättning: 123 457 kr in. Jag köper bitcoin för 57 613 kr, ethereum för 32 922 kr och guld för 32 922 kr.",
+     "entryPlain": "Insättning: 123 457 kr in. Jag köpte bitcoin för 57 613 kr, ethereum för 32 922 kr och guld för 32 922 kr.",
+     "entryFacts": [
+      "Insättning: +123 457 kr (låtsasinsättning)",
+      "Köp: 0,05454054 BTC à 1 050 000 kr = 57 613,27 kr, avgift 345,68 kr",
+      "Köp: 0,85856812 ETH à 38 115 kr = 32 921,87 kr, avgift 197,53 kr",
+      "Köp: 0,88442955 GOLD à 37 000 kr = 32 921,87 kr, avgift 197,53 kr",
+      "Kontant 100 000 kr av 222 716 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 222716.25,
+      "peak": 222716.25,
+      "holdings": {
+       "BTC": 57267.59,
+       "ETH": 32724.33,
+       "GOLD": 32724.34,
+       "CASH": 99999.99
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.05454054,
+        "costSek": 57613.27,
+        "since": "2026-10-23"
+       },
+       "ETH": {
+        "units": 0.85856812,
+        "costSek": 32921.87,
+        "since": "2026-10-23"
+       },
+       "GOLD": {
+        "units": 0.88442955,
+        "costSek": 32921.87,
+        "since": "2026-10-23"
+       }
+      },
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 223457.0,
+        "cash": 223457.0,
+        "flow": 123457.0,
+        "note": "insättning"
+       },
+       {
+        "date": "2026-10-23",
+        "value": 222716.25,
+        "cash": 99999.99,
+        "note": "köp"
+       }
+      ],
+      "firstTrade": null
+     }
+    }
+   },
+   {
+    "name": "dep_heavy_btc",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 44100.02,
+       "ETH": 19819.81,
+       "GOLD": 11100.15,
+       "CASH": 24980.020000000004
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.042,
+        "costSek": 34000,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52,
+        "costSek": 19000,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.3,
+        "costSek": 20000,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 5000,
+    "expect": {
+     "trades": [
+      {
+       "asset": "ETH",
+       "side": "köp",
+       "units": 0.01036125,
+       "priceSek": 38115.01,
+       "sek": 397.3,
+       "feeSek": 2.38
+      },
+      {
+       "asset": "GOLD",
+       "side": "köp",
+       "units": 0.08953178,
+       "priceSek": 37000.5,
+       "sek": 3332.72,
+       "feeSek": 20.0
+      }
+     ],
+     "deposit": {
+      "sek": 5000.0,
+      "valueBefore": 100000.0,
+      "trades": [
+       {
+        "asset": "ETH",
+        "side": "köp",
+        "units": 0.01036125,
+        "priceSek": 38115.01,
+        "sek": 397.3,
+        "feeSek": 2.38
+       },
+       {
+        "asset": "GOLD",
+        "side": "köp",
+        "units": 0.08953178,
+        "priceSek": 37000.5,
+        "sek": 3332.72,
+        "feeSek": 20.0
+       }
+      ],
+      "waiting": [],
+      "invest": true
+     },
+     "plain": "Insättning: 5 000 kr in. Jag köper ethereum för 397 kr och guld för 3 333 kr.",
+     "entryPlain": "Insättning: 5 000 kr in. Jag köpte ethereum för 397 kr och guld för 3 333 kr.",
+     "entryFacts": [
+      "Insättning: +5 000 kr (låtsasinsättning)",
+      "Köp: 0,01036125 ETH à 38 115 kr = 397,30 kr, avgift 2,38 kr",
+      "Köp: 0,08953178 GOLD à 37 000 kr = 3 332,72 kr, avgift 20,00 kr",
+      "Kontant 26 250 kr av 104 978 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 104977.61,
+      "peak": 104977.61,
+      "holdings": {
+       "BTC": 44100.02,
+       "ETH": 20214.72,
+       "GOLD": 14412.87,
+       "CASH": 26250.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.042,
+        "costSek": 34000,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.53036125,
+        "costSek": 19397.3,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.38953178,
+        "costSek": 23332.72,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 105000.0,
+        "cash": 29980.02,
+        "flow": 5000.0,
+        "note": "insättning"
+       },
+       {
+        "date": "2026-10-23",
+        "value": 104977.61,
+        "cash": 26250.0,
+        "note": "köp"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "dep_minimum_100",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 100,
+    "expect": {
+     "trades": [
+      {
+       "asset": "BTC",
+       "side": "köp",
+       "units": 3.313e-05,
+       "priceSek": 1050000.37,
+       "sek": 35.0,
+       "feeSek": 0.21
+      },
+      {
+       "asset": "ETH",
+       "side": "köp",
+       "units": 0.00052158,
+       "priceSek": 38115.01,
+       "sek": 20.0,
+       "feeSek": 0.12
+      },
+      {
+       "asset": "GOLD",
+       "side": "köp",
+       "units": 0.00053729,
+       "priceSek": 37000.5,
+       "sek": 20.0,
+       "feeSek": 0.12
+      }
+     ],
+     "deposit": {
+      "sek": 100.0,
+      "valueBefore": 100000.0,
+      "trades": [
+       {
+        "asset": "BTC",
+        "side": "köp",
+        "units": 3.313e-05,
+        "priceSek": 1050000.37,
+        "sek": 35.0,
+        "feeSek": 0.21
+       },
+       {
+        "asset": "ETH",
+        "side": "köp",
+        "units": 0.00052158,
+        "priceSek": 38115.01,
+        "sek": 20.0,
+        "feeSek": 0.12
+       },
+       {
+        "asset": "GOLD",
+        "side": "köp",
+        "units": 0.00053729,
+        "priceSek": 37000.5,
+        "sek": 20.0,
+        "feeSek": 0.12
+       }
+      ],
+      "waiting": [],
+      "invest": true
+     },
+     "plain": "Insättning: 100 kr in. Jag köper bitcoin för 35 kr, ethereum för 20 kr och guld för 20 kr.",
+     "entryPlain": "Insättning: 100 kr in. Jag köpte bitcoin för 35 kr, ethereum för 20 kr och guld för 20 kr.",
+     "entryFacts": [
+      "Insättning: +100 kr (låtsasinsättning)",
+      "Köp: 0,00003313 BTC à 1 050 000 kr = 35,00 kr, avgift 0,21 kr",
+      "Köp: 0,00052158 ETH à 38 115 kr = 20,00 kr, avgift 0,12 kr",
+      "Köp: 0,00053729 GOLD à 37 000 kr = 20,00 kr, avgift 0,12 kr",
+      "Kontant 25 025 kr av 100 100 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 100099.54,
+      "peak": 100099.54,
+      "holdings": {
+       "BTC": 35034.78,
+       "ETH": 20019.88,
+       "GOLD": 20019.88,
+       "CASH": 25025.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03336645,
+        "costSek": 35035.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52524919,
+        "costSek": 20020.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54107053,
+        "costSek": 20020.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100100.0,
+        "cash": 25100.0,
+        "flow": 100.0,
+        "note": "insättning"
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100099.54,
+        "cash": 25025.0,
+        "note": "köp"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "dep_gold_missing",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": null
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 1000,
+    "expect": {
+     "trades": [
+      {
+       "asset": "BTC",
+       "side": "köp",
+       "units": 0.00033133,
+       "priceSek": 1050000.37,
+       "sek": 350.0,
+       "feeSek": 2.1
+      },
+      {
+       "asset": "ETH",
+       "side": "köp",
+       "units": 0.00521579,
+       "priceSek": 38115.01,
+       "sek": 200.0,
+       "feeSek": 1.2
+      }
+     ],
+     "deposit": {
+      "sek": 1000.0,
+      "valueBefore": 100000.0,
+      "trades": [
+       {
+        "asset": "BTC",
+        "side": "köp",
+        "units": 0.00033133,
+        "priceSek": 1050000.37,
+        "sek": 350.0,
+        "feeSek": 2.1
+       },
+       {
+        "asset": "ETH",
+        "side": "köp",
+        "units": 0.00521579,
+        "priceSek": 38115.01,
+        "sek": 200.0,
+        "feeSek": 1.2
+       }
+      ],
+      "waiting": [
+       "GOLD"
+      ],
+      "invest": true
+     },
+     "plain": "Insättning: 1 000 kr in. Jag köper bitcoin för 350 kr och ethereum för 200 kr. Jag väntar på pris för guld, så den delen ligger som kontanter.",
+     "entryPlain": "Insättning: 1 000 kr in. Jag köpte bitcoin för 350 kr och ethereum för 200 kr. Jag väntar på pris för guld, så den delen ligger som kontanter.",
+     "entryFacts": [
+      "Insättning: +1 000 kr (låtsasinsättning)",
+      "Köp: 0,00033133 BTC à 1 050 000 kr = 350,00 kr, avgift 2,10 kr",
+      "Köp: 0,00521579 ETH à 38 115 kr = 200,00 kr, avgift 1,20 kr",
+      "Kontant 25 450 kr av 100 997 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 100996.69,
+      "peak": 100996.69,
+      "holdings": {
+       "BTC": 35347.89,
+       "ETH": 20198.8,
+       "GOLD": 20000.0,
+       "CASH": 25450.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03366465,
+        "costSek": 35350.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.5299434,
+        "costSek": 20200.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 101000.0,
+        "cash": 26000.0,
+        "flow": 1000.0,
+        "note": "insättning"
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100996.69,
+        "cash": 25450.0,
+        "note": "köp"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "dep_no_gold_on_exchange",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 1000,
+    "expect": {
+     "trades": [
+      {
+       "asset": "BTC",
+       "side": "köp",
+       "units": 0.00033133,
+       "priceSek": 1050000.37,
+       "sek": 350.0,
+       "feeSek": 2.1
+      },
+      {
+       "asset": "ETH",
+       "side": "köp",
+       "units": 0.00521579,
+       "priceSek": 38115.01,
+       "sek": 200.0,
+       "feeSek": 1.2
+      }
+     ],
+     "deposit": {
+      "sek": 1000.0,
+      "valueBefore": 100000.0,
+      "trades": [
+       {
+        "asset": "BTC",
+        "side": "köp",
+        "units": 0.00033133,
+        "priceSek": 1050000.37,
+        "sek": 350.0,
+        "feeSek": 2.1
+       },
+       {
+        "asset": "ETH",
+        "side": "köp",
+        "units": 0.00521579,
+        "priceSek": 38115.01,
+        "sek": 200.0,
+        "feeSek": 1.2
+       }
+      ],
+      "waiting": [],
+      "invest": true
+     },
+     "plain": "Insättning: 1 000 kr in. Jag köper bitcoin för 350 kr och ethereum för 200 kr.",
+     "entryPlain": "Insättning: 1 000 kr in. Jag köpte bitcoin för 350 kr och ethereum för 200 kr.",
+     "entryFacts": [
+      "Insättning: +1 000 kr (låtsasinsättning)",
+      "Köp: 0,00033133 BTC à 1 050 000 kr = 350,00 kr, avgift 2,10 kr",
+      "Köp: 0,00521579 ETH à 38 115 kr = 200,00 kr, avgift 1,20 kr",
+      "Kontant 25 450 kr av 100 997 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 100996.69,
+      "peak": 100996.69,
+      "holdings": {
+       "BTC": 35347.89,
+       "ETH": 20198.8,
+       "GOLD": 20000.0,
+       "CASH": 25450.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03366465,
+        "costSek": 35350.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.5299434,
+        "costSek": 20200.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 101000.0,
+        "cash": 26000.0,
+        "flow": 1000.0,
+        "note": "insättning"
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100996.69,
+        "cash": 25450.0,
+        "note": "köp"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "dep_with_goal",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "autopilot",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": [],
+     "goal": {
+      "name": "Studio",
+      "amountSek": 300000,
+      "date": "2027-10-23"
+     }
+    },
+    "sek": 2000,
+    "expect": {
+     "trades": [],
+     "deposit": {
+      "sek": 2000.0,
+      "valueBefore": 100000.0,
+      "trades": [],
+      "waiting": [],
+      "invest": true
+     },
+     "plain": "Insättning: 2 000 kr in. Pengarna ligger som kontanter tills vidare.",
+     "entryPlain": "Insättning: 2 000 kr in. Pengarna ligger som kontanter tills vidare.",
+     "entryFacts": [
+      "Insättning: +2 000 kr (låtsasinsättning)",
+      "Kontant 27 000 kr av 102 000 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 102000.0,
+      "peak": 102000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 27000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 102000.0,
+        "cash": 27000.0,
+        "flow": 2000.0,
+        "note": "insättning"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "dep_lamps",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": 37000.5
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "rules": {
+     "strategy": "lamps",
+     "decision": {
+      "weekday": "söndag",
+      "bandPp": 5
+     },
+     "parkeraAtRed": 7,
+     "wakeAtRed": 5,
+     "modes": {
+      "buyAtRed": 2,
+      "buyLittleAtRed": 4,
+      "littleShare": 0.5
+     },
+     "paper": {
+      "minTradePct": 2
+     },
+     "maxInvested": 0.75,
+     "minCash": 0.25,
+     "caps": {
+      "BTC": 0.35,
+      "ETH": 0.2,
+      "GOLD": 0.2
+     },
+     "unlock": {
+      "early": {
+       "days": 15,
+       "gainPct": 20,
+       "maxDd": 8,
+       "minGreen": 7
+      },
+      "normal": {
+       "days": 30,
+       "gainPct": 10,
+       "maxDd": 12
+      }
+     },
+     "ethMaxRed": 4,
+     "gold": {
+      "vixAbove": 20,
+      "spxBelowMa": true,
+      "allowedWhenParked": true
+     },
+     "withdrawalFees": {
+      "takerPct": 0.4,
+      "slippagePct": 0.2,
+      "sepaEur": 1,
+      "fxPct": 1
+     },
+     "lampThresholds": {
+      "spxMaDays": 50,
+      "btcMaDays": 200,
+      "btcWeekDropPct": -10,
+      "vixAbove": 20,
+      "us10yRisePp": 0.25,
+      "dxyMaDays": 50,
+      "etfDays": 5,
+      "mvrvZ": 3,
+      "soprAvgDays": 7,
+      "sopr": 1
+     },
+     "lampMaxAgeDays": {
+      "default": 4,
+      "etf": 6,
+      "mvrv": 10,
+      "sopr": 10,
+      "cpi": 35
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 100000.0,
+      "peak": 100000.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25000.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "sek": 500,
+    "expect": {
+     "trades": [],
+     "deposit": {
+      "sek": 500.0,
+      "valueBefore": 100000.0,
+      "trades": [],
+      "waiting": [],
+      "invest": false
+     },
+     "plain": "Insättning: 500 kr in. Med lamp-strategin köper jag inte direkt – pengarna ligger som kontanter tills lamporna säger köp.",
+     "entryPlain": "Insättning: 500 kr in. Med lamp-strategin köper jag inte direkt – pengarna ligger som kontanter tills lamporna säger köp.",
+     "entryFacts": [
+      "Insättning: +500 kr (låtsasinsättning)",
+      "Kontant 25 500 kr av 100 500 kr"
+     ],
+     "portfolio": {
+      "start": 100000,
+      "value": 100500.0,
+      "peak": 100500.0,
+      "holdings": {
+       "BTC": 35000.0,
+       "ETH": 20000.0,
+       "GOLD": 20000.0,
+       "CASH": 25500.0
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.03333332,
+        "costSek": 35000.0,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52472761,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.54053324,
+        "costSek": 20000.0,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 100500.0,
+        "cash": 25500.0,
+        "flow": 500.0,
+        "note": "insättning"
+       }
+      ]
+     }
+    }
+   }
+  ]
  }
 }

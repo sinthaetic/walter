@@ -331,3 +331,81 @@ test("savings_goal_strict_dates_and_since_floor", () => {
   eq(u.savings.since, "2026-10-23");
   eq(WU().setGoal(u, { name: "x", amountSek: 1000, date: "2027-02-30" }), false);
 });
+
+// ---------- Sätt in pengar ----------
+test("deposit_validation", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    const before = JSON.stringify(u);
+    for (const bad of ["99", "abc", "", "NaN", "5,5", "-500", "1e3", "100 000 001", null, 500, NaN]) {
+      const r = WU().deposit(u, bad, m, "2026-10-22");
+      eq(r.ok, false);
+      if (!/minst 100 kr/.test(r.msg)) throw new Error("meddelande: " + r.msg);
+    }
+    eq(JSON.stringify(u), before);
+  } finally { window.WALTER_MARKET = saved; }
+});
+
+test("deposit_fresh_buys_now", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    WU().firstMove(u, m, "2026-10-22");
+    const r = WU().deposit(u, "1 000 kr", m, "2026-10-22");
+    eq(r.ok, true);
+    if (!/^Insättning: 1 000 kr in\. Jag köpte bitcoin för /.test(r.msg)) throw new Error(r.msg);
+    eq(u.portfolio.history.filter((h) => h.note === "insättning").map((h) => [h.date, h.flow]), [["2026-10-22", 1000]]);
+    eq(u.pendingDeposit, undefined);
+    eq(u.journal[0].deposit, { sek: 1000 });
+    // Kopian går att läsa in igen (journal och historik håller formen)
+    WU().importText(JSON.stringify(u));
+  } finally { window.WALTER_MARKET = saved; }
+});
+
+test("deposit_stale_waits_then_buys", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    WU().firstMove(u, m, "2026-10-22");
+    const cash = u.portfolio.holdings.CASH;
+    const r = WU().deposit(u, "500", m, "2026-10-30"); // datan är från 22 okt: inte färsk
+    eq(r.ok, true);
+    eq(u.portfolio.holdings.CASH, cash + 500);
+    eq(u.pendingDeposit, 500);
+    if (!/Jag köper för dem nästa gång jag har färska priser/.test(r.msg)) throw new Error(r.msg);
+    WU().importText(JSON.stringify(u));
+    eq(WU().investPending(u, m, "2026-10-30"), null); // fortfarande gammalt
+    const e = WU().investPending(u, m, "2026-10-22");
+    if (!e || !/^Nu har jag färska priser för insättningen på 500 kr\./.test(e.plain)) throw new Error(e && e.plain);
+    eq(u.pendingDeposit, undefined);
+  } finally { window.WALTER_MARKET = saved; }
+});
+
+test("deposit_lamps_cash_only", () => {
+  const saved = window.WALTER_MARKET;
+  try {
+    const m = fakeMarket();
+    m.now.rules.strategy = "lamps";
+    window.WALTER_MARKET = m;
+    const u = WU().create(100000, "kraken", "2026-10-22");
+    const r = WU().deposit(u, "500", m, "2026-10-22");
+    eq(r.ok, true);
+    eq(u.portfolio.holdings.CASH, 100500);
+    if (!/lamp-strategin/.test(r.msg)) throw new Error(r.msg);
+  } finally { window.WALTER_MARKET = saved; }
+});
+
+test("import_rejects_bad_pending_deposit", () => {
+  const u = WU().create(1000, "kraken", "2026-10-22");
+  u.pendingDeposit = "500";
+  let threw = false;
+  try { WU().importText(JSON.stringify(u)); } catch (e) { threw = true; }
+  eq(threw, true);
+});

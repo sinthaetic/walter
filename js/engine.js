@@ -146,14 +146,19 @@
     }
     return { trades, waiting };
   }
+  // Vad Walter köpte för nya pengar (månadssparande och insättning), som buys_text i Python
+  function buysText(trades, waiting, past) {
+    const buys = trades.map((t) => `${NAMES[t.asset]} för ${num(t.sek)} kr`);
+    let s = "";
+    if (buys.length) s += ` Jag ${past ? "köpte" : "köper"} ${list(buys)}.`;
+    else if (!waiting.length) s += " Pengarna ligger som kontanter tills vidare.";
+    if (waiting.length) s += ` Jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}, så den delen ligger som kontanter.`;
+    return s;
+  }
   function savingsText(sav, past) {
     const months = sav.months.map((k) => MONTHS[Number(k.slice(5, 7)) - 1]);
-    let s = `Månadssparande: ${num(sav.sek)} kr in` + (sav.months.length > 1 ? ` (${list(months)}).` : ".");
-    const buys = sav.trades.map((t) => `${NAMES[t.asset]} för ${num(t.sek)} kr`);
-    if (buys.length) s += ` Jag ${past ? "köpte" : "köper"} ${list(buys)}.`;
-    else if (!sav.waiting.length) s += " Pengarna ligger som kontanter tills vidare.";
-    if (sav.waiting.length) s += ` Jag väntar på pris för ${list(sav.waiting.map((a) => NAMES[a]))}, så den delen ligger som kontanter.`;
-    return s;
+    const s = `Månadssparande: ${num(sav.sek)} kr in` + (sav.months.length > 1 ? ` (${list(months)}).` : ".");
+    return s + buysText(sav.trades, sav.waiting, past);
   }
   // Nästa sparandedag (för översikten): i dag om något ska in, annars nästa sparandedag efter i dag. null = av.
   function nextSavings(s, history, iso) {
@@ -367,24 +372,11 @@
   }
 
   // ---------- Genomför ----------
-  // Skriver förslaget in i användarens Walter (som apply i Python, utan K4). Returnerar journalposten.
-  function apply(user, prop, date) {
+  // Bokför affärerna (genomsnittsmetoden, utan K4), räknar om värde och topp. Delas av apply och applyDeposit.
+  function book(user, trades, date, facts) {
     const pf = user.portfolio, pos = pf.positions || (pf.positions = {});
-    const facts = [];
     user.trades = user.trades || [];
-    const hist = pf.history || (pf.history = []);
-    const sav = prop.savings || null;
-    if (sav) { // månadssparandet: en historikrad med flow per månad, före affärerna
-      if (hist.length && hist[hist.length - 1].date === date && !hist[hist.length - 1].flow) hist.pop();
-      let cash = pf.holdings.CASH;
-      sav.months.forEach((mth, i) => {
-        cash = round(cash + sav.eachSek, 2);
-        hist.push({ date, value: round(sav.valueBefore + sav.eachSek * (i + 1), 2), cash, flow: sav.eachSek, note: SAVINGS_NOTE, month: mth });
-        facts.push(`Månadssparande ${mth}: +${num(sav.eachSek)} kr (låtsasinsättning)`);
-      });
-      pf.holdings.CASH = cash;
-    }
-    for (const t of prop.trades) {
+    for (const t of trades) {
       const a = t.asset, p = pos[a] || (pos[a] = { units: 0, costSek: 0, since: date });
       if (t.side === "köp") {
         if (!p.units) p.since = date;
@@ -404,13 +396,31 @@
     }
     pf.holdings.CASH = round(pf.holdings.CASH, 2);
     const px = {};
-    for (const t of prop.trades) px[t.asset] = t.priceSek;
+    for (const t of trades) px[t.asset] = t.priceSek;
     for (const a of ASSETS) {
       if (a in px) pf.holdings[a] = round(((pos[a] || {}).units || 0) * px[a], 2);
     }
     pf.value = round(sum(pf.holdings), 2);
     pf.peak = Math.max(pf.peak, pf.value);
-    if (prop.trades.length && !pf.firstTrade) pf.firstTrade = date;
+    if (trades.length && !pf.firstTrade) pf.firstTrade = date;
+  }
+
+  // Skriver förslaget in i användarens Walter (som apply i Python, utan K4). Returnerar journalposten.
+  function apply(user, prop, date) {
+    const pf = user.portfolio, facts = [];
+    const hist = pf.history || (pf.history = []);
+    const sav = prop.savings || null;
+    if (sav) { // månadssparandet: en historikrad med flow per månad, före affärerna
+      if (hist.length && hist[hist.length - 1].date === date && !hist[hist.length - 1].flow) hist.pop();
+      let cash = pf.holdings.CASH;
+      sav.months.forEach((mth, i) => {
+        cash = round(cash + sav.eachSek, 2);
+        hist.push({ date, value: round(sav.valueBefore + sav.eachSek * (i + 1), 2), cash, flow: sav.eachSek, note: SAVINGS_NOTE, month: mth });
+        facts.push(`Månadssparande ${mth}: +${num(sav.eachSek)} kr (låtsasinsättning)`);
+      });
+      pf.holdings.CASH = cash;
+    }
+    book(user, prop.trades, date, facts);
     const note = [...new Set(prop.trades.map((t) => t.side))].sort().join("/") || "läge";
     if (hist.length && hist[hist.length - 1].date === date && !hist[hist.length - 1].flow) hist.pop();
     hist.push({ date, value: pf.value, cash: pf.holdings.CASH, note });
@@ -437,6 +447,63 @@
       trades: prop.trades.map((t) => ({ asset: t.asset, side: t.side, sek: t.sek })) };
     if (auto && prop.check) entry.check = true; // autopilotens koll är gjord i dag (se isDue)
     if (sav) entry.savings = { sek: sav.sek, months: sav.months.slice() };
+    (user.journal || (user.journal = [])).unshift(entry);
+    return entry;
+  }
+
+  // ---------- Sätt in pengar (som propose_deposit / apply_deposit i Python) ----------
+  // Insättningen köps direkt som månadssparandet (savingsTrades): bara köp, bara de nya pengarna, minTradePct på
+  // insättningen, minCash håller, saknat pris/tillgång = kontanter. Lamp-strategin: bara kontanter.
+  // opts.stale: marknadsdatan är inte färsk – pengarna sätts in som kontanter och köps senare (investPending).
+  // opts.pending: köp för en tidigare insättning (pengarna finns redan i kassan, ingen ny historikrad).
+  const DEPOSIT_NOTE = "insättning", DEPOSIT_MIN = 100, DEPOSIT_MAX = 100000000;
+  const LAMPS_DEPOSIT = " Med lamp-strategin köper jag inte direkt – pengarna ligger som kontanter tills lamporna säger köp.";
+  const STALE_DEPOSIT = " Jag har inga färska priser just nu, så pengarna ligger som kontanter. Jag köper för dem nästa gång jag har färska priser.";
+  function depositText(dep, past) {
+    const s = dep.pending ? `Nu har jag färska priser för insättningen på ${num(dep.sek)} kr.` : `Insättning: ${num(dep.sek)} kr in.`;
+    if (dep.stale) return s + STALE_DEPOSIT;
+    if (!dep.invest) return s + LAMPS_DEPOSIT;
+    return s + buysText(dep.trades, dep.waiting, past);
+  }
+  function proposeDeposit(user, row, rules, exchange, sek, opts) {
+    const o = opts || {}, r = rules, pf = user.portfolio;
+    const px = {};
+    for (const a of ASSETS) px[a] = (!o.stale && row && row.px && row.px[a]) || null;
+    const { hold, total } = valuation(pf, px);
+    const auto = strategyOf(r) === "autopilot", stale = auto && !!o.stale, invest = auto && !stale;
+    let trades = [], waiting = [];
+    if (invest) {
+      const { w } = weightsFor(r, exchange, glideFactor(user.goal, row.date));
+      const fee = (exchange.takerPct + exchange.slippagePct + (exchange.quote !== "SEK" ? exchange.fxPct : 0)) / 100;
+      const hold2 = Object.assign({}, hold, { CASH: hold.CASH + (o.pending ? 0 : sek) });
+      const st = savingsTrades(px, hold2, total + (o.pending ? 0 : sek), w, r, fee, sek);
+      trades = st.trades; waiting = st.waiting;
+      for (const t of trades) {
+        t.sek = round(t.sek, 2); t.feeSek = round(t.feeSek, 2); t.priceSek = round(t.priceSek, 2);
+        t.units = round(t.units, 8);
+      }
+    }
+    const dep = { sek, valueBefore: round(total, 2), trades, waiting, invest };
+    if (stale) dep.stale = true;
+    if (o.pending) dep.pending = true;
+    return { ready: true, deposit: dep, trades, plain: depositText(dep, false) };
+  }
+  function applyDeposit(user, prop, date) {
+    const pf = user.portfolio, dep = prop.deposit;
+    const hist = pf.history || (pf.history = []);
+    const facts = [];
+    if (!dep.pending) {
+      pf.holdings.CASH = round(pf.holdings.CASH + dep.sek, 2);
+      hist.push({ date, value: round(dep.valueBefore + dep.sek, 2), cash: pf.holdings.CASH, flow: dep.sek, note: DEPOSIT_NOTE });
+      facts.push(`Insättning: +${num(dep.sek)} kr (låtsasinsättning)`);
+    }
+    const first = pf.firstTrade;
+    book(user, prop.trades, date, facts);
+    pf.firstTrade = first; // insättningens köp är inte Walters första drag (det ska fortfarande ske med hela kassan)
+    if (prop.trades.length) hist.push({ date, value: pf.value, cash: pf.holdings.CASH, note: "köp" });
+    facts.push(`Kontant ${num(pf.holdings.CASH)} kr av ${num(pf.value)} kr`);
+    const entry = { date, mode: user.mode, red: null, plain: depositText(dep, true), facts,
+      trades: prop.trades.map((t) => ({ asset: t.asset, side: t.side, sek: t.sek })), deposit: { sek: dep.sek } };
     (user.journal || (user.journal = [])).unshift(entry);
     return entry;
   }
@@ -543,5 +610,6 @@
   }
 
   root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, MOODS, NAMES,
-    strategyOf, nextCheck, dayText, glideFactor, savingsPlan, savingsDue, nextSavings, SAVINGS_NOTE };
+    strategyOf, nextCheck, dayText, glideFactor, savingsPlan, savingsDue, nextSavings, SAVINGS_NOTE,
+    proposeDeposit, applyDeposit, DEPOSIT_NOTE, DEPOSIT_MIN, DEPOSIT_MAX };
 })(typeof window !== "undefined" ? window : this);

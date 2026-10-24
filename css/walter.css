@@ -372,7 +372,20 @@ body.pro .explain { display: none; }
 /* ---------- Mål med datum + månadssparande ---------- */
 .pf-save { display: flex; align-items: center; gap: 10px; margin: auto 0 12px; height: 20px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--soft); }
 .pf-save .dot { width: 6px; height: 6px; flex: none; }
-.pf-save + .pf-foot { margin-top: 0; }
+.pf-act { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: auto 0 12px; min-height: 44px; }
+.pf-act .pf-save { margin: 0; flex: 1 0 auto; max-width: 100%; } /* får aldrig klippas mitt i beloppet: knappen bryts ner i stället */
+.pf-act .dep-open { margin-left: auto; }
+.pf-act + .pf-foot { margin-top: 0; }
+.dep-open { flex: none; min-height: 44px; white-space: nowrap; }
+.dep-panel { margin-top: 20px; }
+.dep-panel .plain { margin-top: 10px; font-size: 14px; }
+.dep-dialog .field { margin-top: 4px; }
+.dep-msg { min-height: 3em; margin-top: 4px; }
+.dep-steps { margin: 4px 0 8px; padding: 0; list-style: none; counter-reset: dep; }
+.dep-steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--line); counter-increment: dep; }
+.dep-steps li::before { content: counter(dep); grid-row: span 2; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--teal); padding-top: 2px; }
+.dep-steps b { font-family: "JetBrains Mono", monospace; font-weight: 400; font-size: 13px; color: var(--ink); }
+.dep-steps span { font-size: 14px; line-height: 1.5; color: var(--soft); }
 .goal-card { margin-top: 28px; }
 .goal-line { margin-top: 12px; min-height: 3.2em; font-size: 15px; line-height: 1.6; color: var(--soft); }
 .goal-track { position: relative; height: 6px; margin-top: 14px; border-radius: 3px; background: var(--line); overflow: hidden; }

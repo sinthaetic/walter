@@ -55,6 +55,8 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Procenten är MARKNADSVINST över alla insättningar (startkapital + `capitalChange.manualTopUp`). Insättningar låser aldrig upp. Belopp räknas från procenten, sparas aldrig fast.
 - Sharpe (årstakt, riskfri ränta 0) visas först efter 30 dagar riktig handel, räknat från `portfolio.firstTrade`. Insättningar (`flow`) räknas bort.
 - `portfolio.history`: insättningar får `"flow": belopp`, paper-testet före start får `"test": true`. Avkastning räknas utan flows.
+- Sätt in pengar (100–100 000 000 kr, hela kronor): historikrad `{flow, note: "insättning"}` + köp direkt med samma kod som månadssparandet (`walter_paper.propose_deposit/apply_deposit` = `engine.proposeDeposit/applyDeposit`, paritet i fixturen `deposit`). Ändrar aldrig läget eller `firstTrade`; lamps = bara kontanter.
+  Ägaren: `insattning.bat` / `walter_paper.py --insattning 500` (sync_from_repo först, vägrar gamla priser, låser state.enc) och sedan `walter deploy`. Användaren: knappen SÄTT IN PENGAR (översikten + Inställningar); inte färska priser = kontanter + `user.pendingDeposit`, köps i boot (`WalterUser.investPending`).
 
 ## Publicering och ägare
 - Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `tradingview/*.pine`, `data/market.js`, `data/cache.json`, `data/pulse.js`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.

@@ -362,3 +362,53 @@ test("next_savings_day", () => {
   eq(N(SAVE(25), [{ date: "2026-10-25", value: 1, flow: 1000, note: "månadssparande", month: "2026-10" }], "2026-10-26"), "2026-11-25");
   eq(N(SAVE(20), [], "2026-10-24"), "2026-10-24");  // missad: görs vid nästa körning
 });
+
+// ---------- Sätt in pengar (paritet mot Python: engine-cases.json -> deposit) ----------
+const DEP = ["dep_on_weights", "dep_big_from_cash", "dep_heavy_btc", "dep_minimum_100", "dep_gold_missing",
+  "dep_no_gold_on_exchange", "dep_with_goal", "dep_lamps"];
+for (const name of DEP) {
+  test("parity_" + name, async () => {
+    const fx = await fixtures();
+    const c = fx.deposit.cases.find((x) => x.name === name);
+    if (!c) throw new Error("fallet saknas i fixturen");
+    const user = Object.assign(newUser(0, 100000), clone(c.user), { trades: [] });
+    const p = E().proposeDeposit(user, c.row, c.rules, c.exchange, c.sek);
+    same(p.trades, c.expect.trades);
+    same(p.deposit, c.expect.deposit);
+    eq(p.plain, c.expect.plain);
+    const entry = E().applyDeposit(user, p, c.row.date);
+    eq(entry.plain, c.expect.entryPlain);
+    eq(entry.facts, c.expect.entryFacts);
+    eq(entry.deposit, { sek: c.sek });
+    same(user.portfolio.holdings, c.expect.portfolio.holdings);
+    same(user.portfolio.positions, c.expect.portfolio.positions);
+    eq(user.portfolio.value, c.expect.portfolio.value);
+    eq(user.portfolio.peak, c.expect.portfolio.peak);
+    eq(user.portfolio.firstTrade, c.expect.portfolio.firstTrade);
+    same(user.portfolio.history, c.expect.portfolio.history);
+  });
+}
+
+test("deposit_flows_count_as_deposits_for_levels", () => {
+  // 100 000 kr start + 50 000 kr insättning, värde 150 000 kr: ingen marknadsvinst → Level 1
+  const user = newUser(150000, 100000);
+  user.portfolio.history.push({ date: "2026-10-05", value: 150000, cash: 150000, flow: 50000, note: "insättning" });
+  user.startDate = "2026-08-01";
+  eq(E().levelFor(user, row("2026-10-06", 1, { px: PX }), RULES, LEVELS), 1);
+});
+
+test("deposit_stale_cash_only_then_pending_buys", () => {
+  const user = newUser(25000, 100000);
+  const p = E().proposeDeposit(user, row("2026-10-23", 3), AP_RULES, EX, 1000, { stale: true });
+  eq(p.trades, []);
+  eq(p.deposit.stale, true);
+  E().applyDeposit(user, p, "2026-10-23");
+  eq(user.portfolio.holdings.CASH, 26000);
+  if (!/Jag har inga färska priser just nu/.test(user.journal[0].plain)) throw new Error(user.journal[0].plain);
+  // Senare, med färska priser: köp för insättningen, ingen ny insättningsrad
+  const q = E().proposeDeposit(user, row("2026-10-24", 3), AP_RULES, EX, 1000, { pending: true });
+  E().applyDeposit(user, q, "2026-10-24");
+  eq(user.portfolio.history.filter((h) => h.note === "insättning").length, 1);
+  if (!q.trades.length) throw new Error("inga köp");
+  if (!/^Nu har jag färska priser för insättningen på 1 000 kr\. Jag köpte /.test(user.journal[0].plain)) throw new Error(user.journal[0].plain);
+});

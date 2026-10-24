@@ -45,6 +45,9 @@
     if (exchange && now.rules && now.levels) {
       const res = window.WalterEngine.catchUp(user, market.log || [], now.rules, now.levels, exchange);
       catchUpText = window.WalterEngine.summary(res.events);
+      // En insättning gjord när marknadsdatan var gammal köps nu, när priserna är färska
+      const bought = U.investPending(user, market);
+      if (bought) catchUpText = [catchUpText, bought.plain].filter(Boolean).join(" ");
       U.save(user);
     }
     start(U.toState(user, market), { who: "user", exchange, catchUpText });

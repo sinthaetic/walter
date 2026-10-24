@@ -112,14 +112,9 @@
   const days = daysSince(S.startDate);
   const parked = S.mode === "PARKERA";
   const start = pf.start;
-  // Insättningar = startkapital + manuella påfyllningar (capitalChange.manualTopUp). Bara det som är över
-  // insättningarna är marknadsvinst – den räknas för vinst, upplåsning och OPTIMERAT.
-  // Månadssparandet (historikrader med note "månadssparande") är också insättningar, aldrig vinst.
-  const savedIn = (pf.history || []).reduce((t, h) => t + (h && h.note === "månadssparande" && h.flow > 0 ? h.flow : 0), 0);
-  const topUp = ((pf.capitalChange && pf.capitalChange.manualTopUp) || 0) + savedIn;
-  const deposits = start + topUp;
-  const marketGain = pf.value - deposits;
-  const marketPct = deposits > 0 ? (marketGain / deposits) * 100 : 0;
+  // Insättningar och marknadsvinst (gain(), längst ner): bara det som är över insättningarna är marknadsvinst –
+  // den räknas för vinst, upplåsning och OPTIMERAT.
+  const { topUp, deposits, marketGain, marketPct } = gain(pf);
 
   // Journalens läge → ordet användaren ser. Läget ändras bara via journalen (Walter skriver posten själv).
   // Lampnivåerna står i rules.modes / parkeraAtRed / wakeAtRed och räknas i fetcher/walter_paper.py.
@@ -173,14 +168,18 @@
   // ---------- Topp, sidfot ----------
   // Rapporterna (mejl) är ägarens. Användaren får ingen rapporttid.
   $("stamp").textContent = isUser ? "" : "NÄSTA RAPPORT " + nextReport();
-  // Vad Walter gjorde medan sidan var stängd (boot.js räknade ikapp), överst som notis
-  if (isUser && ctx.catchUpText) {
+  // Vad Walter gjorde medan sidan var stängd (boot.js räknade ikapp), och en nyss gjord insättning, överst som notis
+  const DEP_NOTE = own("depositNote"); // walter.user.depositNote (sessionStorage), tas bort direkt när den visats
+  const depNote = isUser ? store.get(DEP_NOTE, "", "sessionStorage") : "";
+  if (depNote) { try { sessionStorage.removeItem(DEP_NOTE); } catch { /* lagring blockerad */ } }
+  const noteText = isUser ? [typeof depNote === "string" ? depNote : "", ctx.catchUpText].filter(Boolean).join(" ") : "";
+  if (noteText) {
     const box = document.createElement("div");
     box.className = "panel catchup-note";
     box.setAttribute("role", "status");
     const p = document.createElement("p");
     p.className = "plain";
-    lines(p, ctx.catchUpText);
+    lines(p, noteText);
     box.appendChild(p);
     const main = document.querySelector("main.page");
     main.insertBefore(box, main.firstChild);
@@ -247,7 +246,10 @@
         <div><span>INVESTERAT</span><strong title="${AUTO ? "Autopilotens mål" : `Tak på Level ${S.level}`}">${nf(0).format(invested * 100)} / ${nf(0).format((AUTO ? 1 - apCash : levelCap) * 100)} %</strong></div>
       </div>
     </div>
-    ${saveLine ? `<p class="pf-save"><span class="dot teal" aria-hidden="true"></span>${esc(saveLine)}</p>` : ""}
+    <div class="pf-act">
+      ${saveLine ? `<p class="pf-save"><span class="dot teal" aria-hidden="true"></span>${esc(saveLine)}</p>` : "<span></span>"}
+      <button type="button" class="btn dep-open" data-dep-open>SÄTT IN PENGAR</button>
+    </div>
     <div class="pf-foot"><a href="#wc">BITCOIN · W-CIPHER ↓</a><a href="#siffror">SIFFRORNA →</a></div>`;
 
   // ---------- Målet (valfritt): hur långt kvar, och hur mycket Walter redan flyttat till kontanter ----------
@@ -940,6 +942,14 @@
       <pre class="sv-pre" id="owner-snippet-text"></pre>
     </div>`}
 
+    <section class="panel dep-panel" aria-label="Sätt in pengar">
+      <h3>SÄTT IN PENGAR</h3>
+      <p class="plain">${isUser
+        ? (AUTO ? "Sätt in ett belopp när du vill, som ett eget köp på en börs. Walter köper direkt efter sina andelar – bara med de nya pengarna, han säljer inget." : "Sätt in ett belopp när du vill. Med lamp-strategin ligger pengarna som kontanter tills lamporna säger köp.")
+        : "Din Walter ligger i data/state.json. Insättningen görs på datorn i två steg."}</p>
+      <div class="form-actions start"><button type="button" class="btn btn-primary dep-open" data-dep-open>SÄTT IN PENGAR</button></div>
+    </section>
+
     <div class="section-title"><h2>UTTAG</h2><span class="small">Vad du kan ta ut, och när.</span></div>
     <div class="panel" style="margin-top:20px" id="goal">
       <div class="form-grid">
@@ -1095,6 +1105,58 @@
     ownerSnippet(undefined, { monthlySek: amt, day: d, since });
     $("savings-msg").textContent = "Klistra in raden under formulären i state.json.";
   });
+
+  // ---------- Sätt in pengar (översikten + Inställningar, samma dialog) ----------
+  // Användaren: WalterUser.deposit (samma köp som månadssparandet), sparas i walter.user, sidan ritas om.
+  // Ägaren: portföljen ligger i state.json/state.enc – dialogen visar de två stegen på datorn.
+  (() => {
+    const dlg = $("dep-dialog");
+    if (!dlg) return;
+    const honest = '<p class="sv-honest"><b>PAPER</b><span>Låtsasinsättning – inga riktiga pengar flyttas.</span></p>';
+    dlg.innerHTML = isUser ? `
+      <form method="dialog" id="dep-form" novalidate>
+        <h2 id="dep-title">SÄTT IN PENGAR</h2>
+        <p>${AUTO ? "Walter köper direkt efter sina andelar, bara med de nya pengarna. Han säljer inget." : "Med lamp-strategin ligger pengarna som kontanter tills lamporna säger köp."}</p>
+        <label class="field"><span>BELOPP (KR)</span>
+          <input class="input num" id="dep-amount" name="amount" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="500" aria-describedby="dep-msg"></label>
+        ${honest}
+        <p class="small msg dep-msg" id="dep-msg" aria-live="polite">Minst 100 kr, hela kronor.</p>
+        <div class="form-actions">
+          <button type="button" class="btn" id="dep-cancel">AVBRYT</button>
+          <button type="submit" value="ok" class="btn btn-primary">SÄTT IN</button>
+        </div>
+      </form>` : `
+      <form method="dialog">
+        <h2 id="dep-title">SÄTT IN PENGAR</h2>
+        <p>Din Walter ligger i data/state.json, och sidan kan inte skriva där. Gör så här på datorn:</p>
+        <ol class="dep-steps">
+          <li><b>insattning.bat</b><span>Dubbelklicka och skriv beloppet. Walter hämtar sina affärer först och köper direkt till dagens priser.</span></li>
+          <li><b>walter deploy</b><span>Skickar den låsta state.enc till main, så att Walter i GitHub och sidan ser insättningen.</span></li>
+        </ol>
+        ${honest}
+        <div class="form-actions"><button type="submit" value="cancel" class="btn btn-primary">STÄNG</button></div>
+      </form>`;
+    dlg.setAttribute("aria-labelledby", "dep-title");
+    const input = $("dep-amount"), msg = $("dep-msg");
+    document.querySelectorAll("[data-dep-open]").forEach((b) => b.addEventListener("click", () => {
+      if (input) { input.value = ""; msg.textContent = "Minst 100 kr, hela kronor."; }
+      dlg.showModal();
+      if (input) input.focus();
+    }));
+    if (!isUser) return;
+    $("dep-cancel").addEventListener("click", () => dlg.close());
+    // Enter i fältet och SÄTT IN skickar formuläret (AVBRYT är ingen submit-knapp)
+    $("dep-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const user = U.load();
+      if (!user) { msg.textContent = "Jag hittar ingen sparad Walter att sätta in i."; return; }
+      const res = U.deposit(user, input.value, window.WALTER_MARKET, isoToday);
+      if (!res.ok) { msg.textContent = res.msg; input.focus(); return; }
+      if (!U.save(user)) { msg.textContent = "Din webbläsare låter mig inte spara."; return; }
+      store.set(DEP_NOTE, res.msg, "sessionStorage");
+      location.reload();
+    });
+  })();
 
   // ---------- Uttag: generisk uttagsräknare (slider 5 000–500 000 kr + eget belopp) ----------
   // Brutto = det som måste säljas för att netto ska landa på banken i SEK:
@@ -1366,5 +1428,16 @@
   // Det som "Börja om" rensar: användarens Walter och allt under walter.user.*
   function isUserKey(k) { return k === "walter.user" || String(k).startsWith("walter.user."); }
 
-  window.WalterApp = { start, keyFor, isUserKey };
+  // Insättningar = startkapital + manuella påfyllningar (capitalChange.manualTopUp) + månadssparandet och
+  // "Sätt in pengar" (historikrader med note "månadssparande" / "insättning"). Insättningar är aldrig vinst.
+  const FLOW_NOTES = ["månadssparande", "insättning"];
+  function gain(pf) {
+    const savedIn = (pf.history || []).reduce((t, h) => t + (h && FLOW_NOTES.includes(h.note) && h.flow > 0 ? h.flow : 0), 0);
+    const topUp = ((pf.capitalChange && pf.capitalChange.manualTopUp) || 0) + savedIn;
+    const deposits = pf.start + topUp;
+    const marketGain = pf.value - deposits;
+    return { topUp, deposits, marketGain, marketPct: deposits > 0 ? (marketGain / deposits) * 100 : 0 };
+  }
+
+  window.WalterApp = { start, keyFor, isUserKey, gain };
 })();

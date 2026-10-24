@@ -96,7 +96,8 @@
       isObj(pf.holdings) && Object.values(pf.holdings).every(fin) && fin(pf.holdings.CASH) &&
       isObj(pf.positions) && Object.values(pf.positions).every(positionOk) &&
       (pf.firstTrade === null || pf.firstTrade === undefined || isDate(pf.firstTrade)) &&
-      allOk(pf.history, historyOk) && optional(u, "savings", (s) => savingsOk(s, u.startDate)) && optional(u, "goal", goalOk);
+      allOk(pf.history, historyOk) && optional(u, "savings", (s) => savingsOk(s, u.startDate)) && optional(u, "goal", goalOk) &&
+      optional(u, "pendingDeposit", (v) => fin(v) && v >= 0 && v <= 1e10);
     if (!ok) throw new Error(NOT_A_COPY);
     return u;
   }
@@ -152,6 +153,40 @@
     // Dagen är räknad: ligger loggen efter får den aldrig spela upp samma dag igen.
     if (now.date > user.lastDay) user.lastDay = now.date;
     return entry;
+  }
+
+  // ---------- Sätt in pengar (Inställningar och översikten) ----------
+  // Låtsasinsättning: hela kronor 100–100 000 000 (WalterIntro.parseAmount). Färsk marknadsdata: Walter köper direkt
+  // med samma kod som månadssparandet (WalterEngine.proposeDeposit). Inte färsk: pengarna läggs som kontanter och
+  // beloppet sparas i pendingDeposit, så att Walter köper för dem nästa gång priserna är färska (investPending).
+  const DEPOSIT_RANGE = "Skriv ett belopp i hela kronor, minst 100 kr och högst 100 000 000 kr.";
+  function deposit(user, text, market, day) {
+    const E = root.WalterEngine, parse = root.WalterIntro && root.WalterIntro.parseAmount;
+    const sek = parse && typeof text === "string" ? parse(text) : null;
+    if (sek === null) return { ok: false, msg: DEPOSIT_RANGE };
+    const now = market && market.now;
+    const exchange = (root.WALTER_EXCHANGES || []).find((x) => x.id === user.exchangeId) || null;
+    if (!E || !now || !now.rules || !exchange) return { ok: false, msg: "Jag väntar på marknadsdata. Försök igen om en stund." };
+    const iso = day || today();
+    const fresh = isFresh(now, iso) && isDate(now.date) && now.date >= user.startDate;
+    const prop = E.proposeDeposit(user, now, now.rules, exchange, sek, fresh ? {} : { stale: true });
+    const entry = E.applyDeposit(user, prop, fresh ? now.date : iso);
+    if (prop.deposit.stale) user.pendingDeposit = E.round((user.pendingDeposit || 0) + sek, 2);
+    return { ok: true, sek, entry, msg: entry.plain };
+  }
+  // Köp för en insättning som gjordes när marknadsdatan inte var färsk. Returnerar journalposten eller null.
+  function investPending(user, market, day) {
+    const E = root.WalterEngine, now = market && market.now;
+    const exchange = (root.WALTER_EXCHANGES || []).find((x) => x.id === user.exchangeId) || null;
+    const sek = user.pendingDeposit;
+    if (!(sek > 0) || !E || !now || !now.rules || !exchange || !isDate(now.date)) return null;
+    if (!isFresh(now, day || today()) || now.date < user.startDate) return null;
+    delete user.pendingDeposit;
+    if (E.strategyOf(now.rules) !== "autopilot") return null;
+    const prop = E.proposeDeposit(user, now, now.rules, exchange, sek, { pending: true });
+    // Inget att köpa (t.ex. har Walters vanliga koll redan investerat pengarna): ingen journalpost
+    if (!prop.trades.length && !prop.deposit.waiting.length) return null;
+    return E.applyDeposit(user, prop, now.date);
   }
 
   // ---------- Lås upp ägarens Walter ----------
@@ -237,5 +272,5 @@
   }
 
   root.WalterUser = { load, save, storageOk, create, isFresh, firstMove, exportFile, importText, toState, today, unlockOwner, forgetOwner,
-    setSavings, setGoal };
+    setSavings, setGoal, deposit, investPending };
 })(typeof window !== "undefined" ? window : this);

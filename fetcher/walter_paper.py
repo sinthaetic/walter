@@ -3,6 +3,9 @@
   python fetcher/walter_paper.py        visa Walters förslag och handla manuellt (skriv JA)
   paper.bat                            samma sak, dubbelklick
   python fetcher/walter_paper.py --auto Walter handlar själv (bara GitHub Actionen), ingen fråga
+  python fetcher/walter_paper.py --insattning 500
+                                       sätt in 500 kr (paper) och köp direkt, som månadssparandet
+  insattning.bat                       samma sak, frågar efter beloppet
 
 Hämtaren (walter_fetch.py) räknar förslaget vid varje hämtning och lägger det i state.js, men handlar aldrig.
 Walter handlar själv i Actionen (--auto) högst en gång per dag och skriver journalposten med "auto": true.
@@ -16,6 +19,7 @@ Omkostnad räknas med genomsnittsmetoden (Skatteverkets regel för krypto), avgi
 
 import json
 import math
+import re
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -255,17 +259,97 @@ def month_list(months):
     return _list([MONTHS[int(k[5:7]) - 1] for k in months])
 
 
+def buys_text(trades, waiting, past):
+    """Vad Walter köpte för nya pengar (månadssparande och insättning). Samma text som js/engine.js buysText."""
+    buys = [f"{NAMES[t['asset']]} för {num(t['sek'])} kr" for t in trades]
+    s = ""
+    if buys:
+        s += f" Jag {'köpte' if past else 'köper'} {_list(buys)}."
+    elif not waiting:
+        s += " Pengarna ligger som kontanter tills vidare."
+    if waiting:
+        s += f" Jag väntar på pris för {_list([NAMES[a] for a in waiting])}, så den delen ligger som kontanter."
+    return s
+
+
 def savings_text(sav, past):
     """Walters ord om månadssparandet. past=True i journalen ("köpte"), annars "köper"."""
     s = f"Månadssparande: {num(sav['sek'])} kr in" + (f" ({month_list(sav['months'])})." if len(sav["months"]) > 1 else ".")
-    buys = [f"{NAMES[t['asset']]} för {num(t['sek'])} kr" for t in sav["trades"]]
-    if buys:
-        s += f" Jag {'köpte' if past else 'köper'} {_list(buys)}."
-    elif not sav["waiting"]:
-        s += " Pengarna ligger som kontanter tills vidare."
-    if sav["waiting"]:
-        s += f" Jag väntar på pris för {_list([NAMES[a] for a in sav['waiting']])}, så den delen ligger som kontanter."
-    return s
+    return s + buys_text(sav["trades"], sav["waiting"], past)
+
+
+# ---------- Sätt in pengar (en låtsasinsättning när ägaren vill, som DCA på en börs) ----------
+DEPOSIT_NOTE = "insättning"
+DEPOSIT_MIN, DEPOSIT_MAX = 100, 100_000_000
+LAMPS_DEPOSIT = " Med lamp-strategin köper jag inte direkt – pengarna ligger som kontanter tills lamporna säger köp."
+
+
+def parse_amount(text):
+    """Hela kronor 100–100 000 000 ur text: bara siffror, mellanslag och "kr" (som WalterIntro.parseAmount).
+    Allt annat (komma, minus, e, ord) ger None."""
+    if not isinstance(text, str):
+        return None
+    m = re.fullmatch(r"\s*([0-9][0-9\s]*?)\s*(?:kr)?\s*", text, re.IGNORECASE)
+    if not m:
+        return None
+    n = int(re.sub(r"\s", "", m.group(1)))
+    return n if DEPOSIT_MIN <= n <= DEPOSIT_MAX else None
+
+
+def deposit_text(dep, past):
+    """Walters ord om insättningen. Samma text som js/engine.js depositText."""
+    s = f"Insättning: {num(dep['sek'])} kr in."
+    if not dep["invest"]:
+        return s + LAMPS_DEPOSIT
+    return s + buys_text(dep["trades"], dep["waiting"], past)
+
+
+def propose_deposit(state, today, sek, assets=None):
+    """Insättningen investeras direkt på samma sätt som månadssparandet (savings_trades): bara köp, bara med
+    de nya pengarna, minTradePct räknat på insättningen, minCash håller, saknat pris/tillgång = kontanter.
+    Lamp-strategin: bara kontanter. Ändrar ingenting. Samma kod som js/engine.js proposeDeposit."""
+    r, pf = state["rules"], state["portfolio"]
+    sek = float(sek)
+    px = prices_sek(state["market"])
+    hold, total = valuation(pf, px)
+    invest = strategy_of(r) == "autopilot"
+    trades, waiting = [], []
+    if invest:
+        weights, _ = weights_for(r, assets, glide_factor(state.get("goal"), today))
+        fee = (r["withdrawalFees"]["takerPct"] + r["withdrawalFees"]["slippagePct"]) / 100
+        hold2 = dict(hold, CASH=hold["CASH"] + sek)
+        trades, waiting = savings_trades(px, hold2, total + sek, weights, r, fee, sek)
+        for t in trades:
+            for k in ("sek", "feeSek", "priceSek"):
+                t[k] = round(t[k], 2)
+            t["units"] = round(t["units"], 8)
+    dep = {"sek": sek, "valueBefore": round(total, 2), "trades": trades, "waiting": waiting, "invest": invest}
+    return {"asOf": today, "ready": True, "deposit": dep, "trades": trades, "plain": deposit_text(dep, False)}
+
+
+def apply_deposit(raw, prop, today):
+    """Skriver insättningen in i state.json-innehållet: en historikrad med flow (note insättning), sedan köpen.
+    Läget ändras inte. Returnerar journalposten."""
+    pf, dep = raw["portfolio"], prop["deposit"]
+    hist = pf.setdefault("history", [])
+    pf["holdings"]["CASH"] = round(pf["holdings"]["CASH"] + dep["sek"], 2)
+    hist.append({"date": today, "value": round(dep["valueBefore"] + dep["sek"], 2), "cash": pf["holdings"]["CASH"],
+                 "flow": dep["sek"], "note": DEPOSIT_NOTE})
+    facts = [f"Insättning: +{num(dep['sek'])} kr (låtsasinsättning)"]
+    had, first = "firstTrade" in pf, pf.get("firstTrade")
+    _book(raw, prop["trades"], today, facts)
+    if not first:  # insättningens köp är inte Walters första drag (det ska fortfarande ske med hela kassan)
+        pf.pop("firstTrade", None)
+        if had:
+            pf["firstTrade"] = first
+    if prop["trades"]:
+        hist.append({"date": today, "value": pf["value"], "cash": pf["holdings"]["CASH"], "note": "köp"})
+    facts.append(f"Kontant {num(pf['holdings']['CASH'])} kr av {num(pf['value'])} kr")
+    raw["updatedAt"] = max(raw.get("updatedAt") or today, today)
+    entry = {"date": today, "mode": raw.get("mode"), "red": None, "plain": deposit_text(dep, True), "facts": facts,
+             "deposit": {"sek": dep["sek"]}}
+    raw.setdefault("journal", []).insert(0, entry)
+    return entry
 
 
 def rebalance_trades(pf, px, hold, total, weights, rules, fee, sell_all=False):
@@ -497,24 +581,13 @@ def sharpe(daily, flows, first_trade, today=None):
 
 
 # ---------- Godkänn ----------
-def apply(raw, prop, today):
-    """Skriver förslaget in i state.json-innehållet (raw). Returnerar journalposten."""
-    pf, r = raw["portfolio"], raw["rules"]
+def _book(raw, trades, today, facts):
+    """Bokför affärerna i portföljen (genomsnittsmetoden, K4-rad per försäljning), räknar om värde och topp.
+    Delas av apply (förslaget) och apply_deposit (insättningen)."""
+    pf = raw["portfolio"]
     pos = pf.setdefault("positions", {})
-    facts, k4 = [], raw.setdefault("k4", [])
-    hist = pf.setdefault("history", [])
-    sav = prop.get("savings")
-    if sav:  # månadssparandet: en historikrad med flow per månad, före affärerna
-        if hist and hist[-1]["date"] == today and not hist[-1].get("flow"):
-            hist.pop()
-        cash = pf["holdings"]["CASH"]
-        for i, mth in enumerate(sav["months"]):
-            cash = round(cash + sav["eachSek"], 2)
-            hist.append({"date": today, "value": round(sav["valueBefore"] + sav["eachSek"] * (i + 1), 2), "cash": cash,
-                         "flow": sav["eachSek"], "note": SAVINGS_NOTE, "month": mth})
-            facts.append(f"Månadssparande {mth}: +{num(sav['eachSek'])} kr (låtsasinsättning)")
-        pf["holdings"]["CASH"] = cash
-    for t in prop["trades"]:
+    k4 = raw.setdefault("k4", [])
+    for t in trades:
         a, p = t["asset"], pos.setdefault(t["asset"], {"units": 0, "costSek": 0, "since": today})
         if t["side"] == "köp":
             if not p["units"]:
@@ -537,15 +610,34 @@ def apply(raw, prop, today):
         facts.append(f"{t['side'].capitalize()}: {num(t['units'], 8)} {a} à {num(t['priceSek'])} kr = "
                      f"{num(t['sek'], 2)} kr, avgift {num(t['feeSek'], 2)} kr")
     pf["holdings"]["CASH"] = round(pf["holdings"]["CASH"], 2)
-    px = {t["asset"]: t["priceSek"] for t in prop["trades"]}
+    px = {t["asset"]: t["priceSek"] for t in trades}
     for a in ASSETS:
         units = (pos.get(a) or {}).get("units", 0)
         if a in px:
             pf["holdings"][a] = round(units * px[a], 2)
     pf["value"] = round(sum(pf["holdings"].values()), 2)
     pf["peak"] = max(pf["peak"], pf["value"])
-    if prop["trades"] and not pf.get("firstTrade"):
+    if trades and not pf.get("firstTrade"):
         pf["firstTrade"] = today
+
+
+def apply(raw, prop, today):
+    """Skriver förslaget in i state.json-innehållet (raw). Returnerar journalposten."""
+    pf = raw["portfolio"]
+    facts = []
+    hist = pf.setdefault("history", [])
+    sav = prop.get("savings")
+    if sav:  # månadssparandet: en historikrad med flow per månad, före affärerna
+        if hist and hist[-1]["date"] == today and not hist[-1].get("flow"):
+            hist.pop()
+        cash = pf["holdings"]["CASH"]
+        for i, mth in enumerate(sav["months"]):
+            cash = round(cash + sav["eachSek"], 2)
+            hist.append({"date": today, "value": round(sav["valueBefore"] + sav["eachSek"] * (i + 1), 2), "cash": cash,
+                         "flow": sav["eachSek"], "note": SAVINGS_NOTE, "month": mth})
+            facts.append(f"Månadssparande {mth}: +{num(sav['eachSek'])} kr (låtsasinsättning)")
+        pf["holdings"]["CASH"] = cash
+    _book(raw, prop["trades"], today, facts)
     note = "/".join(sorted({t["side"] for t in prop["trades"]})) or "läge"
     if hist and hist[-1]["date"] == today and not hist[-1].get("flow"):
         hist.pop()
@@ -624,6 +716,46 @@ def auto(wf, today=None, say=lambda s: None):
     return entry
 
 
+def prices_fresh(state, today):
+    """Är marknadsdatan färsk nog att handla på? Samma gräns som WalterUser.isFresh (lampMaxAgeDays.default, 4)."""
+    fetched = _iso((state.get("fetchedAt") or "")[:10])
+    age = ((state.get("rules") or {}).get("lampMaxAgeDays") or {}).get("default", 4)
+    return fetched is not None and (date.fromisoformat(today) - fetched).days <= age
+
+
+def deposit_cli(wf, text, today=None, say=print):
+    """Ägarens "Sätt in pengar" (insattning.bat): hämta Walters affärer först (sync_from_repo), sätt in beloppet
+    till dagens priser med samma kod som månadssparandet, skriv state.json, lås state.enc och bygg om state.js.
+    Returnerar journalposten eller None (då är inget ändrat)."""
+    sek = parse_amount(text)
+    if sek is None:
+        say(f"Skriv ett belopp i hela kronor, minst {num(DEPOSIT_MIN)} kr och högst {num(DEPOSIT_MAX)} kr. Inget insatt.")
+        return None
+    if walter_vault.sync_from_repo() in ("local", "pullfail"):
+        say("Inget insatt. Reda ut state.json/state.enc först (se ovan), kör sedan insattning.bat igen.")
+        return None
+    code = walter_vault.owner_key()
+    if not code:  # utan kod kan state.enc inte sparas – då vore insättningen borta vid nästa hämtning
+        say("WALTER_OWNER_KEY saknas i fetcher/.env – inget insatt (state.enc skulle inte kunna sparas).")
+        return None
+    raw = wf.read_json(wf.BASE, None)
+    if raw is None:
+        say("Hittar inte data/state.json – inget insatt.")
+        return None
+    today = today or stockholm_today()
+    built = rebuild(wf)
+    if not prices_fresh(built, today):
+        say(f"Priserna är från {(built.get('fetchedAt') or 'okänt datum')[:10]} – kör hamta.bat först, "
+            "sedan insattning.bat igen. Inget insatt.")
+        return None
+    entry = apply_deposit(raw, propose_deposit(built, today, sek), today)
+    walter_vault._write_atomic(wf.BASE, json.dumps(raw, indent=2, ensure_ascii=False) + "\n")
+    walter_vault.lock_state(code, wf.BASE, walter_vault.ENC)
+    wf.write_js(rebuild(wf))
+    say(f"Klart. {entry['plain']}")
+    return entry
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -631,6 +763,13 @@ def main():
 
     if "--auto" in sys.argv[1:]:
         auto(wf, say=print)
+        return
+    if "--insattning" in sys.argv[1:]:
+        rest = sys.argv[sys.argv.index("--insattning") + 1:]
+        text = " ".join(rest) if rest else input("Hur mycket vill du sätta in (kr)? ")
+        if deposit_cli(wf, text):
+            print("\nPAPER – inga riktiga pengar flyttas. Kör nu 'walter deploy' så att Walter i GitHub "
+                  "och sidan ser insättningen.")
         return
     # Walter kan ha handlat i Actionen – hämta det först. Är läget oklart handlas inget manuellt,
     # så att ett JA aldrig skriver över en state.enc med Walters egen affär.
