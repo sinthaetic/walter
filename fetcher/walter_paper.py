@@ -221,6 +221,9 @@ def autopilot_plain(trades, hold, total, weights, first, due, today, rules, wait
         s = f"{head}: {' '.join(parts)} {nxt}"
     elif first:
         s = "Jag börjar så fort jag har priserna."
+    elif waiting:
+        s = f"{head}: jag väntar på pris för {_list([NAMES[a] for a in waiting])}. Jag försöker igen i morgon."
+        waiting = []
     else:
         s = f"{head}: allt ligger inom marginalen. Jag rör ingenting. {nxt}"
     if waiting:
@@ -260,7 +263,10 @@ def propose_autopilot(state, today, assets=None):
                             catch_up, last_check(journal, pf) == today and not first)
     return {"asOf": today, "ready": True, "strategy": "autopilot", "red": red, "mode": mode, "currentMode": current,
             "trades": trades, "valueSek": round(total, 2), "plain": plain,
-            "needsApproval": bool(trades) or mode != current or due, "decisionDay": due,
+            # Kollen skrivs i journalen på beslutsdagen, och en ikapp-dag bara när kollen blev klar (inget väntar på pris),
+            # så att ett prisavbrott efter en missad söndag inte ger en journalpost per dag.
+            "needsApproval": bool(trades) or mode != current or (due and (not catch_up or not waiting)),
+            "decisionDay": due,
             # En koll räknas som gjord när inget väntar på pris (annars görs den om nästa dag).
             "check": due and not waiting,
             "nextCheck": next_check(today, r), "weights": weights, "missing": missing, "waiting": waiting}
@@ -457,6 +463,8 @@ def auto(wf, today=None, say=lambda s: None):
     walter_vault.lock_state(code, wf.BASE, walter_vault.ENC)
     wf.write_js(rebuild(wf))
     say(f"Walter handlade själv: {entry['plain']}")
+    # Rad för Actionens commit-meddelande: handlade (affär), koll (autopilotens koll) eller läge (bara läget).
+    say("WALTER_COMMIT=" + ("handlade" if prop["trades"] else "koll" if entry.get("check") else "läge"))
     return entry
 
 

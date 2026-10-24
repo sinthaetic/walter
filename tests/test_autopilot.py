@@ -172,6 +172,21 @@ class AutopilotTest(unittest.TestCase):
         self.assertTrue(prop["decisionDay"])
         self.assertFalse(prop["check"])  # guldet väntar -> kollen görs om nästa dag
 
+    def test_price_outage_catch_up_is_quiet(self):
+        # Missad söndag + guldpris saknas + inget annat att göra: ingen journalpost, försök igen i morgon
+        p = pf(25000, {"BTC": 35000, "ETH": 20000, "GOLD": 10000})
+        s = state(p, gold=False)
+        s["journal"] = [{"date": "2026-10-11", "check": True}]
+        prop = wp.propose(s, today=FRIDAY)
+        self.assertTrue(prop["decisionDay"])
+        self.assertEqual(prop["trades"], [])
+        self.assertFalse(prop["needsApproval"])
+        self.assertEqual(prop["plain"], "Fredag (söndagens koll): jag väntar på pris för guld. Jag försöker igen i morgon.")
+        # Själva söndagen skrivs kollen ändå (en gång)
+        s2 = state(copy.deepcopy(p), gold=False)
+        s2["portfolio"]["firstTrade"] = "2026-10-19"
+        self.assertTrue(wp.propose(s2, today=SUNDAY)["needsApproval"])
+
     def test_next_check(self):
         self.assertEqual(wp.next_check("2026-10-25", RULES), "2026-11-01")
         self.assertEqual(wp.next_check("2026-10-24", RULES), "2026-10-25")

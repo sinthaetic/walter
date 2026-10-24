@@ -108,6 +108,24 @@ class AutoTest(unittest.TestCase):
         self.assertTrue(entry["plain"].startswith("Söndag: allt ligger inom marginalen."))
         self.assertIsNone(self.run_auto(p))  # en gång per dag
 
+    def test_commit_marker(self):
+        # Actionens commit-meddelande: "Walter handlade" bara vid affär
+        for prop, want in ((proposal(), "WALTER_COMMIT=handlade"),):
+            said = []
+            with patch.object(wpaper, "propose", lambda s, **k: prop):
+                wpaper.auto(wf, today=TODAY, say=said.append)
+            self.assertIn(want, said)
+        said = []
+        p = {"asOf": "2026-10-24", "ready": True, "strategy": "autopilot", "red": 3, "mode": "AVVAKTAR",
+             "currentMode": "AVVAKTAR", "trades": [], "decisionDay": True, "check": True, "plain": "Söndag: ok.",
+             "needsApproval": True, "weights": {"BTC": 0.35, "ETH": 0.2, "GOLD": 0.2}}
+        with patch.object(wpaper, "propose", lambda s, **k: p):
+            wpaper.auto(wf, today="2026-10-24", say=said.append)
+        self.assertIn("WALTER_COMMIT=koll", said)
+        wfile = (ROOT / ".github" / "workflows" / "walter-auto.yml").read_text(encoding="utf-8")
+        self.assertIn('*WALTER_COMMIT=handlade*) msg="Walter handlade"', wfile)
+        self.assertIn('*WALTER_COMMIT=koll*) msg="Walter: söndagskoll"', wfile)
+
     def test_no_key_does_not_trade(self):
         before = self.state.read_text(encoding="utf-8")
         with patch.object(v, "owner_key", lambda: None):

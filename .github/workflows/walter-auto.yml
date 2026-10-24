@@ -104,13 +104,20 @@ jobs:
             echo "Ingen WALTER_OWNER_KEY – Walter handlar inte."
             exit 0
           fi
-          python fetcher/walter_paper.py --auto
+          out=$(python fetcher/walter_paper.py --auto)
+          echo "$out"
           if git diff --quiet -- data/state.enc; then
             echo "Ingen affär i dag att spara."
             exit 0
           fi
+          # walter_paper skriver WALTER_COMMIT=handlade|koll|läge: "handlade" bara när en affär gjordes
+          case "$out" in
+            *WALTER_COMMIT=handlade*) msg="Walter handlade" ;;
+            *WALTER_COMMIT=koll*) msg="Walter: söndagskoll" ;;
+            *) msg="Walter: nytt läge (väder)" ;;
+          esac
           git add data/state.enc
-          git -c user.name=WALTER -c user.email=walter@localhost commit -q -m "Walter handlade $(date +%Y-%m-%d) [skip ci]"
+          git -c user.name=WALTER -c user.email=walter@localhost commit -q -m "$msg $(date +%Y-%m-%d) [skip ci]"
           if ! git push -q origin HEAD:main; then
             echo "main har rört sig – hämtar och försöker en gång till."
             git -c user.name=WALTER -c user.email=walter@localhost pull -q --rebase --autostash origin main

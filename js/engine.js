@@ -154,7 +154,10 @@
       parts = [parts[0]].concat(parts.slice(1).map(cap));
       s = `${head}: ${parts.join(" ")} ${nxt}`;
     } else if (first) s = "Jag börjar så fort jag har priserna.";
-    else s = `${head}: allt ligger inom marginalen. Jag rör ingenting. ${nxt}`;
+    else if (waiting.length) {
+      s = `${head}: jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}. Jag försöker igen i morgon.`;
+      waiting = [];
+    } else s = `${head}: allt ligger inom marginalen. Jag rör ingenting. ${nxt}`;
     if (waiting.length) s += ` Jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}.`;
     for (const a of wantedMissing) s += ` ${cap(NAMES[a])} finns inte på din börs, så den delen ligger kvar som kontanter.`;
     return s;
@@ -183,7 +186,8 @@
     const plain = autopilotPlain(trades, hold, total, w, first, due, row.date, r, waiting, wantedMissing,
       catchUp, lastCheck(journal, pf) === row.date && !first);
     return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades, valueSek: round(total, 2),
-      plain, missing, waiting, decisionDay: due, check: due && !waiting.length, nextCheck: nextCheck(row.date, r), weights: w };
+      plain, missing, waiting, decisionDay: due, check: due && !waiting.length,
+      needsApproval: trades.length > 0 || mode !== current || (due && (!catchUp || !waiting.length)), nextCheck: nextCheck(row.date, r), weights: w };
   }
 
   // ---------- Förslag ----------
@@ -388,7 +392,7 @@
       }
 
       const prop = propose(user, row, rules, exchange);
-      if (prop.trades.length || prop.mode !== user.mode || (auto && prop.decisionDay)) {
+      if (prop.trades.length || prop.mode !== user.mode || (auto && prop.needsApproval)) {
         events.push(apply(user, prop, row.date));
       } else {
         // Ingen affär: dagens värde sparas ändå (en riktig loggdag), så att historiken stämmer.

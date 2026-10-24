@@ -130,15 +130,21 @@
   const AUTO = (S.rules.strategy || "autopilot") === "autopilot";
   const unlocked = AUTO ? { BTC: true, ETH: true, GOLD: true } : { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
   const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
-  const capPct = (k) => nf(0).format(S.rules.caps[k] * 100);
+  // Autopilotens andelar: det motorn faktiskt använder (proposal.weights; en tillgång börsen saknar = 0),
+  // annars rules.caps med börsens saknade tillgångar som 0.
+  const apWeights = (S.proposal && S.proposal.weights) || ["BTC", "ETH", "GOLD"].reduce((o, k) => {
+    o[k] = ex && (!ex.assets || ex.assets[k] !== true) ? 0 : S.rules.caps[k]; return o; }, {});
+  const AP_NAMES = { BTC: "bitcoin", ETH: "ethereum", GOLD: "guld" };
+  const apNote = (k, txt) => (apWeights[k] > 0 ? txt : "finns inte på din börs");
   const apDay = String((S.rules.decision && S.rules.decision.weekday) || "söndag").toLowerCase();
   const apBand = S.rules.decision && S.rules.decision.bandPp != null ? S.rules.decision.bandPp : 5;
   const E = window.WalterEngine;
   const apNext = (S.proposal && S.proposal.nextCheck) || (E && S.updatedAt ? E.nextCheck(S.updatedAt, S.rules) : null);
   const apNextText = apNext && E ? E.dayText(apNext) : null;
-  const autoLine = `Autopilot: ${capPct("BTC")} % bitcoin · ${capPct("ETH")} % ethereum · ${capPct("GOLD")} % guld · ` +
-    `${nf(0).format((1 - S.rules.caps.BTC - S.rules.caps.ETH - S.rules.caps.GOLD) * 100)} % kontant. ` +
-    `Jag justerar på ${apDay}ar om något glidit mer än ${apBand} %.`;
+  const apCash = 1 - ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (apWeights[k] || 0), 0);
+  const autoLine = "Autopilot: " + ["BTC", "ETH", "GOLD"].filter((k) => apWeights[k] > 0)
+    .map((k) => `${nf(0).format(apWeights[k] * 100)} % ${AP_NAMES[k]}`).concat(`${nf(0).format(apCash * 100)} % kontant`).join(" · ") +
+    `. Jag justerar på ${apDay}ar om något glidit mer än ${apBand} procentenheter.`;
 
   // Rapporterna skickas 08:13 och 22:05 (se .github/workflows/walter-auto.yml)
   const nextReport = () => {
@@ -167,7 +173,7 @@
   // ================================================================
   $("status-line").textContent = (AUTO ? "WALTERS VÄDERRAPPORT · " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
   $("mode").innerHTML = `<span class="mode-light" style="color: var(--${MODE.acc})" aria-hidden="true"><i></i><b></b></span>
-    <h1 class="mode-name">${esc(MODE.word)}</h1>`;
+    <h1 class="mode-name${AUTO ? " weather" : ""}">${AUTO ? '<span class="mode-pre">VÄDER</span>' : ""}${esc(MODE.word)}</h1>`;
   // Ägarens läge byts via journalen, som Walter skriver själv i Actionen: säg rakt ut när lamporna redan pekar på något annat
   const Pnow = S.proposal || {};
   const pending = !AUTO && !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
@@ -214,7 +220,7 @@
       <div class="stats">
         <div><span>AVKASTNING</span><strong title="Marknadsvinst över alla insättningar">${avk}</strong></div>
         <div><span>KONTANT</span><strong>${nf(0).format((1 - invested) * 100)} %</strong></div>
-        <div><span>INVESTERAT</span><strong title="${AUTO ? "Autopilotens mål" : `Tak på Level ${S.level}`}">${nf(0).format(invested * 100)} / ${nf(0).format(levelCap * 100)} %</strong></div>
+        <div><span>INVESTERAT</span><strong title="${AUTO ? "Autopilotens mål" : `Tak på Level ${S.level}`}">${nf(0).format(invested * 100)} / ${nf(0).format((AUTO ? 1 - apCash : levelCap) * 100)} %</strong></div>
       </div>
     </div>
     <div class="candles" id="candles"><span class="small">Hämtar bitcoin …</span></div>
@@ -397,10 +403,10 @@
   // ---------- Fördelning ----------
   const share = (k) => (pf.value > 0 ? pf.holdings[k] / pf.value : 0);
   const rows = [
-    { k: "BTC", name: "Bitcoin", note: AUTO ? "mål" : "Level 1", cap: S.rules.caps.BTC },
-    { k: "ETH", name: "Ethereum", note: AUTO ? "mål" : "Level 2", cap: S.rules.caps.ETH },
-    { k: "GOLD", name: "Guld", note: AUTO ? "PAXG · mål" : "PAXG / XAUT · L3", cap: S.rules.caps.GOLD },
-    { k: "CASH", name: "Kontant", note: "minst 25 %", cap: null }
+    { k: "BTC", name: "Bitcoin", note: AUTO ? apNote("BTC", "mål") : "Level 1", cap: AUTO ? apWeights.BTC : S.rules.caps.BTC },
+    { k: "ETH", name: "Ethereum", note: AUTO ? apNote("ETH", "mål") : "Level 2", cap: AUTO ? apWeights.ETH : S.rules.caps.ETH },
+    { k: "GOLD", name: "Guld", note: AUTO ? apNote("GOLD", "PAXG · mål") : "PAXG / XAUT · L3", cap: AUTO ? apWeights.GOLD : S.rules.caps.GOLD },
+    { k: "CASH", name: "Kontant", note: AUTO ? "mål · minst 25 %" : "minst 25 %", cap: null }
   ];
   $("allocation").innerHTML = `
     <h3>FÖRDELNING</h3>
@@ -408,19 +414,19 @@
       ${rows.map((r) => {
         const locked = r.cap !== null && !unlocked[r.k];
         const s = share(r.k);
-        const capPos = r.cap !== null ? r.cap * 100 : S.rules.minCash * 100;
+        const capPos = r.cap !== null ? r.cap * 100 : (AUTO ? apCash : S.rules.minCash) * 100;
         return `<div class="alloc-row">
           <div class="lbl"><b>${r.name}</b><span>${esc(r.note)}</span></div>
           <div class="bar${locked ? " locked" : ""}">
             <span class="fill" style="width:${s * 100}%"></span>
             <span class="cap" style="left:${capPos}%" title="${r.cap !== null ? "Tak" : "Golv"} ${capPos} %"></span>
           </div>
-          <div class="pct">${locked ? "låst" : nf(0).format(s * 100) + " %"}${r.cap !== null ? " / " + r.cap * 100 + " %" : ""}</div>
+          <div class="pct">${locked ? "låst" : nf(0).format(s * 100) + " %"}${r.cap !== null ? " / " + nf(0).format(r.cap * 100) + " %" : AUTO ? " / " + nf(0).format(apCash * 100) + " %" : ""}</div>
         </div>`;
       }).join("")}
     </div>
     <p class="small" style="margin-top:16px">${AUTO
-      ? `Investerat ${nf(0).format(invested * 100)} %. Strecket visar autopilotens mål (golv för kontanter). Inom ${apBand} procentenheter från målet rör jag ingenting.`
+      ? `Investerat ${nf(0).format(invested * 100)} %. Strecket visar autopilotens mål. Inom ${apBand} procentenheter från målet rör jag ingenting.`
       : `Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).`}</p>`;
 
   // ---------- Nivåer ----------

@@ -1140,6 +1140,7 @@
      "nextCheck": "2026-11-01",
      "decisionDay": true,
      "check": true,
+     "needsApproval": true,
      "waiting": [],
      "missing": [],
      "entryCheck": true,
@@ -1286,6 +1287,7 @@
      "nextCheck": "2026-11-01",
      "decisionDay": true,
      "check": true,
+     "needsApproval": true,
      "waiting": [],
      "missing": [],
      "entryCheck": true,
@@ -1420,6 +1422,7 @@
      "nextCheck": "2026-10-25",
      "decisionDay": false,
      "check": false,
+     "needsApproval": false,
      "waiting": [],
      "missing": [],
      "entryCheck": false,
@@ -1558,6 +1561,7 @@
      "nextCheck": "2026-10-25",
      "decisionDay": true,
      "check": true,
+     "needsApproval": true,
      "waiting": [],
      "missing": [],
      "entryCheck": true,
@@ -1687,6 +1691,7 @@
      "nextCheck": "2026-10-25",
      "decisionDay": true,
      "check": true,
+     "needsApproval": true,
      "waiting": [],
      "missing": [
       "GOLD"
@@ -1814,6 +1819,7 @@
      "nextCheck": "2026-11-01",
      "decisionDay": true,
      "check": false,
+     "needsApproval": true,
      "waiting": [
       "GOLD"
      ],
@@ -1949,6 +1955,7 @@
      "nextCheck": "2026-10-25",
      "decisionDay": true,
      "check": true,
+     "needsApproval": true,
      "waiting": [],
      "missing": [],
      "entryCheck": true,
@@ -2100,6 +2107,7 @@
      "nextCheck": "2026-10-25",
      "decisionDay": true,
      "check": true,
+     "needsApproval": true,
      "waiting": [],
      "missing": [],
      "entryCheck": true,
@@ -2234,6 +2242,7 @@
      "nextCheck": "2026-11-01",
      "decisionDay": false,
      "check": false,
+     "needsApproval": false,
      "waiting": [],
      "missing": [],
      "entryCheck": false,
@@ -2276,6 +2285,275 @@
        {
         "date": "2026-10-25",
         "value": 99149.88,
+        "cash": 24129.9,
+        "note": "läge"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "ap_missed_sunday_price_outage",
+    "row": {
+     "date": "2026-10-23",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": null
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 90749.87,
+      "peak": 100000,
+      "holdings": {
+       "BTC": 35700.01,
+       "ETH": 19819.81,
+       "GOLD": 11100.15,
+       "CASH": 24129.899999999994
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.034,
+        "costSek": 34000,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52,
+        "costSek": 19000,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.3,
+        "costSek": 20000,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": [
+      {
+       "date": "2026-10-11",
+       "check": true
+      }
+     ]
+    },
+    "expect": {
+     "ready": true,
+     "mode": "NORMAL",
+     "red": 3,
+     "valueSek": 90749.87,
+     "trades": [],
+     "plain": "Fredag (söndagens koll): jag väntar på pris för guld. Jag försöker igen i morgon.",
+     "nextCheck": "2026-10-25",
+     "decisionDay": true,
+     "check": false,
+     "needsApproval": false,
+     "waiting": [
+      "GOLD"
+     ],
+     "missing": [],
+     "entryCheck": false,
+     "portfolio": {
+      "start": 100000,
+      "value": 90749.87,
+      "peak": 100000,
+      "holdings": {
+       "BTC": 35700.01,
+       "ETH": 19819.81,
+       "GOLD": 11100.15,
+       "CASH": 24129.9
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.034,
+        "costSek": 34000,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52,
+        "costSek": 19000,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.3,
+        "costSek": 20000,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-23",
+        "value": 90749.87,
+        "cash": 24129.9,
+        "note": "läge"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "ap_sunday_price_outage",
+    "row": {
+     "date": "2026-10-25",
+     "ready": true,
+     "red": 3,
+     "px": {
+      "BTC": 1050000.37,
+      "ETH": 38115.013431,
+      "GOLD": null
+     },
+     "ethBtcAbove30dMa": false,
+     "vix": 15,
+     "spxBelowMa": false
+    },
+    "exchange": {
+     "id": "test",
+     "quote": "SEK",
+     "takerPct": 0.4,
+     "slippagePct": 0.2,
+     "fxPct": 1,
+     "assets": {
+      "BTC": true,
+      "ETH": true,
+      "GOLD": true
+     }
+    },
+    "user": {
+     "mode": "NORMAL",
+     "level": 1,
+     "portfolio": {
+      "start": 100000,
+      "value": 90749.87,
+      "peak": 100000,
+      "holdings": {
+       "BTC": 35700.01,
+       "ETH": 19819.81,
+       "GOLD": 11100.15,
+       "CASH": 24129.899999999994
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.034,
+        "costSek": 34000,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52,
+        "costSek": 19000,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.3,
+        "costSek": 20000,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       }
+      ]
+     },
+     "journal": []
+    },
+    "expect": {
+     "ready": true,
+     "mode": "NORMAL",
+     "red": 3,
+     "valueSek": 90749.87,
+     "trades": [],
+     "plain": "Söndag: jag väntar på pris för guld. Jag försöker igen i morgon.",
+     "nextCheck": "2026-11-01",
+     "decisionDay": true,
+     "check": false,
+     "needsApproval": true,
+     "waiting": [
+      "GOLD"
+     ],
+     "missing": [],
+     "entryCheck": false,
+     "portfolio": {
+      "start": 100000,
+      "value": 90749.87,
+      "peak": 100000,
+      "holdings": {
+       "BTC": 35700.01,
+       "ETH": 19819.81,
+       "GOLD": 11100.15,
+       "CASH": 24129.9
+      },
+      "positions": {
+       "BTC": {
+        "units": 0.034,
+        "costSek": 34000,
+        "since": "2026-10-01"
+       },
+       "ETH": {
+        "units": 0.52,
+        "costSek": 19000,
+        "since": "2026-10-01"
+       },
+       "GOLD": {
+        "units": 0.3,
+        "costSek": 20000,
+        "since": "2026-10-01"
+       }
+      },
+      "firstTrade": "2026-10-01",
+      "history": [
+       {
+        "date": "2026-10-01",
+        "value": 100000,
+        "cash": 100000,
+        "note": "start",
+        "flow": 100000
+       },
+       {
+        "date": "2026-10-25",
+        "value": 90749.87,
         "cash": 24129.9,
         "note": "läge"
        }
@@ -2363,6 +2641,7 @@
      "nextCheck": null,
      "decisionDay": null,
      "check": null,
+     "needsApproval": false,
      "waiting": [],
      "missing": [],
      "entryCheck": false,

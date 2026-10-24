@@ -192,7 +192,7 @@ test("catchup_old_not_ready_day_is_passed", () => {
 
 // ---------- Autopiloten (paritet mot Python: tests/make_fixtures.py → engine-cases.json → autopilot) ----------
 const AP = ["ap_sunday_within_band", "ap_sunday_outside_band", "ap_weekday_waits", "ap_first_trade_weekday",
-  "ap_missing_gold_on_exchange", "ap_missing_price", "ap_lamps_not_ready", "ap_missed_sunday", "ap_checked_today", "ap_no_prices"];
+  "ap_missing_gold_on_exchange", "ap_missing_price", "ap_lamps_not_ready", "ap_missed_sunday", "ap_checked_today", "ap_no_prices", "ap_missed_sunday_price_outage", "ap_sunday_price_outage"];
 for (const name of AP) {
   test("parity_" + name, async () => {
     const fx = await fixtures();
@@ -213,6 +213,7 @@ for (const name of AP) {
     eq(p.nextCheck, c.expect.nextCheck);
     eq(p.decisionDay, c.expect.decisionDay);
     eq(p.check, c.expect.check);
+    eq(p.needsApproval, c.expect.needsApproval);
     const entry = E().apply(user, p, c.row.date);
     eq(!!entry.check, c.expect.entryCheck);
     same(user.portfolio.holdings, c.expect.portfolio.holdings);

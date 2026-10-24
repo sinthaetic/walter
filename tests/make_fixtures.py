@@ -108,6 +108,13 @@ def autopilot_cases(lamp_rules):
          {"journal": [{"date": "2026-10-11", "check": True}]}),
         ("ap_checked_today", sun, 3, "NORMAL", _pf(near_cash, heavy), None,
          {"journal": [{"date": sun, "check": True}]}),
+        # Missad söndag + guldpris saknas + inget annat att göra: ingen journalpost (görs om i morgon, tyst)
+        ("ap_missed_sunday_price_outage", fri, 3, "NORMAL",
+         _pf(near_cash, {"BTC": near["BTC"], "ETH": near["ETH"], "GOLD": (0.30, 20000)}), None,
+         {"journal": [{"date": "2026-10-11", "check": True}], "gold": False}),
+        # Samma på själva söndagen: kollen skrivs (en gång) fast guldet väntar
+        ("ap_sunday_price_outage", sun, 3, "NORMAL",
+         _pf(near_cash, {"BTC": near["BTC"], "ETH": near["ETH"], "GOLD": (0.30, 20000)}), None, {"gold": False}),
         ("ap_no_prices", sun, 3, "NORMAL", _pf(near_cash, heavy), None, {"prices": False, "ready": False}),
     ]
     out = []
@@ -134,6 +141,7 @@ def autopilot_cases(lamp_rules):
                                "valueSek": prop["valueSek"], "trades": prop["trades"],
                                "plain": prop["plain"], "nextCheck": prop.get("nextCheck"),
                                "decisionDay": prop.get("decisionDay"), "check": prop.get("check"),
+                               "needsApproval": prop["needsApproval"],
                                "waiting": prop["waiting"], "missing": prop["missing"],
                                "entryCheck": bool(entry and entry.get("check")),
                                "portfolio": raw["portfolio"]}})

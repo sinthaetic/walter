@@ -29,7 +29,10 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
   Beslut bara på `rules.decision.weekday` (söndag, svenskt datum). Glidit en tillgång MER än `rules.decision.bandPp` (5) procentenheter
   (minst minTradePct) från sin andel går den hela vägen tillbaka; sälj först, sedan köp. Annars rörs inget.
   Första affären någonsin (`portfolio.firstTrade` saknas) får ske vilken dag som helst. Saknas tillgången på börsen: andel 0, kontant.
-  Saknas pris: den tillgången väntar. Samma kod i `walter_paper.propose`, `js/engine.js` och `backtest/sim.autopilot()` (paritetstest).
+  Saknas pris: den tillgången väntar. Missad beslutsdag (ingen körning/loggrad): kollen görs första dagen efter, en gång.
+  En klar koll skrivs som journalpost med `check: true` (senaste sådan = senaste kollen); väntar en tillgång på pris görs kollen
+  om nästa dag, tyst (ingen journalpost på ikapp-dagar utan affär). Autopiloten handlar på priserna även när lamporna inte är klara.
+  Samma kod i `walter_paper.propose`, `js/engine.js` och `backtest/sim.autopilot()` (paritetstest).
 - Lamporna och läget räknas och visas fortfarande ("Walters väderrapport", journalens `mode`), men i autopiloten ÄNDRAR DE INGA AFFÄRER
   och Levels låser ingenting. Allt nedan om lägen, ETH-villkor, guldsignal och Levels gäller bara `"strategy": "lamps"`.
 - Läge från röda lampor (`rules.modes`): 0–2 = Köper (OFFENSIV, fulla tak), 3–4 = Köper lite (NORMAL, halva taken), 5–6 = Avvaktar (rör inget), 7+ = Vilar (PARKERA, säljer till kontant).
