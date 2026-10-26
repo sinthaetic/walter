@@ -958,8 +958,16 @@
     : "Jag hittar inte din börs i listan, så avgifterna är Walters standard. Tomt fält = standard.";
 
   $("view-installningar").innerHTML = `
-    <p class="kicker">INSTÄLLNINGAR · DITT MÅL</p>
-    <div class="title-row"><h1>DITT MÅL</h1></div>
+    <p class="kicker">INSTÄLLNINGAR</p>
+    <div class="title-row">
+      <h1>INSTÄLLNINGAR</h1>
+      <div class="seg full-sm" role="group" aria-label="Välj avdelning" id="set-tabs">
+        <button type="button" data-set="mal">MÅL</button>
+        <button type="button" data-set="pengar">PENGAR</button>
+        <button type="button" data-set="om">OM WALTER</button>
+      </div>
+    </div>
+    <div data-sgroup="mal">
     <p class="intro">Ett mål med ett datum, och ett sparande varje månad. Båda är valfria. Allt är låtsaspengar (PAPER).</p>
     ${AUTO ? "" : '<p class="warn">Målet och månadssparandet fungerar bara med autopiloten. Walter kör nu lamp-strategin (rules.strategy = "lamps"), så de ändrar inget.</p>'}
     <div class="plan sv-plan"${AUTO ? "" : " hidden"}>
@@ -1011,7 +1019,9 @@
       <p class="plain">Din Walter läser målet och sparandet från <b>data/state.json</b> – sidan kan inte skriva där. Byt ut hela blocken <b>"savings": {…}</b> och <b>"goal": …</b> i state.json (de går över flera rader) mot raderna nedan och kör sedan <b>walter deploy</b> – den låser state.enc och skickar den till main. Först då ser Walter i GitHub Actionen ändringen; hämtaren ensam når aldrig dit.</p>
       <pre class="sv-pre" id="owner-snippet-text"></pre>
     </div>`}
+    </div>
 
+    <div data-sgroup="pengar" hidden>
     <section class="panel dep-panel" aria-label="Sätt in pengar">
       <h3>SÄTT IN PENGAR</h3>
       <p class="plain">${isUser
@@ -1055,6 +1065,11 @@
           <div class="form-actions"><button type="submit" class="btn btn-primary">SPARA</button></div>
         </form>
       </section>
+    </div>
+    </div>
+
+    <div data-sgroup="om" hidden>
+    <div class="cards">
       <section class="panel" aria-label="Handelsläge">
         <h3>HANDELSLÄGE</h3>
         ${isUser ? `
@@ -1113,7 +1128,22 @@
         </form>
         <p class="small msg" id="owner-msg" aria-live="polite">Bara för ägaren. Koden sparas i den här webbläsaren först när den stämmer.</p>
       </section>` : ""}
+    </div>
     </div>`;
+
+  // Tre avdelningar, en visas i taget. Allt innehåll och alla formulär finns kvar i sidan (bara dolt),
+  // så knappar och uträkningar fungerar som förut. Valet minns bara den här fliken.
+  (() => {
+    const TAB_KEY = own("setTab"), view = $("view-installningar");
+    const show = (g) => {
+      view.querySelectorAll("[data-sgroup]").forEach((el) => { el.hidden = el.dataset.sgroup !== g; });
+      view.querySelectorAll("#set-tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.set === g)));
+      store.set(TAB_KEY, g, "sessionStorage");
+    };
+    $("set-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-set]"); if (b) show(b.dataset.set); });
+    const saved = store.get(TAB_KEY, "mal", "sessionStorage");
+    show(["mal", "pengar", "om"].includes(saved) ? saved : "mal");
+  })();
 
   // ---------- Mål och månadssparande ----------
   // Användaren: sparas i walter.user (WalterUser.setGoal / setSavings) och gäller från nästa gång Walter räknar.

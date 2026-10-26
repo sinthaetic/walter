@@ -373,6 +373,7 @@ body.pro .explain { display: none; }
 .seg.full { width: 100%; }
 .seg.full button { flex: 1; padding: 0 6px; letter-spacing: .12em; }
 .seg.sm { margin-top: 10px; }
+@media (max-width: 800px) { .seg.full-sm { width: 100%; } .seg.full-sm button { flex: 1; padding: 0 8px; letter-spacing: .12em; } }
 .fixed { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line); }
 .fixed div { display: flex; justify-content: space-between; min-height: 32px; align-items: center; font-size: 13px; color: var(--soft); }
 .fixed .num { color: var(--ink); }
