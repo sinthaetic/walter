@@ -102,7 +102,7 @@ def autopilot_cases(lamp_rules):
         ("ap_first_trade_weekday", fri, 8, "AVVAKTAR", _pf(100000), None, {}),
         ("ap_missing_gold_on_exchange", fri, 1, "AVVAKTAR", _pf(100000), no_gold, {}),
         ("ap_missing_price", sun, 3, "NORMAL", _pf(100000), None, {"gold": False}),
-        # Lamporna inte klara: autopiloten handlar på priserna, läget står kvar (vädret väntar)
+        # Lamporna inte klara: autopiloten handlar på priserna, läget står kvar (lamporna väntar)
         ("ap_lamps_not_ready", fri, 3, "AVVAKTAR", _pf(100000), None, {"ready": False}),
         # Söndag 18 okt missades (senaste koll 11 okt): fredag 23 okt gör kollen en gång
         ("ap_missed_sunday", fri, 3, "NORMAL", _pf(near_cash, heavy), None,

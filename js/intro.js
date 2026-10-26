@@ -6,10 +6,10 @@
 
   const MIN = 100, MAX = 100000000;
   // En mening per rad (egen span), så att en rad aldrig börjar mitt i en mening.
-  // Autopiloten (standard): fasta andelar, koll på söndagar – lamporna är bara vädret och styr inga köp.
+  // Autopiloten (standard): fasta andelar, koll på söndagar – lamporna visar bara hur marknaden mår och styr inga köp.
   const CARDS_AUTO = [
-    ["Jag är Walter.", "Jag läser marknaden varje dag – tio signaler som visar vädret."],
-    ["Jag håller fasta andelar och justerar på söndagar.", "Lamporna visar vädret – de styr inte mina köp.", "Aldrig mer än 75 % investerat."],
+    ["Jag är Walter.", "Jag läser marknaden varje dag med tio signaler."],
+    ["Jag håller fasta andelar och justerar på söndagar.", "Lamporna visar hur marknaden mår – de styr inte mina köp.", "Aldrig mer än 75 % investerat."],
     ["Jag rör inga riktiga pengar.", "Det kan jag inte än.", "Vi börjar med låtsaspengar, tills du är redo."]
   ];
   const cards = () => {

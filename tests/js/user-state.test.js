@@ -201,7 +201,7 @@ test("first_move_on_creation_day", () => {
     eq(JSON.stringify(u), before);
     // Kopian av en Walter efter första draget går att läsa in
     eq(WU().importText(JSON.stringify(u)).journal.length, 1);
-    // Lamporna inte klara men priserna finns: autopiloten gör första draget, läget (vädret) står kvar
+    // Lamporna inte klara men priserna finns: autopiloten gör första draget, läget står kvar
     const m2 = fakeMarket(); m2.now.ready = false;
     const u2 = WU().create(100000, "kraken", "2026-10-22");
     if (!WU().firstMove(u2, m2, "2026-10-22")) throw new Error("inget drag på priserna");

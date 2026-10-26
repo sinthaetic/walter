@@ -97,7 +97,7 @@ class AutopilotTest(unittest.TestCase):
         calm = wp.propose(state(copy.deepcopy(p), red=0, mode="OFFENSIV"), today=FRIDAY)
         storm = wp.propose(state(copy.deepcopy(p), red=9, mode="OFFENSIV"), today=FRIDAY)
         self.assertEqual(calm["trades"], storm["trades"])
-        self.assertEqual(storm["mode"], "PARKERA")  # läget räknas fortfarande (väderrapporten)
+        self.assertEqual(storm["mode"], "PARKERA")  # läget räknas fortfarande (marknadsläget)
 
     def test_lamps_not_ready_still_trades(self):
         prop = wp.propose(state(pf(100000, first=None), source="journal"), today=FRIDAY)

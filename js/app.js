@@ -195,7 +195,9 @@
   // ================================================================
   // Autopiloten: det stora ordet är vad Walter gör. Lamporna säger hur marknaden mår.
   const MOOD = (E && E.MOODS && E.MOODS[S.mode]) || "okänd";
-  $("status-line").textContent = (AUTO ? "AUTOPILOT · " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
+  $("status-line").textContent = (AUTO ? "UPPDATERAD " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
+  // Autopiloten: AUTOPILOT är en liten status (den står likadant varje dag) – dagens mening under den är hjälten
+  $("mode").classList.toggle("small", AUTO);
   $("mode").innerHTML = `<span class="mode-light" style="color: var(--${AUTO ? "teal" : MODE.acc})" aria-hidden="true"><i></i><b></b></span>
     <h1 class="mode-name">${AUTO ? "AUTOPILOT" : esc(MODE.word)}</h1>`;
   // Ägarens läge byts via journalen, som Walter skriver själv i Actionen: säg rakt ut när lamporna redan pekar på något annat
@@ -203,7 +205,8 @@
   const pending = !AUTO && !isUser && Pnow.ready && Pnow.mode && Pnow.mode !== S.mode;
   // Vad Walter gjorde med pengarna i dag (journalen, samma källa som loggen) – svaret på "vad hände med mina pengar?"
   const avkNow = Math.abs(marketPct) < 0.005 ? "±0,00 %" : pct(marketPct, 2);
-  const todayLine = AUTO ? todaySentence() : "";
+  // Hårt mellanslag mellan tal och "kr"/"%", så att "350 kr" aldrig bryts mitt i
+  const todayLine = AUTO ? todaySentence().replace(/(\d) (kr|%)/g, "$1 $2") : "";
   function todaySentence() {
     const day0 = S.updatedAt;
     const todays = S.journal.filter((e) => e && e.date === day0);
@@ -405,15 +408,19 @@
       : isUser
         ? `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge själv nästa gång han räknar.`
         : `Datan (${day(S.lampScore.asOf)}) pekar på ${modeOf(P.mode).word}. Walter byter läge vid nästa körning i GitHub (högst en gång per dag).`;
-  $("lamps").innerHTML = `
-    <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
-    <ul class="lamp-grid">
+  const lampList = `<ul class="lamp-grid">
       ${S.lamps.map((l) => { const s = lampState(l); return `
         <li><div class="lamp-row"><span class="dot ${s === "wait" ? "" : s + " lit"}"></span>
           <span class="txt"><span class="nm">${esc(l.name)}</span><span class="rl">Varnar om: ${esc(lowerFirst(l.rule))}</span></span>
           <span class="st">${STATE_WORD[s]}</span></div>
           ${EXPLAIN[l.id] ? `<p class="explain">${esc(EXPLAIN[l.id])}</p>` : ""}</li>`; }).join("")}
-    </ul>
+    </ul>`;
+  // Autopiloten: lamporna styr inga affärer, så på mobil och platta ligger listan bakom en knapp (ringen visar läget).
+  // På bred skärm är den öppen och fyller högerspalten.
+  const wide = window.matchMedia ? window.matchMedia("(min-width: 1281px)") : null;
+  $("lamps").innerHTML = `
+    <div class="panel-head"><span>TIO LAMPOR</span><span class="num">DATA ${esc(day(S.lampScore.asOf).toUpperCase())}</span></div>
+    ${AUTO ? `<details class="lamp-more"${!wide || wide.matches ? " open" : ""}><summary>VISA ALLA TIO LAMPOR</summary>${lampList}</details>` : lampList}
     <p class="lamp-note">${esc(lampNote)} <a href="#pro">Värdena bakom lamporna →</a></p>
     ${lampCountOk ? "" : isUser ? `<p class="warn small">Marknadsfilen har ${S.lamps.length} lampor. Walter räknar alltid med 10.</p>` : `<p class="warn small">state.json har ${S.lamps.length} lampor (poäng av ${S.lampScore.total}). Walter räknar alltid med 10 – rätta i state.json.</p>`}`;
 
@@ -874,11 +881,11 @@
         <div class="panel">
           <div class="panel-head"><span>SEKTION D · ÖVRIGA TILLGÅNGAR (KRYPTO)</span><span class="num">${yearRows.length} RAD${yearRows.length === 1 ? "" : "ER"}</span></div>
           ${yearRows.length ? `
-          <div class="table-wrap"><table class="pro-table" style="min-width:640px">
+          <div class="table-wrap k4-wrap"><table class="pro-table k4-table">
             <thead><tr><th>BETECKNING</th><th class="r">ANTAL</th><th class="r">FÖRSÄLJNING</th><th class="r">OMKOSTNAD</th><th class="r">VINST</th></tr></thead>
             <tbody>${yearRows.map((r, i) => `
               <tr class="pro-row" data-k="${i}" aria-selected="${i === k4Open}">
-                <td><span class="nm"><button type="button" data-k="${i}" aria-expanded="${i === k4Open}"><span style="display:flex;flex-direction:column;gap:2px;line-height:1.3">${esc(r.beteckning)}<span class="small" style="color:inherit;opacity:.75">köpt ${day(r.kopdatum)} · såld ${day(r.saljdatum)}</span></span></button></span></td>
+                <td><span class="nm"><button type="button" data-k="${i}" aria-expanded="${i === k4Open}"><span style="display:flex;flex-direction:column;gap:2px;line-height:1.3">${esc(r.beteckning)}<span class="small" style="color:inherit;opacity:.75">köpt ${day(r.kopdatum)} · såld ${day(r.saljdatum)}</span><span class="pro-sub">${nf(8).format(r.antal)} st · försäljning ${nf(2).format(r.forsaljningspris_sek)} · omkostnad ${nf(2).format(r.omkostnad_sek)}</span></span></button></span></td>
                 <td class="r"><span class="mono">${nf(8).format(r.antal)}</span></td>
                 <td class="r"><span class="mono">${nf(2).format(r.forsaljningspris_sek)}</span></td>
                 <td class="r"><span class="mono">${nf(2).format(r.omkostnad_sek)}</span></td>

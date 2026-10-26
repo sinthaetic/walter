@@ -253,7 +253,7 @@ test("autopilot_catchup_trades_on_prices_when_lamps_not_ready", () => {
   const user = newUser(100000, 100000);
   const r = E().catchUp(user, [row("2026-10-01", 4, { ready: false })], AP_RULES, LEVELS, EX);
   eq(r.user.trades.length, 3);          // priserna räcker
-  eq(r.user.mode, "AVVAKTAR");          // vädret väntar, läget står kvar
+  eq(r.user.mode, "AVVAKTAR");          // lamporna väntar, läget står kvar
   eq(r.user.lastDay, "2026-10-01");
   eq(r.user.journal[0].check, true);
   // Utan pris och utan klara lampor händer inget, och nyaste dagen kan spelas upp senare

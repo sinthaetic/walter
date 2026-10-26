@@ -9,7 +9,7 @@ Frontend läser `data/market.js` (`window.WALTER_MARKET`, publik marknad) och, m
 - `data/cache.json` – senast hämtade marknadsvärden (publik, skrivs av hämtaren).
 - `data/owner-cache.json` – ägarens privata dagsvärden och notis (gitignorerad; publiceras bara krypterad).
 - `fetcher/walter_fetch.py` – hämtar, räknar lampor, bygger `state.js` (bara lokalt, ägarens hela bild) = state.json + cache, och `data/market.js` via `fetcher/walter_public.py` (publik, bara marknaden: lamps, mode, px, usdsek, eursek, rules, levels, version, `log` = dagsrader). `--offline` bygger bara om. `hamta.bat` = dubbelklick.
-- Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode (väderrapporten) ändras bara via journalpost – men Walter handlar själv i GitHub Actionen (`walter_paper.py --auto`) högst en gång per dag och skriver då journalposten med `auto: true`. Bara Actionen handlar själv, aldrig `hamta.bat`.
+- Lampornas poäng blir `source: "data"` när alla 10 har värde. Mode (marknadsläget) ändras bara via journalpost – men Walter handlar själv i GitHub Actionen (`walter_paper.py --auto`) högst en gång per dag och skriver då journalposten med `auto: true`. Bara Actionen handlar själv, aldrig `hamta.bat`.
 - `fetcher/walter_paper.py` = trade-motorn. Hämtaren räknar förslaget (`state.proposal`), dagens värde och Sharpe i state.js men handlar aldrig.
   Actionen (`--auto`) skriver läge, `portfolio.positions`, kontanter, historik, journalpost och K4-rad in i state.json, låser state.enc och committar den till main (`[skip ci]`). `paper.bat` finns kvar för att se förslaget och handla manuellt (JA).
   Datorn hämtar Walters affärer själv: `walter_vault.sync_from_repo()` (git pull + las-upp, aldrig i Actionen) körs först i hämtaren, `paper.bat` och deploy.
@@ -40,7 +40,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Målläge (`goal: {name, amountSek, date}` eller null): de sista 24 månaderna skalas andelarna med
   f = clamp(dagar kvar / 730,5, 0, 1); på datumet säljs allt på söndagskollen. Ersätter gamla `walter.plan`.
   Samma kod i `walter_paper` och `js/engine.js` (paritet: `tests/make_fixtures.py` → savingsGoal). Historik: docs/BACKTEST.md.
-- Lamporna och läget räknas och visas fortfarande ("Walters väderrapport", journalens `mode`), men i autopiloten ÄNDRAR DE INGA AFFÄRER
+- Lamporna och läget räknas och visas fortfarande (marknadsläget, journalens `mode`; kalla det aldrig "väder"), men i autopiloten ÄNDRAR DE INGA AFFÄRER
   och Levels låser ingenting. Allt nedan om lägen, ETH-villkor, guldsignal och Levels gäller bara `"strategy": "lamps"`.
 - Läge från röda lampor (`rules.modes`): 0–2 = Köper (OFFENSIV, fulla tak), 3–4 = Köper lite (NORMAL, halva taken), 5–6 = Avvaktar (rör inget), 7+ = Vilar (PARKERA, säljer till kontant).
 - Buffert: från Vilar vaknar Walter först vid `rules.wakeAtRed` (5) eller färre röda. 6 röda = vilar kvar.

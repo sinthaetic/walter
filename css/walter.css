@@ -160,6 +160,11 @@ details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 
 .today { margin-top: 16px; height: calc(3 * 1.45em); overflow: hidden; font-size: 20px; line-height: 1.45; font-weight: 400; color: var(--ink); }
 .today .line { display: block; }
 .today + .quote { margin-top: 12px; }
+/* Autopiloten: AUTOPILOT är en liten status, dagens mening är hjälten. Minsta höjd tre rader; en lång dag får växa i stället för att klippas. */
+.mode.small { height: 36px; gap: 14px; }
+.mode.small .mode-name { font-size: 24px; letter-spacing: .34em; }
+.mode.small + .today { margin-top: 14px; height: auto; min-height: calc(3 * 1.35em); font-size: 26px; line-height: 1.35; font-weight: 300; }
+.lamp-more > summary { margin-bottom: 4px; }
 .quote { margin-top: 18px; height: 96px; overflow: hidden; font-size: 20px; line-height: 1.6; color: var(--soft); }
 .quote .line, .catchup-note .line { display: block; }
 .quote.auto { height: 160px; } /* autopiloten: andelarna + nästa koll, en mening per rad, fast höjd */
@@ -300,6 +305,17 @@ body.pro .explain { display: none; }
   .lamp-table .pro-sub { display: block; }
   .lamp-table td.r { vertical-align: top; }
   .lamp-table td.r .mono { white-space: normal; text-align: right; max-width: 11em; }
+}
+/* K4 (bara ägaren): samma sak – smal ruta = beteckning och vinst, resten i grått under beteckningen */
+.k4-table { min-width: 640px; }
+.k4-wrap { container-type: inline-size; }
+@container (max-width: 639px) {
+  .k4-table { min-width: 0; }
+  .k4-table th:nth-child(n+2):nth-child(-n+4), .k4-table td:nth-child(n+2):nth-child(-n+4) { display: none; }
+  .k4-table .pro-row td > * { height: auto; min-height: 54px; padding-block: 10px; }
+  .k4-table .pro-row .nm { white-space: normal; }
+  .k4-table .pro-sub { display: block; }
+  .k4-table td.r { vertical-align: top; }
 }
 .pro-row .src { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; display: block; line-height: 54px; }
 .sel { height: 240px; display: flex; flex-direction: column; }
@@ -449,6 +465,11 @@ body.pro .explain { display: none; }
   .hero { grid-template-columns: minmax(0, 1fr); }
   .ring-panel { height: auto; }
   .quote.auto { height: 128px; } /* bredare kolumn: färre radbrytningar */
+  /* En spalt: portföljen direkt under dagens mening, sedan kursen, ringen och lamporna */
+  .hero { row-gap: 0; }
+  .hero-left, .hero-right { display: contents; }
+  #status-line { order: 1; } #mode { order: 2; } #today { order: 3; } #pf { order: 4; margin-top: 20px; }
+  #quote { order: 5; } #mode-explain { order: 6; } #ring { order: 7; } #lamps { order: 8; margin-top: 16px; }
 }
 @media (max-width: 1100px) {
   .two, .plan { grid-template-columns: minmax(0, 1fr); }
@@ -468,6 +489,9 @@ body.pro .explain { display: none; }
   .quote { margin-top: 14px; height: 77px; font-size: 17px; line-height: 1.5; }
   .quote.auto { height: 128px; } /* en mening per rad: upp till fem rader */
   .today { margin-top: 12px; font-size: 17px; }
+  .mode.small { height: 30px; }
+  .mode.small .mode-name { font-size: 20px; letter-spacing: .3em; }
+  .mode.small + .today { margin-top: 10px; font-size: 21px; }
   .mode-explain { height: 4.5em; font-size: 13px; }
   .lamp-grid .explain { min-height: 0; }
   .ring-panel { margin-top: 12px; padding: 16px; gap: 18px; border-radius: 22px; }

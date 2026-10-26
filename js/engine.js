@@ -59,7 +59,7 @@
 
   // ---------- Autopiloten ----------
   // Som propose_autopilot i Python: fasta andelar (rules.caps), koll på beslutsdagen (rules.decision.weekday,
-  // loggradens svenska datum), band rules.decision.bandPp. Lamporna räknas bara för läget (väderrapporten).
+  // loggradens svenska datum), band rules.decision.bandPp. Lamporna räknas bara för läget (marknadsläget).
   const WEEKDAYS = { "måndag": 0, "tisdag": 1, "onsdag": 2, "torsdag": 3, "fredag": 4, "lördag": 5, "söndag": 6,
     monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6 };
   const DAY_WORDS = ["måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag", "söndag"];
@@ -252,7 +252,7 @@
   }
   function proposeAutopilot(user, row, rules, exchange) {
     const r = rules, pf = user.portfolio, current = user.mode;
-    // Lamporna är bara vädret: är raden inte klar står läget kvar, men autopiloten handlar på priserna.
+    // Lamporna visar bara marknadsläget: är raden inte klar står läget kvar, men autopiloten handlar på priserna.
     const red = row.ready ? row.red : null, mode = row.ready ? suggestMode(red, current, r) : current;
     const px = {};
     for (const a of ASSETS) px[a] = (row.px && row.px[a]) || null;

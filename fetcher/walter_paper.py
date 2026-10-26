@@ -433,7 +433,7 @@ def autopilot_plain(trades, hold, total, weights, first, due, today, rules, wait
 
 def propose_autopilot(state, today, assets=None):
     """Fasta andelar (rules.caps), koll på beslutsdagen (rules.decision.weekday, svenskt datum). Första affären
-    någonsin (firstTrade saknas) får ske vilken dag som helst. Lamporna räknas bara för läget (väderrapporten)."""
+    någonsin (firstTrade saknas) får ske vilken dag som helst. Lamporna räknas bara för läget (marknadsläget)."""
     r, m, pf = state["rules"], state["market"], state["portfolio"]
     score = state.get("lampScore") or {}
     current = state["mode"]
