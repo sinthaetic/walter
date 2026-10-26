@@ -93,7 +93,7 @@
           <span>NEDRE GRAFEN: VÅGEN · PENGAFLÖDE <em>CIPHER B</em></span>
           <span id="oscNow" class="num"></span>
         </div>
-        <ul class="wc-legend" id="legend"></ul>
+        <details class="wc-legend-box"><summary>VAD BETYDER FÄRGERNA?</summary><ul class="wc-legend" id="legend"></ul></details>
       </section>
 
       <aside class="side">
@@ -125,7 +125,7 @@
     <section class="panel wc-copy-panel" aria-label="Kopiera till TradingView"><div id="wc-copy"></div></section>
 
     <footer class="foot">
-      <p>Signalerna är vad indikatorn visar, inte råd. W-Cipher ändrar aldrig Walters läge – det gör bara lamporna och journalen. Går du in när Walter vilar gör du det på egen hand.</p>
+      <p id="foot-honest">Signalerna är vad indikatorn visar, inte råd. W-Cipher ändrar aldrig vad Walter gör: autopiloten håller fasta andelar och justerar på söndagar, oavsett signalerna. Köper eller säljer du efter en signal gör du det på egen hand, vid sidan av Walter.</p>
       <p>
         Till TradingView: <a href="tradingview/w-cipher.pine" download>W-Cipher B</a> och <a href="tradingview/w-cipher-a.pine" download>W-Cipher A</a> ·
         <a href="https://github.com/sinthaetic/walter/blob/main/tradingview/README.md" target="_blank" rel="noopener">Så lägger du in den</a> ·
@@ -135,10 +135,13 @@
     </footer>
   </main>
 
-  <script src="data/state.js"></script>
+  <!-- Publik marknadsfil (strategin) + ägarens state.js om den finns lokalt. Saknas filerna händer inget. -->
+  <script src="data/market.js" onerror="void 0"></script>
+  <script src="data/state.js" onerror="void 0"></script>
   <script src="https://unpkg.com/lightweight-charts@5.0.0/dist/lightweight-charts.standalone.production.js" integrity="sha384-/z0wnnyAhUnLX5YRrxljPlJlhJPGIOuhRU9kt785gf9AUeh8YsG8O6oxSE2sTS9m" crossorigin="anonymous"></script>
   <script src="js/wcipher.js"></script>
   <script src="js/cipher-chart.js"></script>
+  <script src="js/top.js"></script>
   <script src="js/cipher-app.js"></script>
 </body>
 </html>

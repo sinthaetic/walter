@@ -17,21 +17,27 @@
 }
 
 /* Förklaringen under grafen */
-.wc-legend { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 12px; color: var(--soft); min-height: 40px; }
+/* Förklaringen ligger bakom "VAD BETYDER FÄRGERNA?" (details), så att panelen inte blir en lista med 13 rader */
+.wc-legend-box { margin-top: 10px; }
+.wc-legend-box summary { display: flex; align-items: center; min-height: 44px; list-style: none; cursor: pointer; font-size: 11px; letter-spacing: .24em; color: var(--muted); }
+.wc-legend-box summary::-webkit-details-marker { display: none; }
+.wc-legend-box summary::after { content: " +"; margin-left: 6px; }
+.wc-legend-box[open] summary::after { content: " −"; }
+.wc-legend { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--soft); }
 .wc-legend li { display: flex; align-items: center; gap: 8px; }
 .wc-legend .sw { width: 18px; height: 8px; border-radius: 2px; }
 .wc-legend .dt { width: 8px; height: 8px; border-radius: 50%; }
 
 /* Kopiera till TradingView */
-.wc-copy { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.wc-copy { font-size: 13px; line-height: 1.6; color: var(--muted); }
 .wc-copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .wc-copy-btn, .wc-copy-alt {
   min-height: 44px; padding: 0 16px; border-radius: 12px; cursor: pointer;
-  font-size: 10px; font-weight: 400; letter-spacing: .24em;
+  font-size: 11px; font-weight: 400; letter-spacing: .2em;
 }
 .wc-copy-btn { border: 0; background: var(--seg-bg); color: var(--seg-fg); }
 .wc-copy-alt { border: 1px solid var(--glass-edge); background: transparent; color: var(--ink); }
-.wc-copy-msg { font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .08em; color: var(--teal); min-height: 1.6em; }
+.wc-copy-msg { font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: .04em; color: var(--teal-text); min-height: 1.6em; }
 .wc-steps { margin: 8px 0 0; padding-left: 20px; color: var(--soft); }
 .wc-honest { margin: 8px 0 0; }
 
@@ -39,17 +45,16 @@
 .wc-panel { margin-top: 28px; }
 .wc-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 10px; }
 .wc-bar .seg button { padding: 0 16px; }
-.wc-open { font-size: 10px; letter-spacing: .24em; text-decoration: none; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
+.wc-open { font-size: 11px; letter-spacing: .2em; text-decoration: none; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
 .wc-chart { height: 560px; margin-top: 8px; }
-.wc-panel .wc-legend { min-height: 64px; }
 .wc-panel .wc-copy { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
-.wc-panel .panel-head em { font-style: normal; color: var(--teal); margin-left: 8px; }
+.wc-panel .panel-head em { font-style: normal; color: var(--teal-text); margin-left: 8px; }
 @media (max-width: 800px) {
   .wc-chart { height: 460px; }
   .wc-bar .seg { flex: 1; }
   .wc-bar .seg button { flex: 1; padding: 0 8px; letter-spacing: .12em; }
   .wc-panel .panel-head em { display: none; }
-  .wc-panel .wc-legend { gap: 6px 14px; font-size: 11px; min-height: 104px; }
+  .wc-panel .wc-legend { gap: 6px 14px; }
   .wc-panel .panel-head { flex-wrap: wrap; gap: 4px 16px; }
   .wc-panel .panel-head span { white-space: nowrap; }
 }
@@ -60,5 +65,5 @@
 .wc-copy-panel { margin-top: 28px; }
 .wc-pane-label {
   position: absolute; left: 6px; z-index: 3; pointer-events: none;
-  font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: .3em; color: var(--muted);
+  font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .2em; color: var(--muted);
 }

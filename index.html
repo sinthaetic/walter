@@ -47,7 +47,7 @@
             <svg class="main" viewBox="0 0 64 64" aria-hidden="true"><path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" cx="32" cy="5.5" r="2.7"/></svg>
           </div>
           <h1 class="word" aria-label="WALTER">WALTER</h1>
-          <p class="tag"><span>Walter läser marknaden varje dag och förvaltar åt dig.</span> <span>Lugnt, metodiskt, alltid exakt.</span> <span>Han börjar med låtsaspengar, tills du är redo.</span></p>
+          <p class="tag"><span>Walter läser marknaden varje&nbsp;dag och förvaltar åt&nbsp;dig.</span> <span>Lugnt, metodiskt, alltid exakt.</span> <span>Han börjar med låtsaspengar, tills du är redo.</span></p>
           <button type="button" class="cta"><i aria-hidden="true"></i>GÅ IN</button>
         </div>
         <div class="status"><span>SYSTEM · ONLINE</span><span class="num" id="landing-clock">--:--:--</span><span id="landing-signals">LÄSER 10 SIGNALER</span></div>
@@ -110,6 +110,8 @@
         <div class="hero-left">
           <p class="kicker" id="status-line"></p>
           <div class="mode" id="mode"></div>
+          <!-- Vad Walter gjorde i dag, i hans egen röst (autopiloten). Fast höjd: två rader. -->
+          <p class="today" id="today" role="status" hidden></p>
           <p class="quote" id="quote"></p>
           <p class="explain mode-explain" id="mode-explain"></p>
           <div class="panel ring-panel" id="ring"></div>
@@ -135,7 +137,7 @@
           <a class="wc-open" href="cipher.html">ÖPPNA W-CIPHER →</a>
         </div>
         <div class="wc-chart" id="wc-chart" role="img" aria-label="Bitcoin med W-Cipher: pris och trendband överst, vågen och pengaflödet i mitten, Walters lampor längst ned. W-markörerna är Walters affärer."></div>
-        <ul class="wc-legend" id="wc-legend"></ul>
+        <details class="wc-legend-box"><summary>VAD BETYDER FÄRGERNA?</summary><ul class="wc-legend" id="wc-legend"></ul></details>
         <div id="wc-copy"></div>
       </section>
 
@@ -184,6 +186,7 @@
   <script src="js/engine.js"></script>
   <script src="js/exchanges.js"></script>
   <script src="js/user-state.js"></script>
+  <script src="js/top.js"></script>
   <script src="js/app.js"></script>
   <script src="js/landing.js"></script>
   <script src="js/intro.js"></script>

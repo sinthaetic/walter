@@ -45,10 +45,20 @@
   }
 
   // ---------- Text till höger ----------
+  // Autopiloten (standard): Walter håller fasta andelar oavsett lamporna och signalerna – då säger han AUTOPILOT.
+  // Strategin står i ägarens state.js eller i den publika marknadsfilen (data/market.js).
+  function strategy() {
+    const st = window.WALTER_STATE, m = window.WALTER_MARKET;
+    const rules = (st && st.rules) || (m && m.now && m.now.rules) || {};
+    return rules.strategy || "autopilot";
+  }
+  const AUTO = strategy() === "autopilot";
   function walterMode() {
-    const st = window.WALTER_STATE;
-    if (!st || !st.mode) return null;
-    return st.mode === "PARKERA" ? "VILAR" : String(st.mode).toUpperCase();
+    if (AUTO) return "AUTOPILOT";
+    const st = window.WALTER_STATE, m = window.WALTER_MARKET;
+    const mode = (st && st.mode) || (m && m.now && m.now.mode);
+    if (!mode) return null;
+    return mode === "PARKERA" ? "VILAR" : String(mode).toUpperCase();
   }
 
   function renderSide(r, d) {
@@ -73,7 +83,10 @@
     $("walterSays").textContent = wm || "VÄNTAR PÅ DATA";
     const resting = wm === "VILAR";
     let hy;
-    if (fresh && fresh.side === "buy" && resting) hy = "Walter vilar, men ciphern visar " + fresh.name.toLowerCase() + ". Vill du gå in gör du det på egen hand, vid sidan av Walters plan.";
+    if (AUTO) hy = fresh
+      ? "Ciphern visar " + fresh.name.toLowerCase() + ". Walter följer ändå sina fasta andelar – en extra affär gör du på egen hand."
+      : "Ciphern har ingen stark signal just nu. Walter följer sina fasta andelar oavsett.";
+    else if (fresh && fresh.side === "buy" && resting) hy = "Walter vilar, men ciphern visar " + fresh.name.toLowerCase() + ". Vill du gå in gör du det på egen hand, vid sidan av Walters plan.";
     else if (fresh && fresh.side === "sell") hy = "Ciphern visar " + fresh.name.toLowerCase() + ". Har du köpt på egen hand kan det vara läge att se över det.";
     else if (fresh) hy = "Ciphern visar " + fresh.name.toLowerCase() + ". Walters läge ändras bara av lamporna och journalen.";
     else hy = resting ? "Båda är lugna. Walter vilar och ciphern har ingen stark signal just nu." : "Ciphern har ingen stark signal just nu.";
@@ -85,9 +98,9 @@
     $("readDot").className = "dot " + (L.zone === "bottom" && L.dir === "up" ? "buy" : L.zone === "top" && L.dir === "down" ? "sell" : "wait");
     const lastBig = r.signals.filter(s => s.big).pop();
     $("readText").textContent = "Vågen ligger " + zone + " och pekar " + dir + ". Priset ligger " + (L.aboveBand ? "över" : "under") + " sitt trendband. "
-      + (L.zone === "middle" ? "Inget starkt tecken just nu, så Walter väntar. "
+      + (L.zone === "middle" ? "Inget starkt tecken just nu. "
         : L.zone === "bottom" ? "Det kan vara tidigt i en vändning uppåt, men det är ett tecken, inte ett köpbeslut. "
-        : "Det har gått fort uppåt. Walter köper inte i toppen. ")
+        : "Det har gått fort uppåt. Det är ett tecken, inte ett säljbeslut. ")
       + (lastBig ? "Senaste starka signal: " + lastBig.name.toLowerCase() + " " + when(lastBig.time) + "." : "");
 
     const P = W.PARAMS;
@@ -189,11 +202,18 @@
   });
 
   // ---------- Start ----------
-  // Menyn börjar alltid till vänster, som på översikten (Safari kan annars minnas en sidledsrullning)
-  const navStart = () => document.querySelectorAll(".nav").forEach(n => { n.scrollLeft = 0; });
-  navStart(); window.addEventListener("pageshow", navStart);
+  // Samma flikar som översikten: K4 är ägarens (state.js lokalt eller sparad kod), annars ingen K4-flik.
+  // Den aktiva fliken rullas in i bild (js/top.js).
+  let owner = !!window.WALTER_STATE;
+  try { owner = owner || !!localStorage.getItem("walter.ownerKey"); } catch (e) { /* lagring blockerad */ }
+  if (!owner) document.querySelectorAll('.nav a[href="index.html#k4"]').forEach(a => a.remove());
+  if (window.WalterTop) window.WalterTop.fit();
+  // Den gamla lamp-strategin: där är det lamporna (journalen) som styr Walters läge
+  if (!AUTO && $("foot-honest")) $("foot-honest").textContent = "Signalerna är vad indikatorn visar, inte råd. W-Cipher ändrar aldrig Walters läge – det gör bara lamporna och journalen. Går du in när Walter vilar gör du det på egen hand.";
   CC.mountCopy($("wc-copy"));
   if (!LC || !W || !CC) { setLive("GRAFEN KUNDE INTE LADDAS", "err"); return; }
-  graph = CC.mount($("chart"), { view: S.view }); syncControls(); load(true);
+  // Mushjulet rullar sidan (inte grafen) på smala skärmar och pekskärmar; lodrät fingerdragning rullar alltid sidan
+  const narrow = window.matchMedia && window.matchMedia("(max-width: 800px), (hover: none), (pointer: coarse)").matches;
+  graph = CC.mount($("chart"), { view: S.view, wheel: !narrow }); syncControls(); load(true);
   setInterval(() => { if (!document.hidden) load(false); }, REFRESH_MS);
 })();

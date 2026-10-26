@@ -74,7 +74,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 
 ## W-Cipher (`cipher.html`)
 - Egen sida: `js/wcipher.js` (ren matte, inga DOM-anrop) + `js/cipher-app.js` (börser, graf, text) + `css/cipher.css` (nya designen).
-- Sidhuvudet (logo, meny, ljust/mörkt) är samma fil på båda sidorna: `css/top.css`. Ändra toppen där, inte i walter.css/cipher.css.
+- Sidhuvudet (logo, meny, ljust/mörkt) är samma fil på båda sidorna: `css/top.css` + `js/top.js` (aktiv flik rullas in i bild, toning i kanten). Ändra toppen där, inte i walter.css/cipher.css. Samma flikar på båda sidorna (K4 bara för ägaren).
 - Hämtar ljus direkt i webbläsaren från Binance/Coinbase/Kraken/Bybit/OKX, ritar med Lightweight Charts 5.0.0 (unpkg, med integrity-hash).
 - Samma parametrar finns i `tradingview/*.pine`. Ändras en parameter ska båda ändras.
 - W-Cipher ändrar ALDRIG Walters läge. Egen kod från öppna formler – kopiera inte VuManChu-kod.

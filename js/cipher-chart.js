@@ -8,7 +8,8 @@
 //   loadChartLib()                     -> Promise: laddar Lightweight Charts utan att blockera sidan (om det inte redan finns)
 //   decimals(v)                        antal decimaler för ett pris
 //   mount(el, opts) -> handle          ritar i el. opts: {view: "walter"|"cipher", wavePane: 0.4 (andel av höjden),
-//                                      pulsePane: 64 (px för WALTERS LAMPOR)}
+//                                      pulsePane: 64 (px för WALTERS LAMPOR), wheel: true (mushjulet zoomar/flyttar grafen;
+//                                      false = hjulet rullar sidan). Lodrät fingerdragning rullar alltid sidan.}
 //     handle.setBars(bars, tf, reset)  ritar; reset = visa de senaste ~120 staplarna. -> {result, decimals} | null
 //     handle.setView(view)             "walter" eller "cipher" (ritar inte; anropa redraw)
 //     handle.setExtras({pulse, trades}) Walters lampor [[datum, röda]] (bara DAG/VECKA) och affärer från tradeMarks()
@@ -109,6 +110,16 @@
   }
 
   function decimals(v) { return v >= 1000 ? 0 : v >= 10 ? 2 : v >= 1 ? 3 : v >= 0.01 ? 5 : 8; }
+  // Tidsaxeln: korta svenska datum utan punkt ("3 sep", "okt", "2026"), så att fler ryms och inget kapas till "uli"
+  const MON = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  const two = n => String(n).padStart(2, "0");
+  function tickMark(t, type) {
+    const d = new Date((typeof t === "number" ? t : 0) * 1000);
+    if (type === 0) return String(d.getUTCFullYear());
+    if (type === 1) return MON[d.getUTCMonth()];
+    if (type === 2) return d.getUTCDate() + " " + MON[d.getUTCMonth()];
+    return two(d.getUTCHours()) + ":" + two(d.getUTCMinutes());
+  }
   const isIntraday = tf => tf === "15m" || tf === "1h" || tf === "4h";
   const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -183,20 +194,34 @@
   // ---------- Grafen ----------
   function mount(el, opts) {
     const LC = window.LightweightCharts, W = window.WCipher;
-    const o = Object.assign({ view: "walter", wavePane: 0.4, pulsePane: 64 }, opts);
+    const o = Object.assign({ view: "walter", wavePane: 0.4, pulsePane: 64, wheel: true }, opts);
     let view = o.view, tf = "1D", bars = null, firstDraw = true, extras = { pulse: null, trades: null };
     let chart, candles, ribbon = [], wt1S, wt2S, vwapS, mfiS, kS, dS, candleMarks, waveMarks, divSeries = [], zoneLines = [];
-    let pulseS = null, pulseLine = null;
+    let pulseS = null, pulseLine = null, allMarks = [], marksQueued = false;
+    // Tiden för stapeln en etikettbredd in från vänsterkanten: allt till vänster om den skulle kapas av kanten
+    function leftEdgeTime(px) {
+      if (!bars || !chart) return -Infinity;
+      const ts = chart.timeScale(), r = ts.getVisibleLogicalRange();
+      if (!r) return -Infinity;
+      const n = Math.ceil((px || 22) / Math.max(1, ts.options().barSpacing));
+      const i = W.PARAMS.warmup + Math.max(0, Math.ceil(r.from)) + n;
+      return bars[Math.min(i, bars.length - 1)].time;
+    }
     const fixed = () => ({ priceRange: { minValue: -100, maxValue: 100 } });
     const fixedPulse = () => ({ priceRange: { minValue: -5, maxValue: 5 } });
 
     chart = LC.createChart(el, {
       autoSize: true,
-      layout: { background: { type: "solid", color: "transparent" }, fontFamily: "JetBrains Mono, monospace", fontSize: 10, attributionLogo: false,
+      layout: { background: { type: "solid", color: "transparent" }, fontFamily: "JetBrains Mono, monospace", fontSize: 11, attributionLogo: false,
         panes: { enableResize: false } },
       grid: { vertLines: { visible: false }, horzLines: { visible: true } },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, rightOffset: 4 },
+      // Korta datum, tätare (max 6 tecken), och ingen etikett som kapas i vänsterkanten ("uli")
+      timeScale: { borderVisible: false, rightOffset: 4, tickMarkMaxCharacterLength: 6,
+        tickMarkFormatter: (t, type) => (typeof t === "number" && t < leftEdgeTime() ? "" : tickMark(t, type)) },
+      // Ingen scrollfälla: lodrät fingerdragning rullar sidan, och mushjulet bara när o.wheel (cipher.html på dator)
+      handleScroll: { mouseWheel: o.wheel, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: o.wheel, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
       crosshair: { mode: 0 },
       localization: { locale: "sv-SE" }
     });
@@ -213,11 +238,22 @@
     candleMarks = LC.createSeriesMarkers(candles, []);
     waveMarks = LC.createSeriesMarkers(wt2S, []);
     zoneLines = [60, 0, -60].map(p => wt2S.createPriceLine({ price: p, lineWidth: 1, lineStyle: p ? 2 : 0, axisLabelVisible: true, title: "" }));
+    // Rutornas höjder. setHeight räknar om de andra rutorna utifrån höjderna vid senaste ritningen, så två anrop i
+    // samma bildruta påverkar varandra (vågen kunde tryckas ihop till några pixlar). Därför en ruta per bildruta,
+    // några varv, tills höjderna stämmer.
+    let sizing = 0;
     const sizePanes = () => {
       if (!el.clientHeight) return; // dold ruta: görs när den syns
-      const panes = chart.panes();
-      if (panes[1]) panes[1].setHeight(Math.round(el.clientHeight * o.wavePane));
-      if (panes[2]) panes[2].setHeight(o.pulsePane);
+      const my = ++sizing, want = [null, Math.round(el.clientHeight * o.wavePane), o.pulsePane];
+      let n = 0;
+      const step = () => {
+        if (my !== sizing || !el.clientHeight) return;
+        const panes = chart.panes(), i = 1 + (n % 2);
+        if (panes[i] && Math.abs(panes[i].getHeight() - want[i]) > 2) panes[i].setHeight(want[i]);
+        if (pulseS) placeLabel(); // rubriken WALTERS LAMPOR följer med rutan
+        if (++n < 8) requestAnimationFrame(() => requestAnimationFrame(step));
+      };
+      step();
     };
     sizePanes();
 
@@ -258,7 +294,8 @@
     let pulseLabel = null;
     function placeLabel() {
       const pane = pulseS && chart.panes()[2];
-      const pe = pane && pane.getHTMLElement && pane.getHTMLElement();
+      let pe = null;
+      try { pe = pane && pane.getHTMLElement && pane.getHTMLElement(); } catch (e) { pe = null; } // rutan inte ritad än
       if (!pe) { if (pulseLabel) pulseLabel.hidden = true; return; }
       if (!pulseLabel) {
         pulseLabel = document.createElement("span");
@@ -279,6 +316,9 @@
         requestAnimationFrame(() => { sizePanes(); firstDraw = true; draw(); });
       }
       else if (el.clientHeight === 0) wasHidden = true;
+      // Grafens egen storlek sätts asynkront (autoSize): rutornas höjder sätts om när den är känd, annars kan vågen
+      // tryckas ihop till några pixlar
+      else requestAnimationFrame(sizePanes);
       if (pulseS) requestAnimationFrame(placeLabel);
     }) : null;
     if (ro) ro.observe(el);
@@ -367,7 +407,17 @@
         });
       }
       priceMarks.sort((a, b) => a.time - b.time);
-      candleMarks.setMarkers(priceMarks);
+      // Etiketter som krockar: samma text på samma sida inom 3 staplar visas en gång (formen står kvar)
+      const idx = new Map(bars.map((b, i) => [b.time, i]));
+      const lastAt = {};
+      priceMarks.forEach(m => {
+        if (!m.text) return;
+        const k = m.position + m.text, i = idx.get(m.time);
+        if (lastAt[k] != null && i - lastAt[k] <= 3) m.text = "";
+        else lastAt[k] = i;
+      });
+      allMarks = priceMarks;
+      applyMarks();
 
       drawPulse(from);
 
@@ -376,10 +426,24 @@
       return { result: r, decimals: d };
     }
 
+    // Etiketter längst till vänster i bild kapas av grafens kant ("ÖP"): där visas bara pilen, utan text.
+    function applyMarks() {
+      marksQueued = false;
+      if (!bars) { candleMarks.setMarkers([]); return; }
+      const cut = leftEdgeTime(26);
+      candleMarks.setMarkers(allMarks.map(m => (m.text && m.time < cut ? Object.assign({}, m, { text: "" }) : m)));
+    }
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      if (!marksQueued && allMarks.length) { marksQueued = true; requestAnimationFrame(applyMarks); }
+    });
+
     applyTheme();
     return {
       chart,
-      setBars(b, t, reset) { bars = b; if (t) tf = t; if (reset) firstDraw = true; return draw(); },
+      setBars(b, t, reset) {
+        bars = b; if (t) tf = t; if (reset) { firstDraw = true; requestAnimationFrame(sizePanes); }
+        return draw();
+      },
       setView(v) { view = v; },
       setExtras(x) { extras = Object.assign({ pulse: null, trades: null }, x); return draw(); },
       applyTheme,

@@ -5,8 +5,20 @@
   "use strict";
 
   const MIN = 100, MAX = 100000000;
-  // En mening per rad (egen span), så att en rad aldrig börjar mitt i en mening
-  const CARDS = [
+  // En mening per rad (egen span), så att en rad aldrig börjar mitt i en mening.
+  // Autopiloten (standard): fasta andelar, koll på söndagar – lamporna är bara vädret och styr inga köp.
+  const CARDS_AUTO = [
+    ["Jag är Walter.", "Jag läser marknaden varje dag – tio signaler som visar vädret."],
+    ["Jag håller fasta andelar och justerar på söndagar.", "Lamporna visar vädret – de styr inte mina köp.", "Aldrig mer än 75 % investerat."],
+    ["Jag rör inga riktiga pengar.", "Det kan jag inte än.", "Vi börjar med låtsaspengar, tills du är redo."]
+  ];
+  const cards = () => {
+    const m = window.WALTER_MARKET;
+    const strategy = (m && m.now && m.now.rules && m.now.rules.strategy) || "autopilot";
+    return strategy === "lamps" ? CARDS_LAMPS : CARDS_AUTO;
+  };
+  // Den gamla lamp-strategin (rules.strategy = "lamps"): där styr lamporna köpen
+  const CARDS_LAMPS = [
     ["Jag är Walter.", "Jag läser marknaden varje dag – tio signaler, alltid samma regler."],
     ["Jag förvaltar åt dig: köper när läget är bra, vilar när det stormar.", "Aldrig mer än 75 % investerat."],
     ["Jag rör inga riktiga pengar.", "Det kan jag inte än.", "Vi börjar med låtsaspengar, tills du är redo."]
@@ -73,22 +85,26 @@
     return b;
   }
 
+  // Varje steg: innehållet (.i-main, centrerat) och knappraden sist. Knappraden ligger alltid längst ned i rutan,
+  // så att knapparna står på samma plats i alla steg (fasta höjder, inget hoppar).
   function render() {
     const body = root.querySelector(".i-body");
     body.textContent = "";
     dots();
+    const main = el("div", "i-main");
+    body.appendChild(main);
     if (step < 3) {
       const h = heading();
       h.classList.add("card-text");
-      CARDS[step].forEach((t, i) => { if (i) h.append(" "); h.appendChild(el("span", "line", t)); });
-      body.appendChild(h);
+      cards()[step].forEach((t, i) => { if (i) h.append(" "); h.appendChild(el("span", "line", t)); });
+      main.appendChild(h);
+      if (step === 0) main.appendChild(importRow());
       const row = el("div", "i-actions");
       row.appendChild(button("Hoppa över", "i-btn ghost", () => go(3)));
       row.appendChild(button(step === 2 ? "Kom igång" : "Vidare", "i-btn", () => go(step + 1)));
       body.appendChild(row);
-      if (step === 0) body.appendChild(importRow());
-    } else if (step === 3) renderAmount(body);
-    else renderExchange(body);
+    } else if (step === 3) renderAmount(main, body);
+    else renderExchange(main, body);
     const head = body.querySelector(".i-head");
     if (head) head.focus({ preventScroll: true });
   }
@@ -150,20 +166,21 @@
     body.querySelector(".i-head").focus({ preventScroll: true });
   }
 
-  function renderAmount(body) {
-    body.appendChild(heading("Hur mycket låtsaspengar vill du börja med?"));
+  function renderAmount(main, body) {
+    main.appendChild(heading("Hur mycket låtsaspengar vill du börja med?"));
     const wrap = el("div", "i-field");
     const label = el("label", "i-label", "Belopp i kronor");
     label.htmlFor = "intro-amount";
     const input = el("input", "i-input");
     input.id = "intro-amount"; input.type = "text"; input.inputMode = "numeric"; input.autocomplete = "off";
-    input.spellcheck = false; input.placeholder = "10 000";
+    // Platshållaren får inte se ifylld ut: "t.ex." och samma dämpade färg som vanlig platshållartext
+    input.spellcheck = false; input.placeholder = "t.ex. 10 000";
     input.setAttribute("aria-describedby", "intro-hint");
     if (amount !== null) input.value = sv(amount, 0);
     const hint = el("p", "i-hint");
     hint.id = "intro-hint";
     wrap.append(label, input, hint);
-    body.appendChild(wrap);
+    main.appendChild(wrap);
     const row = el("div", "i-actions");
     const next = button("Fortsätt", "i-btn", () => { if (amount !== null) go(4); });
     next.disabled = true;
@@ -180,8 +197,8 @@
     update();
   }
 
-  function renderExchange(body) {
-    body.appendChild(heading("Var vill du handla?"));
+  function renderExchange(main, body) {
+    main.appendChild(heading("Var vill du handla?"));
     const list = el("div", "i-list");
     list.setAttribute("role", "radiogroup");
     list.setAttribute("aria-label", "Börs");
@@ -194,20 +211,26 @@
       r.onchange = () => { exchangeId = x.id; start.disabled = false; };
       const txt = el("span", "i-ex-txt");
       txt.appendChild(el("span", "i-ex-name", x.name));
-      // Land och avgift på var sin rad, så att en smal skärm aldrig bryter mitt i
+      // Land och avgift på samma rad (bryts mellan delarna, aldrig mitt i en del)
       const meta = el("span", "i-ex-meta");
-      exMeta(x).forEach((t) => meta.appendChild(el("span", "", t)));
+      exMeta(x).forEach((t) => {
+        // Siffran i mono, orden i Jost
+        const part = el("span", "");
+        const m = /^(.*?)(\d[\d\s,]*)(.*)$/.exec(t);
+        if (m) { part.append(m[1]); part.appendChild(el("span", "num", m[2])); part.append(m[3]); } else part.textContent = t;
+        meta.appendChild(part);
+      });
       txt.appendChild(meta);
       if (x.assets && x.assets.ETH === false) txt.appendChild(el("span", "i-ex-miss", "Ether finns inte här"));
       if (x.assets && x.assets.GOLD === false) txt.appendChild(el("span", "i-ex-miss", "Guld finns inte här"));
       lab.append(r, txt);
       list.appendChild(lab);
     });
-    body.appendChild(list);
+    main.appendChild(list);
     if (!window.WalterUser.storageOk()) {
       const w = el("p", "i-warn", NO_STORAGE);
       w.setAttribute("role", "status");
-      body.appendChild(w);
+      main.appendChild(w);
     }
     const row = el("div", "i-actions");
     row.appendChild(button("Tillbaka", "i-btn ghost", () => go(3)));

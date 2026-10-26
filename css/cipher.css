@@ -9,6 +9,7 @@
   --glass: rgba(255, 255, 255, 0.42); --glass-edge: rgba(255, 255, 255, 0.75);
   --fog: rgba(160, 200, 208, 0.55); --fog2: rgba(255, 255, 255, 0.7);
   --teal: #17808D; --red: #B0203A; --green: #1E8460; --blurple: #4B3BF0;
+  --teal-text: #0D5F69; /* teal för text i ljust tema (WCAG AA), samma som walter.css */
   --seg-bg: #14222A; --seg-fg: #E9EEF0;
   /* grafens färger (--gold, --c-*): css/cipher-chart.css */
   color-scheme: light;
@@ -21,6 +22,7 @@
   --glass: rgba(255, 255, 255, 0.05); --glass-edge: rgba(255, 255, 255, 0.12);
   --fog: rgba(60, 140, 155, 0.22); --fog2: rgba(90, 110, 140, 0.2);
   --teal: #6FD3DE; --red: #FF4D66; --green: #3DD39A; --blurple: #8C84FF;
+  --teal-text: #6FD3DE;
   --seg-bg: #E8F0F2; --seg-fg: #0A1216;
   color-scheme: dark;
 }
@@ -32,7 +34,7 @@ body {
   color: var(--ink); font-family: "Jost", system-ui, sans-serif; font-weight: 300;
   overflow-x: hidden;
 }
-a { color: var(--teal); }
+a { color: var(--teal-text); }
 .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 300; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 button, input, select { font: inherit; color: inherit; }
@@ -70,17 +72,17 @@ h1, h2, .kicker, .label, .hybrid, .headline { text-wrap-style: balance; }
 .kicker { margin: 36px 0 0; font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .3em; color: var(--muted); }
 .title-row { display: flex; align-items: baseline; gap: 28px; flex-wrap: wrap; min-height: 56px; margin-top: 10px; }
 h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-height: 1; }
-.price { font-size: 18px; color: var(--soft); min-width: 140px; }
-.live { display: inline-flex; align-items: center; gap: 10px; font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .24em; color: var(--muted); }
+.price { font-size: 17px; color: var(--soft); min-width: 140px; }
+.live { display: inline-flex; align-items: center; gap: 10px; font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .24em; color: var(--muted); }
 .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .live.on i { background: var(--teal); box-shadow: 0 0 10px var(--teal); animation: breathe 3.2s ease-in-out infinite; }
 .live.err i { background: var(--red); }
 
 .controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-top: 18px; }
-.field { display: flex; flex-direction: column; gap: 6px; font-size: 9px; letter-spacing: .3em; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 11px; letter-spacing: .2em; color: var(--muted); }
 .field select, .field input {
   min-height: 44px; min-width: 150px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--glass-edge);
-  background: var(--glass); backdrop-filter: blur(24px); color: var(--ink); font-size: 14px; letter-spacing: .04em;
+  background: var(--glass); backdrop-filter: blur(24px); color: var(--ink); font-size: 15px; letter-spacing: .04em;
 }
 .field input { font-family: "JetBrains Mono", monospace; text-transform: uppercase; width: 170px; }
 .field select option { color: #14222A; }
@@ -90,17 +92,18 @@ h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-h
   background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(24px) saturate(140%);
   border-radius: 26px; padding: 18px 24px;
 }
-.label, .panel-head { font-size: 10px; font-weight: 400; letter-spacing: .36em; color: var(--muted); }
+.label, .panel-head { font-size: 11px; font-weight: 400; letter-spacing: .3em; color: var(--muted); }
 .panel-head { display: flex; justify-content: space-between; gap: 16px; height: 20px; align-items: center; }
-.panel-head em { font-style: normal; color: var(--teal); margin-left: 8px; }
+.panel-head em { font-style: normal; color: var(--teal-text); margin-left: 8px; }
 .panel-head .num { letter-spacing: .08em; }
 .panel-head.lower { margin-top: 6px; }
 .chart { height: 640px; margin-top: 6px; }
 /* förklaringen under grafen (.wc-legend): css/cipher-chart.css */
 
 .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.says-row { display: flex; justify-content: space-between; align-items: center; height: 44px; border-bottom: 1px solid var(--line); }
-.says-row strong { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 400; letter-spacing: .08em; }
+.says-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 44px; border-bottom: 1px solid var(--line); }
+.says-row .label { flex: none; }
+.says-row strong { display: flex; align-items: center; justify-content: flex-end; gap: 10px; text-align: right; font-size: 17px; font-weight: 400; letter-spacing: .08em; }
 .hybrid { margin: 12px 0 0; height: 66px; overflow: hidden; font-size: 13px; line-height: 1.55; color: var(--soft); }
 .dot { display: inline-block; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--muted); }
 .dot.buy { background: var(--green); box-shadow: 0 0 10px var(--green); }
@@ -109,29 +112,30 @@ h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-h
 .dot.wait { background: var(--blurple); box-shadow: 0 0 10px var(--blurple); }
 .dot.small { width: 6px; height: 6px; background: transparent; border: 1px solid var(--muted); box-shadow: none; }
 
-.read { height: 300px; display: flex; flex-direction: column; }
+.read { height: 330px; display: flex; flex-direction: column; }
 .read-head { display: flex; justify-content: space-between; align-items: center; }
 .pill {
   min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--glass-edge); background: transparent;
-  font-size: 10px; letter-spacing: .24em; cursor: pointer;
+  font-size: 11px; letter-spacing: .2em; cursor: pointer;
 }
 .pill[aria-pressed="true"] { background: var(--seg-bg); color: var(--seg-fg); }
-.headline { display: flex; align-items: center; gap: 12px; margin: 8px 0 0; height: 34px; font-size: 21px; letter-spacing: .05em; white-space: nowrap; }
-.read-text { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--soft); }
+.headline { display: flex; align-items: center; gap: 12px; margin: 8px 0 0; height: 34px; font-size: 20px; letter-spacing: .05em; white-space: nowrap; }
+.read-text { margin: 8px 0 0; font-size: 15px; line-height: 1.6; color: var(--soft); }
 .nums { margin: 4px 0 0; overflow: auto; }
 .nums div { display: flex; justify-content: space-between; gap: 12px; height: 30px; align-items: center; border-bottom: 1px solid var(--line); font-size: 13px; }
 .nums dt { color: var(--soft); white-space: nowrap; }
-.nums dd { margin: 0; font-family: "JetBrains Mono", monospace; font-size: 12px; white-space: nowrap; }
+.nums dd { margin: 0; font-family: "JetBrains Mono", monospace; font-size: 13px; white-space: nowrap; }
 
-.signals ul { list-style: none; margin: 6px 0 0; padding: 0; height: 324px; overflow: auto; }
+/* Listan växer i stället för att rulla inuti rutan (ingen rullningslist över datumen) */
+.signals ul { list-style: none; margin: 6px 0 0; padding: 0; }
 .signals li { display: flex; align-items: center; gap: 14px; height: 54px; border-bottom: 1px solid var(--line); }
 .signals .txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.signals .nm { font-size: 14px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.signals .ex { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.signals .when { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--soft); white-space: nowrap; }
+.signals .nm { font-size: 15px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.signals .ex { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.signals .when { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--soft); white-space: nowrap; }
 .signals .empty { color: var(--muted); font-size: 13px; }
 
-.foot { margin: 28px 0 0; padding: 0 0 40px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.foot { margin: 28px 0 0; padding: 0 0 40px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 .foot p { margin: 0 0 6px; }
 
 @media (max-width: 1100px) {
@@ -152,6 +156,7 @@ h1 { margin: 0; font-size: 40px; font-weight: 300; letter-spacing: .26em; line-h
   .chart { height: 480px; }
   .panel-head em { display: none; }
   .panel-head { height: auto; flex-wrap: wrap; gap: 4px 16px; }
+  .says-row strong { font-size: 15px; letter-spacing: .04em; }
 }
 
 /* Pekskärmar: lättare glas (sist i filen så att det vinner över reglerna ovan) */

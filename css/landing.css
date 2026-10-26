@@ -71,8 +71,8 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
 
 /* Innehållet: flex i stället för absolut statusrad, så inget kan överlappa */
 #landing .content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px 32px 12px; }
-#landing .kicker { font-family: "JetBrains Mono", monospace; font-size: clamp(9px, 2.4vw, 11px); letter-spacing: .4em; margin: 0 -.4em 30px 0; color: var(--muted); white-space: nowrap; }
-#landing .kicker b { color: var(--teal); font-weight: 400; }
+#landing .kicker { font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .34em; margin: 0 -.34em 30px 0; color: var(--muted); white-space: nowrap; }
+#landing .kicker b { color: var(--teal-text); font-weight: 400; }
 
 /* Logo med glitch */
 #landing .logo { position: relative; width: 108px; height: 108px; flex: none; }
@@ -97,7 +97,7 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
 }
 #landing .cta:hover { background: color-mix(in srgb, var(--teal) 14%, transparent); box-shadow: 0 0 40px 0 color-mix(in srgb, var(--teal) 40%, transparent); }
 #landing .cta i { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 10px var(--teal); animation: l-breathe 3.2s ease-in-out infinite; }
-#landing .status { position: relative; flex: none; display: flex; justify-content: space-between; gap: 12px; padding: 0 28px 22px; font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: .28em; color: var(--muted); white-space: nowrap; }
+#landing .status { position: relative; flex: none; display: flex; justify-content: space-between; gap: 12px; padding: 0 28px 22px; font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .24em; color: var(--muted); white-space: nowrap; }
 
 /* Ljust/mörkt-knappen, samma runda glasknapp som i appen */
 #landing .l-theme, #intro .l-theme {
@@ -136,10 +136,9 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
   #landing .cta { margin-top: 28px; }
   #landing .kicker .long { display: none; }
   #landing .pane { height: min(620px, 88vh); }
-  #intro .pane { height: min(620px, 88dvh); }
   #landing .l-theme, #intro .l-theme { top: 12px; right: 12px; width: 44px; height: 44px; }
 }
-@media (max-height: 640px) and (max-width: 600px) { #landing .tag { font-size: 14px; line-height: 1.5; } #landing .logo { width: 72px; height: 72px; } }
+@media (max-height: 640px) and (max-width: 600px) { #landing .tag { font-size: 15px; line-height: 1.5; } #landing .logo { width: 72px; height: 72px; } }
 @media (max-height: 700px) { #landing .lab .readout { display: none; } }
 /* Låga skärmar (liggande mobil, små laptops): tätare så att allt ryms i glaset */
 @media (max-height: 640px) and (min-width: 601px) {
@@ -171,11 +170,14 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
 
 /* ---------- Introt: samma glas, ett steg i taget ---------- */
 #intro { opacity: 1; background-image: radial-gradient(ellipse at 25% 20%, rgba(var(--blob1), .28), transparent 60%), radial-gradient(ellipse at 80% 85%, rgba(var(--blob2), .26), transparent 60%); }
-#intro .pane { height: min(560px, 82vh); }
+#intro .pane { height: min(640px, 86vh); }
 #intro .content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 28px 32px 8px; text-align: center; }
 #intro .i-mark { width: 52px; height: 52px; flex: none; overflow: visible; }
 #intro .i-mark path { stroke: var(--ink); }
-#intro .i-body { flex: 1 1 auto; min-height: 0; width: min(560px, 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; margin-top: 12px; }
+/* Innehållet (.i-main) centreras i den yta som finns, knappraden ligger alltid sist: samma plats i varje steg */
+#intro .i-body { flex: 1 1 auto; min-height: 0; width: min(560px, 100%); display: flex; flex-direction: column; align-items: center; margin-top: 12px; }
+#intro .i-main { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+#intro .i-body > .i-actions { margin-top: 18px; min-height: 48px; }
 #intro .i-head { margin: 0; font-weight: 300; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.45; letter-spacing: .01em; color: var(--ink); outline: none; }
 #intro .i-head.card-text { font-size: clamp(21px, 3vw, 30px); max-width: 22em; min-height: 6.2em; display: flex; align-items: center; }
 #intro .i-actions { display: flex; gap: 12px; justify-content: center; flex: none; flex-wrap: wrap; }
@@ -185,27 +187,32 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
 }
 #intro .i-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--teal) 14%, transparent); box-shadow: 0 0 34px 0 color-mix(in srgb, var(--teal) 38%, transparent); }
 #intro .i-btn.ghost { border-color: transparent; color: var(--soft); }
-#intro .i-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* Avstängd: tydligt avstängd men fortfarande läsbar (streckad kant i stället för nästan osynlig) */
+#intro .i-btn:disabled { opacity: .6; border-style: dashed; border-color: var(--muted); color: var(--soft); cursor: not-allowed; }
 #intro .i-btn:focus-visible, #intro .i-input:focus-visible, #intro .i-ex:has(input:focus-visible), #intro .l-theme:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 #intro .i-field { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; text-align: left; }
 #intro .i-label { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
 #intro .i-input { height: 54px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--l-edge); background: var(--l-glass); color: var(--ink); font-family: "JetBrains Mono", monospace; font-size: 22px; width: 100%; }
-#intro .i-hint { margin: 0; min-height: 2.8em; font-size: 14px; line-height: 1.4; color: var(--soft); }
+#intro .i-input::placeholder { font-family: "Jost", system-ui, sans-serif; font-size: 17px; color: var(--muted); opacity: .7; }
+#intro .i-hint { margin: 0; min-height: 2.8em; font-size: 15px; line-height: 1.4; color: var(--soft); }
 #intro .i-list { flex: 1 1 auto; min-height: 0; width: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; text-align: left; }
 #intro .i-ex { display: flex; align-items: flex-start; gap: 14px; padding: 10px 16px; border-radius: 14px; border: 1px solid var(--l-edge); background: var(--l-glass); cursor: pointer; flex: none; }
 #intro .i-ex:has(input:checked) { border-color: var(--teal); box-shadow: 0 0 22px 0 color-mix(in srgb, var(--teal) 28%, transparent); }
 #intro .i-ex input { accent-color: var(--teal); width: 18px; height: 18px; margin: 3px 0 0; flex: none; }
 #intro .i-ex-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 #intro .i-ex-name { font-size: 17px; font-weight: 400; color: var(--ink); }
-#intro .i-ex-meta { display: flex; flex-direction: column; gap: 1px; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--soft); }
+/* Ord i Jost, siffror i mono (.num). Land och avgift på samma rad, men aldrig bruten mitt i en del. */
+#intro .i-ex-meta { display: flex; flex-wrap: wrap; gap: 0 10px; font-size: 13px; color: var(--soft); }
+#intro .i-ex-meta > span { white-space: nowrap; }
+#intro .i-ex-meta .num { font-family: "JetBrains Mono", monospace; }
 #intro .i-import { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
-#intro .i-link { background: none; border: 0; padding: 8px 4px; min-height: 44px; font: inherit; font-size: 14px; color: var(--soft); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+#intro .i-link { background: none; border: 0; padding: 8px 4px; min-height: 44px; font: inherit; font-size: 15px; color: var(--soft); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 #intro .i-link:hover { color: var(--ink); }
 #intro .i-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 8px; }
 #intro .i-import-msg { min-height: 1.5em; font-size: 13px; color: var(--muted); }
 #intro .i-field .i-actions { margin-top: 6px; }
 #intro .i-ex-miss { font-size: 13px; color: var(--muted); }
-#intro .i-warn { margin: 0; flex: none; font-size: 14px; line-height: 1.4; color: var(--soft); border-left: 2px solid var(--muted); padding-left: 10px; text-align: left; }
+#intro .i-warn { margin: 0; flex: none; font-size: 15px; line-height: 1.4; color: var(--soft); border-left: 2px solid var(--muted); padding-left: 10px; text-align: left; }
 #intro .steps { position: relative; flex: none; display: flex; justify-content: center; gap: 10px; padding: 8px 0 22px; }
 #intro .steps i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .4; }
 #intro .steps i.on { background: var(--teal); opacity: 1; box-shadow: 0 0 8px var(--teal); }
@@ -213,7 +220,8 @@ html.landing-on, html.landing-on body, html.intro-on, html.intro-on body { overf
 @keyframes i-in { from { opacity: 0; transform: translateY(6px); } }
 @media (max-width: 600px) {
   #intro .content { padding: 20px 18px 6px; }
-  #intro .i-body { gap: 16px; }
+  #intro .i-main { gap: 16px; }
+  #intro .pane { height: min(720px, 88vh); height: min(720px, 88dvh); }
   #intro .i-btn { padding: 0 18px; letter-spacing: .22em; }
   #intro .i-ex { padding: 8px 12px; }
 }
