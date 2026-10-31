@@ -291,7 +291,7 @@
       catchUp, lastCheck(journal, pf) === row.date && !first);
     const plainAuto = plain;
     if (sav) plain = savingsText(sav, false) + " " + (due ? plain : `Nästa koll ${dayText(nextCheck(row.date, r))}.`);
-    return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades: sTrades.concat(trades), valueSek: round(total, 2),
+    return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades: sTrades.concat(trades), valueSek: round(total, 2), pricesSek: pricesOut(px),
       plain, plainAuto, missing, waiting, decisionDay: due, check: due && !waiting.length,
       needsApproval: trades.length > 0 || !!sav || mode !== current || (due && (!catchUp || !waiting.length)), nextCheck: nextCheck(row.date, r), weights: w,
       glide, savings: sav };
@@ -368,12 +368,20 @@
     }
     if (waiting.length) plain += ` Jag väntar på pris för ${list(waiting.map((a) => NAMES[a]))}.`;
     for (const a of wantedMissing) plain += ` ${cap(NAMES[a])} finns inte på din börs, så den delen ligger kvar som kontanter.`;
-    return { ready: true, red, mode, currentMode: current, trades, valueSek: round(total, 2), plain, missing, waiting };
+    return { ready: true, red, mode, currentMode: current, trades, valueSek: round(total, 2), pricesSek: pricesOut(px), plain, missing, waiting };
   }
 
   // ---------- Genomför ----------
+  // Dagens priser som följer med förslaget, så att apply värderar om alla innehav (som prices_out i Python)
+  function pricesOut(px) {
+    const o = {};
+    for (const a of ASSETS) if (px[a]) o[a] = round(px[a], 2);
+    return o;
+  }
+
   // Bokför affärerna (genomsnittsmetoden, utan K4), räknar om värde och topp. Delas av apply och applyDeposit.
-  function book(user, trades, date, facts) {
+  // prices = förslagets dagspriser: alla innehav värderas om, även en dag utan affär.
+  function book(user, trades, date, facts, prices) {
     const pf = user.portfolio, pos = pf.positions || (pf.positions = {});
     user.trades = user.trades || [];
     for (const t of trades) {
@@ -395,7 +403,7 @@
       user.trades.push({ date, asset: a, side: t.side, units: t.units, priceSek: t.priceSek, sek: t.sek, feeSek: t.feeSek });
     }
     pf.holdings.CASH = round(pf.holdings.CASH, 2);
-    const px = {};
+    const px = Object.assign({}, prices || {});
     for (const t of trades) px[t.asset] = t.priceSek;
     for (const a of ASSETS) {
       if (a in px) pf.holdings[a] = round(((pos[a] || {}).units || 0) * px[a], 2);
@@ -420,7 +428,7 @@
       });
       pf.holdings.CASH = cash;
     }
-    book(user, prop.trades, date, facts);
+    book(user, prop.trades, date, facts, prop.pricesSek);
     const note = [...new Set(prop.trades.map((t) => t.side))].sort().join("/") || "läge";
     if (hist.length && hist[hist.length - 1].date === date && !hist[hist.length - 1].flow) hist.pop();
     hist.push({ date, value: pf.value, cash: pf.holdings.CASH, note });

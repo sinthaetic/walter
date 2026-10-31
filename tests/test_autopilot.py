@@ -52,6 +52,18 @@ class AutopilotTest(unittest.TestCase):
         self.assertIn("Nästa koll söndag 1 nov.", prop["plain"])
         self.assertEqual(prop["nextCheck"], "2026-11-01")
 
+    def test_day_without_trade_saves_todays_value(self):
+        # Gammalt fel (okt 2026): utan affär sparades gårdagens värde i historiken varje dag
+        p = pf(26000, {"BTC": 38000, "ETH": 18000, "GOLD": 18000})
+        st = state(p)
+        st["market"]["btc"]["value"] = PX["BTC"] * 0.9  # bitcoin −10 %; ETH/BTC samma kvot, så ETH −10 % också
+        raw = {"portfolio": p, "mode": "NORMAL", "updatedAt": "2026-10-01", "journal": []}
+        prop = wp.propose(st, today=SUNDAY)
+        self.assertEqual(prop["trades"], [])
+        wp.apply(raw, prop, SUNDAY)
+        self.assertAlmostEqual(p["value"], 26000 + 38000 * 0.9 + 18000 * 0.9 + 18000, places=1)
+        self.assertEqual(p["history"][-1]["value"], p["value"])
+
     def test_sunday_outside_band_sells_back_to_weight(self):
         p = pf(25000, {"BTC": 41000, "ETH": 17000, "GOLD": 17000})
         prop = wp.propose(state(p), today=SUNDAY)

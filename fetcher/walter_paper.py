@@ -68,6 +68,11 @@ def prices_sek(m):
     }
 
 
+def prices_out(px):
+    """Dagens priser som följer med förslaget, så att apply värderar om alla innehav (även utan affär)."""
+    return {a: round(px[a], 2) for a in ASSETS if px.get(a)}
+
+
 def valuation(pf, px):
     """Innehav i SEK till dagens pris. Saknas pris används senast godkända värdet."""
     pos = pf.get("positions") or {}
@@ -482,7 +487,7 @@ def propose_autopilot(state, today, assets=None):
     if sav:
         plain = savings_text(sav, False) + " " + (plain if due else f"Nästa koll {day_text(next_check(today, r))}.")
     return {"asOf": today, "ready": True, "strategy": "autopilot", "red": red, "mode": mode, "currentMode": current,
-            "trades": s_trades + trades, "valueSek": round(total, 2), "plain": plain, "plainAuto": plain_auto,
+            "trades": s_trades + trades, "valueSek": round(total, 2), "pricesSek": prices_out(px), "plain": plain, "plainAuto": plain_auto,
             # Kollen skrivs i journalen på beslutsdagen, och en ikapp-dag bara när kollen blev klar (inget väntar på pris),
             # så att ett prisavbrott efter en missad söndag inte ger en journalpost per dag.
             "needsApproval": bool(trades) or bool(sav) or mode != current or (due and (not catch_up or not waiting)),
@@ -560,7 +565,7 @@ def propose_lamps(state, today):
     if waiting:
         plain += f" Väntar på pris för {', '.join(NAMES[a] for a in waiting)}."
     return {"asOf": today, "ready": True, "red": red, "mode": mode, "currentMode": current,
-            "trades": trades, "valueSek": round(total, 2), "plain": plain,
+            "trades": trades, "valueSek": round(total, 2), "pricesSek": prices_out(px), "plain": plain,
             "needsApproval": bool(trades) or mode != current}
 
 
@@ -581,8 +586,9 @@ def sharpe(daily, flows, first_trade, today=None):
 
 
 # ---------- Godkänn ----------
-def _book(raw, trades, today, facts):
+def _book(raw, trades, today, facts, prices=None):
     """Bokför affärerna i portföljen (genomsnittsmetoden, K4-rad per försäljning), räknar om värde och topp.
+    prices = förslagets dagspriser: alla innehav värderas om, även en dag utan affär (annars står gårdagens värde kvar).
     Delas av apply (förslaget) och apply_deposit (insättningen)."""
     pf = raw["portfolio"]
     pos = pf.setdefault("positions", {})
@@ -610,7 +616,8 @@ def _book(raw, trades, today, facts):
         facts.append(f"{t['side'].capitalize()}: {num(t['units'], 8)} {a} à {num(t['priceSek'])} kr = "
                      f"{num(t['sek'], 2)} kr, avgift {num(t['feeSek'], 2)} kr")
     pf["holdings"]["CASH"] = round(pf["holdings"]["CASH"], 2)
-    px = {t["asset"]: t["priceSek"] for t in trades}
+    px = dict(prices or {})
+    px.update({t["asset"]: t["priceSek"] for t in trades})
     for a in ASSETS:
         units = (pos.get(a) or {}).get("units", 0)
         if a in px:
@@ -637,7 +644,7 @@ def apply(raw, prop, today):
                          "flow": sav["eachSek"], "note": SAVINGS_NOTE, "month": mth})
             facts.append(f"Månadssparande {mth}: +{num(sav['eachSek'])} kr (låtsasinsättning)")
         pf["holdings"]["CASH"] = cash
-    _book(raw, prop["trades"], today, facts)
+    _book(raw, prop["trades"], today, facts, prop.get("pricesSek"))
     note = "/".join(sorted({t["side"] for t in prop["trades"]})) or "läge"
     if hist and hist[-1]["date"] == today and not hist[-1].get("flow"):
         hist.pop()

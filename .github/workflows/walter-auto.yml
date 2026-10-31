@@ -114,7 +114,7 @@ jobs:
           case "$out" in
             *WALTER_COMMIT=handlade*) msg="Walter handlade" ;;
             *WALTER_COMMIT=koll*) msg="Walter: söndagskoll" ;;
-            *) msg="Walter: nytt läge (väder)" ;;
+            *) msg="Walter: dagens marknadsläge" ;;
           esac
           git add data/state.enc
           git -c user.name=WALTER -c user.email=walter@localhost commit -q -m "$msg $(date +%Y-%m-%d) [skip ci]"
