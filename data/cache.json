@@ -1,0 +1,212 @@
+{
+  "market": {
+    "nasdaq": {
+      "changePct": -2.86,
+      "asOf": "2026-10-30"
+    },
+    "spx": {
+      "value": 7580.07,
+      "changePct": -1.82,
+      "ma50": 7697.08,
+      "belowMa": true,
+      "asOf": "2026-10-30"
+    },
+    "dow": {
+      "changePct": 0.69,
+      "asOf": "2026-10-21"
+    },
+    "vix": {
+      "value": 19.42,
+      "changePct": 12.9,
+      "asOf": "2026-10-30"
+    },
+    "dxy": {
+      "value": 101.88,
+      "ma50": 100.815,
+      "aboveMa": true,
+      "asOf": "2026-10-30"
+    },
+    "us10y": {
+      "value": 4.93,
+      "changeBp": -6,
+      "monthAgo": 5.29,
+      "change1mPp": -0.36,
+      "asOf": "2026-10-30",
+      "source": "Yahoo ^TNX"
+    },
+    "btc": {
+      "value": 77512,
+      "unit": "usd",
+      "asOf": "2026-10-31",
+      "changePct24h": 0.49,
+      "ma200": 73136,
+      "belowMa200": false,
+      "change7dPct": -4.1
+    },
+    "ethBtc": {
+      "value": 0.02918,
+      "ma30": 0.02997
+    },
+    "ethBtcAbove30dMa": false,
+    "mvrvZ": {
+      "value": 0.75,
+      "asOf": "2026-10-30",
+      "source": "Coin Metrics (egen uträkning)"
+    },
+    "sopr": {
+      "value": 0.9933,
+      "avg7": 0.9988,
+      "asOf": "2026-10-30"
+    },
+    "etfFlow": {
+      "mtdUsd": 128303702,
+      "sum5dUsd": 302803353,
+      "lastDayUsd": 17071922,
+      "asOf": "2026-10-29"
+    },
+    "usdsek": {
+      "value": 9.8263,
+      "asOf": "2026-10-30",
+      "source": "Riksbanken"
+    },
+    "eursek": {
+      "value": 10.978,
+      "asOf": "2026-10-30",
+      "source": "Riksbanken"
+    },
+    "gold": {
+      "value": 3896.87,
+      "asOf": "2026-10-31"
+    }
+  },
+  "fetchedAt": "2026-10-31T18:43:03",
+  "sources": {
+    "Börsindex (yfinance)": "ok",
+    "VIX (yfinance)": "ok",
+    "Dollarindex (yfinance)": "ok",
+    "10-årig ränta (FRED / Yahoo ^TNX)": "ok",
+    "BTC + ETH/BTC (CoinGecko)": "ok",
+    "USDSEK + EURSEK (Riksbanken)": "ok",
+    "MVRV-Z (Coin Metrics) + SOPR (BGeometrics)": "ok",
+    "ETF-flöden (ByKaranteli)": "ok"
+  },
+  "marketLog": [
+    {
+      "date": "2026-10-23",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 809052.8776,
+        "ETH": 23883.240946752,
+        "GOLD": 39825.736296
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 19.45,
+      "spxBelowMa": true
+    },
+    {
+      "date": "2026-10-24",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 798869.6072,
+        "ETH": 23007.44468736,
+        "GOLD": 39756.52188
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 19.45,
+      "spxBelowMa": true
+    },
+    {
+      "date": "2026-10-25",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 799346.948,
+        "ETH": 23165.074553039994,
+        "GOLD": 39870.785334
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 19.45,
+      "spxBelowMa": true
+    },
+    {
+      "date": "2026-10-26",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 795976.1658,
+        "ETH": 22932.073336698,
+        "GOLD": 40056.464393999995
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 18.39,
+      "spxBelowMa": true
+    },
+    {
+      "date": "2026-10-27",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 804095.7927999999,
+        "ETH": 23608.252476608002,
+        "GOLD": 40358.909408
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 17.52,
+      "spxBelowMa": false
+    },
+    {
+      "date": "2026-10-28",
+      "ready": true,
+      "red": 2,
+      "px": {
+        "BTC": 805775.1812,
+        "ETH": 23496.404283791995,
+        "GOLD": 40349.932788
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 16.91,
+      "spxBelowMa": false
+    },
+    {
+      "date": "2026-10-29",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 786089.7234,
+        "ETH": 22136.286610944,
+        "GOLD": 39702.264845
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 17.2,
+      "spxBelowMa": false
+    },
+    {
+      "date": "2026-10-30",
+      "ready": true,
+      "red": 3,
+      "px": {
+        "BTC": 754433.8351,
+        "ETH": 21712.605774178002,
+        "GOLD": 38226.960101
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 19.42,
+      "spxBelowMa": true
+    },
+    {
+      "date": "2026-10-31",
+      "ready": true,
+      "red": 4,
+      "px": {
+        "BTC": 761656.1656,
+        "ETH": 22225.126912208,
+        "GOLD": 38291.813681
+      },
+      "ethBtcAbove30dMa": false,
+      "vix": 19.42,
+      "spxBelowMa": true
+    }
+  ]
+}
