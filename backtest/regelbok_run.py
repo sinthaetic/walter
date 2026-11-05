@@ -15,17 +15,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backtest import candles, data, run, wcipher, wcipher_run as W  # noqa: E402
+from backtest.mf_run import uptrend  # noqa: E402
 
 UP, DN = {"liten_upp", "kop", "guld"}, {"liten_ned", "salj"}
 WINDOW = 30
 
 
 class Regelbok(W.Tape):
-    def __init__(self, tf, series):
+    def __init__(self, tf, series, trend="band"):
         bars = candles.load(tf)
         super().__init__(tf, series, bars)
         res = wcipher.compute(bars)
         wt2, e2, e8 = res["wt2"], res["ribbon"][1], res["ribbon"][7]
+        up200 = uptrend(self.c, tf)  # del 5d: trend = över 200-dagarssnittet
         self.long_in, self.short_in, self.stops = set(), set(), {}
         anc_l = anc_s = None  # (stapel, vågvärde, lägsta/högsta pris sedan)
         for i in range(len(bars)):
@@ -34,7 +36,7 @@ class Regelbok(W.Tape):
                 anc_l = (anc_l[0], anc_l[1], min(anc_l[2], self.lo[i]))
             if anc_s:
                 anc_s = (anc_s[0], anc_s[1], max(anc_s[2], self.h[i]))
-            trend_up, trend_dn = e2[i] > e8[i], e2[i] < e8[i]
+            trend_up, trend_dn = (e2[i] > e8[i], e2[i] < e8[i]) if trend == "band" else (up200[i], not up200[i])
             if k & UP and anc_l and 0 < i - anc_l[0] <= WINDOW and wt2[i] > anc_l[1] and trend_up:
                 self.long_in.add(i); self.stops[i] = anc_l[2]; anc_l = None
             elif "div_upp" in k and trend_up:
@@ -67,7 +69,7 @@ _T = None
 def _init():
     global _T
     s = data.load_all()
-    _T = {tf: Regelbok(tf, s) for tf in ("1d", "4h")}
+    _T = {(tf, t): Regelbok(tf, s, t) for tf in ("1d", "4h") for t in ("band", "200d")}
 
 
 def _job(job):
@@ -77,7 +79,7 @@ def _job(job):
 
 def main():
     end = W.FULL[1]
-    combos = [(tf, m) for tf in ("1d", "4h") for m in ("long", "ls")]
+    combos = [((tf, t), m) for t in ("band", "200d") for tf in ("1d", "4h") for m in ("long", "ls")]
     jobs = [((tf, m, p), (tf, m, a, b)) for tf, m in combos
             for p, (a, b) in (("2014-2019", W.TRAIN), ("2020-idag", W.TEST))]
     jobs += [((tf, m, q), (tf, m, q, end)) for tf, m in combos for q in run.quarters()]
@@ -92,7 +94,7 @@ def main():
         full = res[(tf, m, "2014-2019")]
         aw = statistics.median(x["avg_win"] or 0 for x in st)
         al = statistics.median(x["avg_loss"] or 0 for x in st)
-        print(f"{tf + ' ' + ('bara köp' if m == 'long' else 'köp+blanka'):<16}{full['bank']:>11,.0f}"
+        print(f"{tf[0] + ' ' + tf[1] + ' ' + ('bara köp' if m == 'long' else 'köp+blanka'):<22}{full['bank']:>11,.0f}"
               f"{res[(tf, m, '2020-idag')]['bank']:>11,.0f}{statistics.median(b):>11,.0f}"
               f"{statistics.quantiles(b, n=10, method='inclusive')[0]:>12,.0f}{max(x['dd'] for x in st):>13.0%}"
               f"{sum(bool(x.get('liquidations')) for x in st):>5}/{len(st)}"

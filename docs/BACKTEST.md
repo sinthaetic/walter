@@ -418,3 +418,20 @@ Regeln bestämdes innan körningen (`backtest/regelbok_run.py`). Förenklat bort
   Stoppen tar ofta ut en innan uppgången, och efter avgifter och skatt finns ingen fördel kvar.
 - Det som saknas i testet är det ägaren gör med ögat: välja bort dåliga signaler, stöd/motstånd och delvinster. Det går inte att
   skriva som regel utan att lura sig själv i efterhand. Rättvisa provet är en provbot på låtsaspengar framåt i tiden.
+
+## Fler källor (del 5d, 5 nov 2026)
+Ägarens länkar: marketciphertrading.com (tutorials + riskkalkylator), marketsaga.net och dev.to (Claude-botar), en YouTube-video
+(ingen text gick att läsa). Ny konkret regel: "Long i en uppåttrend" – köp på grön prick (våg under −60) när pengaflödet är rött
+men stiger, sälj när pengaflödet blir grönt (`backtest/mf_run.py`). Uppåttrend = priset över 200-dagarssnittet: med Cipher A-bandet
+som trend blev det 0 affärer (en djup dipp vänder alltid det snabba bandet). Samma 200-dagarstrend provades också i regelboken.
+
+| Kr per 100 000 kr (median 44 starter) | Dag | 4 h |
+|---|---|---|
+| Pengaflödes-regeln, bara köp | 83 000 | 66 000 |
+| Regelboken med 200-dagarstrend, bara köp | 65 000 | 34 000 |
+| Regelboken med 200-dagarstrend, köp + blanka | 81 000 | 77 000 |
+| Jämför: autopiloten | 524 000 | – |
+
+Ingen variant tjänade pengar efter avgifter och skatt; kontot tömdes aldrig (stoppen). Riskkalkylatorn (1–2 % risk per affär,
+låg hävstång) styr hur stort man förlorar, inte om man vinner. Claude-bot-artiklarna redovisar inga riktiga resultat; den ena
+körs bara på låtsas och ligger efter köp-och-behåll i uppgångar. Båda råder 60–90 dagars provhandel innan riktiga pengar.
