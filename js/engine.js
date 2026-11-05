@@ -295,7 +295,8 @@
     if (sav) plain = savingsText(sav, false) + " " + (due ? plain : `Nästa koll ${dayText(nextCheck(row.date, r))}.`);
     return { ready: true, strategy: "autopilot", red, mode, currentMode: current, trades: sTrades.concat(trades), valueSek: round(total, 2), pricesSek: pricesOut(px),
       plain, plainAuto, missing, waiting, decisionDay: due, check: due && !waiting.length,
-      needsApproval: trades.length > 0 || !!sav || mode !== current || (due && (!catchUp || !waiting.length)), nextCheck: nextCheck(row.date, r), weights: w,
+      // Som Python: marknadsläget ensamt skrivs inte i journalen (sidan visar det från proposal.mode)
+      needsApproval: trades.length > 0 || !!sav || (due && (!catchUp || !waiting.length)), nextCheck: nextCheck(row.date, r), weights: w,
       glide, savings: sav };
   }
 

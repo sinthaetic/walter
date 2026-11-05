@@ -503,7 +503,9 @@ def propose_autopilot(state, today, assets=None):
             "trades": s_trades + trades, "valueSek": round(total, 2), "pricesSek": prices_out(px), "plain": plain, "plainAuto": plain_auto,
             # Kollen skrivs i journalen på beslutsdagen, och en ikapp-dag bara när kollen blev klar (inget väntar på pris),
             # så att ett prisavbrott efter en missad söndag inte ger en journalpost per dag.
-            "needsApproval": bool(trades) or bool(sav) or mode != current or (due and (not catch_up or not waiting)),
+            # Bara affärer, sparande och kollen skrivs i journalen. Marknadsläget ensamt (2 <-> 3 varningar) gav en
+            # journalpost och en commit om dagen utan affär; sidan visar läget direkt från lamporna (proposal.mode).
+            "needsApproval": bool(trades) or bool(sav) or (due and (not catch_up or not waiting)),
             "decisionDay": due,
             # En koll räknas som gjord när inget väntar på pris (annars görs den om nästa dag).
             "check": due and not waiting,

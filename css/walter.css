@@ -246,19 +246,6 @@ body.pro .explain { display: none; }
 .bar.locked { opacity: .4; }
 .alloc-row .pct { font-family: "JetBrains Mono", monospace; font-size: 13px; text-align: right; }
 
-.conds { list-style: none; margin: 0; padding: 0; }
-.conds li { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.45; color: var(--soft); }
-.conds li .dot { margin-top: 5px; }
-.level { padding: 4px 0 14px; }
-.level + .level { border-top: 1px solid var(--line); padding-top: 14px; }
-.level-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 4px; }
-.level-head b { font-weight: 400; font-size: 15px; letter-spacing: .06em; }
-.level-head span { font-size: 13px; color: var(--muted); text-align: right; }
-.level.current .level-head b { color: var(--teal-text); }
-.lv-bar { height: 4px; border-radius: 2px; background: var(--line); margin: 8px 0 4px; overflow: hidden; }
-.lv-bar span { display: block; height: 100%; background: var(--teal); }
-.unlock-path + .unlock-path { margin-top: 18px; }
-.unlock-path h4 { margin: 0 0 4px; font-size: 15px; font-weight: 400; letter-spacing: .06em; }
 
 .journey-grid { display: grid; grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1fr); gap: 20px; align-items: center; }
 .journey-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }

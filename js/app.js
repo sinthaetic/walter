@@ -73,18 +73,6 @@
   // Små belopp med ören (624,77), stora i hela kronor
   const amount = (v) => new Intl.NumberFormat("sv-SE", { maximumFractionDigits: Math.abs(v) < 10000 ? 2 : 0 }).format(v);
 
-  const daysSince = (iso) => {
-    const start = new Date(iso + "T00:00:00");
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return Math.floor((now - start) / 86400000) + 1;
-  };
-
-  // true = uppfyllt (grön), false = inte (röd), null = väntar på data (streckad)
-  const check = (ok) => ok === null || ok === undefined
-    ? '<span class="dot" title="Väntar på data"></span>'
-    : ok ? '<span class="dot green" title="Uppfyllt"></span>'
-         : '<span class="dot red" title="Inte uppfyllt"></span>';
 
   // ---------- Tema (ljust standard, mörkt via knappen) ----------
   const themeBtn = $("theme");
@@ -111,8 +99,6 @@
   const red = S.lampScore.red;
   const total = LAMPS;
   const lampCountOk = S.lamps.length === LAMPS && S.lampScore.total === LAMPS;
-  const green = total - red;
-  const days = daysSince(S.startDate);
   const parked = S.mode === "PARKERA";
   const start = pf.start;
   // Insättningar och marknadsvinst (gain(), längst ner): bara det som är över insättningarna är marknadsvinst –
@@ -194,7 +180,8 @@
   // ÖVERSIKT
   // ================================================================
   // Autopiloten: det stora ordet är vad Walter gör. Lamporna säger hur marknaden mår.
-  const MOOD = (E && E.MOODS && E.MOODS[S.mode]) || "okänd";
+  // Marknadsläget från lamporna nu (förslaget räknar det varje hämtning); journalens läge uppdateras bara vid affärer
+  const MOOD = (E && E.MOODS && E.MOODS[(AUTO && S.proposal && S.proposal.mode) || S.mode]) || "okänd";
   $("status-line").textContent = (AUTO ? "UPPDATERAD " : "STATUS · ") + (S.fetchedAt ? dotStamp(S.fetchedAt) : day(S.updatedAt));
   // Autopiloten: AUTOPILOT är en liten status (den står likadant varje dag) – dagens mening under den är hjälten
   $("mode").classList.toggle("small", AUTO);
@@ -645,86 +632,6 @@
     <p class="small" style="margin-top:16px">${AUTO
       ? `Investerat ${nf(0).format(invested * 100)} %. Strecket visar autopilotens mål. Inom ${apBand} procentenheter från målet rör jag ingenting.`
       : `Investerat ${nf(0).format(invested * 100)} %. På Level ${S.level} är taket ${nf(0).format(levelCap * 100)} %, eftersom bara upplåsta tillgångar räknas. Max ${S.rules.maxInvested * 100} % nås först på Level 3. Strecket visar tak (eller golv för kontanter).`}</p>`;
-
-  // ---------- Nivåer ----------
-  // Upplåsning räknas ALLTID på marknadsvinst över insättningarna – insättningar låser aldrig upp.
-  // Level 2: en av vägarna i rules.unlock räcker. Level 3: +levels.3.gainPct % och drawdown under levels.3.maxDd.
-  // Beloppen räknas här (inte fasta i state.json), så en ny insättning flyttar kraven med sig.
-  const LV = S.levels || {};
-  const u = S.rules.unlock;
-  const krFor = (p) => kr(deposits * p / 100);
-  const gainCond = (p) => [`Marknadsvinst ${nf(0).format(Math.max(0, marketPct))} % / ${p} % (krävs +${krFor(p)} över insättningarna ${kr(deposits)})`, marketPct >= p];
-  const paths = [
-    { name: "Tidig väg", conds: [
-      [`Minst ${u.early.days} dagar (dag ${days})`, days >= u.early.days],
-      gainCond(u.early.gainPct),
-      [`Drawdown under ${u.early.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.early.maxDd],
-      [`Minst ${u.early.minGreen}/${total} gröna lampor (nu ${green})`, green >= u.early.minGreen]
-    ] },
-    { name: "Normal väg", conds: [
-      [`Minst ${u.normal.days} dagar (dag ${days})`, days >= u.normal.days],
-      gainCond(u.normal.gainPct),
-      [`Drawdown under ${u.normal.maxDd} % (nu ${nf(1).format(dd)} %)`, dd < u.normal.maxDd]
-    ] }
-  ];
-  const lv3 = LV[3] || null;
-  const lvUnlocked = (n) => n === 1
-    || (n === 2 && marketGain > 0 && paths.some((p) => p.conds.every(([, ok]) => ok === true)))
-    || (n === 3 && lv3 != null && marketGain > 0 && marketPct >= lv3.gainPct && dd < lv3.maxDd);
-  // Närmaste vägens vinstkrav till Level 2 (används i nivåerna och i planen)
-  const lv2Gain = Math.min(u.early.gainPct, u.normal.gainPct);
-
-  // Guld är skyddet: önskas när oron är hög (VIX över gränsen eller S&P under sitt snitt). null = väntar på data.
-  const g = S.rules.gold;
-  const vixHigh = m.vix.value == null ? null : m.vix.value > g.vixAbove;
-  const spxLow = m.spx.belowMa == null ? null : m.spx.belowMa;
-  const goldWanted = vixHigh === true || spxLow === true ? true : vixHigh === null || spxLow === null ? null : false;
-
-  // Låst level: villkoren visas släckta ("tänds" först när leveln är upplåst)
-  const lockedDot = '<span class="dot" title="Låst tills leveln är upplåst"></span>';
-  const lv2Profit = deposits * lv2Gain / 100;
-  const lv2pct = lv2Profit > 0 ? Math.min(100, Math.max(0, marketGain) / lv2Profit * 100) : 0;
-  const levels = [
-    { n: 1, name: "Level 1 · Bitcoin", tag: "BTC max 35 % · kontant minst 25 %", conds: [
-      ["Aktiv från start", true],
-      [`Walter vilar inte (färre än ${S.rules.parkeraAtRed}/${total} röda lampor${isUser ? "" : " i journalen"})`, !parked]
-    ] },
-    { n: 2, name: "Level 2 · Ethereum", tag: "ETH 20 %", bar: lvUnlocked(2) ? null : lv2pct, conds: [
-      [`Upplåst: tidig eller normal väg klar (marknadsvinst nu ${kr(Math.max(0, marketGain))} av ${kr(lv2Profit)})`, lvUnlocked(2), true],
-      ["BTC är LONG", m.btcLong],
-      ["ETH/BTC över 30-dagars snitt", m.ethBtcAbove30dMa],
-      [`Högst ${S.rules.ethMaxRed} röda lampor (nu ${red})`, red <= S.rules.ethMaxRed]
-    ] },
-    { n: 3, name: "Level 3 · Guld", tag: "PAXG / XAUT 20 % · även när Walter vilar", conds: [
-      [`Upplåst: +${lv3 ? lv3.gainPct : "?"} % marknadsvinst (${kr(Math.max(0, marketGain))} / ${lv3 ? krFor(lv3.gainPct) : "?"})`, lvUnlocked(3), true],
-      [`Oro: VIX över ${g.vixAbove} (nu ${m.vix.value != null ? nf(1).format(m.vix.value) : "?"}) eller S&P 500 under 50-dagarssnitt`, goldWanted]
-    ] }
-  ];
-  // Autopiloten har inga nivåer (allt köps från dag 1): korten döljs i stället för att säga "inte aktivt"
-  $("unlock").hidden = AUTO;
-  $("levels").hidden = AUTO;
-  if (!AUTO) $("levels").innerHTML = `
-    <h3>NIVÅER</h3>
-    <p class="explain">Walter får handla med fler tillgångar först när han har tjänat pengar på marknaden. Insättningar låser aldrig upp något.</p>
-    ${levels.map((l) => `
-      <div class="level${l.n === S.level ? " current" : ""}">
-        <div class="level-head"><b>${l.name}${l.n === S.level ? " · nu" : ""}</b><span>${esc(l.tag)}</span></div>
-        ${l.bar != null ? `<div class="lv-bar" role="progressbar" aria-label="Marknadsvinst mot Level 2" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(l.bar)}"><span style="width:${l.bar}%"></span></div>` : ""}
-        <ul class="conds">${l.conds.map(([t, ok, gate]) => `<li>${gate || lvUnlocked(l.n) ? check(ok) : lockedDot}<span>${esc(t)}</span></li>`).join("")}</ul>
-      </div>`).join("")}`;
-
-  // ---------- Vägen till Level 2 ----------
-  if (!AUTO) $("unlock").innerHTML = `
-    <h3>VÄGEN TILL LEVEL 2</h3>
-    <p class="small">En av vägarna räcker.</p>
-    <p class="explain"><b>Drawdown:</b> Hur långt värdet har fallit från sin högsta punkt.</p>
-    ${paths.map((p) => {
-      const done = p.conds.filter(([, ok]) => ok === true).length;
-      return `<div class="unlock-path" style="margin-top:14px">
-        <h4>${p.name} <span class="small">· ${done}/${p.conds.length}</span></h4>
-        <ul class="conds">${p.conds.map(([t, ok]) => `<li>${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul>
-      </div>`;
-    }).join("")}`;
 
   // ---------- Resan: fas 1 och fas 2 som två grafer med ett brott emellan ----------
   // Faser: capitalChange i state.json delar historiken. Före = fas 1 (paper-test), från och med = fas 2.
