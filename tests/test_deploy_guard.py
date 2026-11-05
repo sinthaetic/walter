@@ -87,7 +87,8 @@ class OwnerEncTest(unittest.TestCase):
     def test_allow_has_no_private_files(self):
         self.assertEqual(wd.ALLOW, ["index.html", "cipher.html", "css", "js", "assets",
                                     "tradingview/w-cipher.pine", "tradingview/w-cipher-a.pine",
-                                    "data/market.js", "data/cache.json", "data/pulse.js", "data/owner.enc"])
+                                    "data/market.js", "data/cache.json", "data/pulse.js", "data/owner.enc",
+                                    "data/news.js"])
 
     def test_pulse_js_passes_leak_check(self):
         """data/pulse.js (bara datum och heltal) är tillåten och stoppas inte av läckspärren."""

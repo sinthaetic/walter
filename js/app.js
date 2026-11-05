@@ -1054,6 +1054,25 @@
   statsReady = true;
   renderProStats();
 
+  // ---------- Krypto-rubriker (data/news.js) ----------
+  // Bara rubrik, källa och tid, med länk till artikeln. Nyheterna ändrar inget i Walter.
+  (() => {
+    const N = window.WALTER_NEWS, el = $("pro-news");
+    const list = N && Array.isArray(N.items) ? N.items.filter((i) => i && /^https:\/\//.test(i.url) && i.t) : [];
+    if (!el || !list.length) return;
+    const ago = (iso) => {
+      const h = Math.max(0, Math.round((Date.now() - new Date(iso)) / 36e5));
+      return h < 1 ? "nyss" : h < 24 ? `${h} tim sedan` : day(iso.slice(0, 10));
+    };
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="panel-head"><span>KRYPTO-RUBRIKER</span><span class="num">${N.updatedAt ? esc(ago(N.updatedAt).toUpperCase()) : ""}</span></div>
+      <ul class="news-list">${list.map((i) => `
+        <li><a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.t)}</a>
+          <span class="small">${esc(i.src || "")} · ${esc(ago(i.at || ""))}</span></li>`).join("")}</ul>
+      <p class="small">Rubrikerna kommer från CoinDesk, Cryptonews och DI. De ändrar inget i Walters affärer.</p>`;
+  })();
+
   // ================================================================
   // K4 – underlag (PAPER). Hela kronor som fetcher/walter_k4.py: försäljning efter avgift, omkostnad.
   // ================================================================

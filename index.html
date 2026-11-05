@@ -162,6 +162,9 @@
       <!-- Statistik (js/app.js renderProStats): nästa justering, värdet över tid, avgifter/skatt, du mot Walter -->
       <div id="pro-stats"></div>
 
+      <!-- Krypto-rubriker (data/news.js, fetcher/walter_news.py i Actionen). Dolt när filen saknas. -->
+      <section class="panel pro-news" id="pro-news" aria-label="Krypto-rubriker" hidden></section>
+
       <details class="pro-lamps-box">
         <summary>TIO LAMPOR · VÄRDENA BAKOM</summary>
         <div id="pro-lamps"></div>
@@ -193,6 +196,7 @@
   <script src="data/market.js" onerror="void 0"></script>
   <script src="data/state.js" onerror="void 0"></script>
   <script src="data/pulse.js" onerror="void 0"></script>
+  <script src="data/news.js" onerror="void 0"></script>
   <!-- Lightweight Charts (samma version + integrity som cipher.html) laddas utan att blockera: js/cipher-chart.js loadChartLib -->
   <script src="js/wcipher.js"></script>
   <script src="js/cipher-chart.js"></script>

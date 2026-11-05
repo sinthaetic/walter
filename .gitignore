@@ -22,3 +22,6 @@ graphify-out/
 # Skisser från brainstorm
 .superpowers/
 backtest/cache/
+
+# Rubriker till Pro, byggs i Actionen (fetcher/walter_news.py)
+data/news.js

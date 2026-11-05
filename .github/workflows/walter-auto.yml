@@ -135,6 +135,12 @@ jobs:
           WALTER_OWNER_KEY: ${{ secrets.WALTER_OWNER_KEY }}
         run: python fetcher/walter_notis.py
 
+      # Krypto-rubriker till Pro (data/news.js). Ett fel här får aldrig stoppa publiceringen.
+      - name: Nyheter (rubriker till Pro)
+        if: steps.gate.outputs.run == 'true'
+        continue-on-error: true
+        run: python fetcher/walter_news.py
+
       - name: Bygg deploy/ och pusha gh-pages (walter deploy)
         if: steps.gate.outputs.run == 'true'
         env:

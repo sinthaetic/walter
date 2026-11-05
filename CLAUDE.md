@@ -62,7 +62,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
   Ägaren: `insattning.bat` / `walter_paper.py --insattning 500` (sync_from_repo först, vägrar gamla priser, låser state.enc, sätter owner-cache daily[i dag], pushar state.enc till main direkt via `walter_deploy.push_source`); `walter deploy` bara för sidan. Deploy stoppar vid sync "pullfail"/"local". Tester mockar ALLTID push_source/git. Användaren: knappen SÄTT IN PENGAR (översikten + Inställningar); inte färska priser = kontanter + `user.pendingDeposit`, köps i boot (`WalterUser.investPending`).
 
 ## Publicering och ägare
-- Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `tradingview/*.pine`, `data/market.js`, `data/cache.json`, `data/pulse.js`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.
+- Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `tradingview/*.pine`, `data/market.js`, `data/cache.json`, `data/pulse.js`, `data/news.js`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.
 - Utan Secret `WALTER_OWNER_KEY` hoppar Actionen över hämtning och publicering (sidan ligger kvar som den var).
 - Lokal deploy slår först ihop publicerade `owner.enc` (dagsvärden) och vägrar korta historiken. `WALTER_GLOM_GAMLA_DAGAR=1` är nödutgången vid kodbyte: lägg den ALDRIG i `.env`.
 - Boot (`js/boot.js`): `data/state.js` finns → ägare lokalt. Annars `walter.ownerKey` i localStorage (skrivs in under Inställningar) → dekryptera `owner.enc` → ägarens Walter. Annars landning (`js/landing.js`) → användarens Walter eller intro (`js/intro.js`).
@@ -72,7 +72,9 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - `js/engine.js` = trade-motorn i JS (samma regler som `walter_paper.py`), `catchUp` spelar upp missade loggdagar från `market.js` → `log` och visar en ikapp-notis. Ny användare: Walter gör sitt första drag samma dag.
 - Översikten är för den som vill att det bara ska funka (hjälten, portföljen, Walter gjorde, lampringen). Pro är för den som vill
   titta och handla själv: grafen, egen handel, statistik (`renderProStats`: nästa justering, värdet över tid, avgifter/skatt,
-  Sharpe, du mot Walter) och lamptabellen hopfälld längst ned (`#pro-lamps`).
+  Sharpe, du mot Walter), krypto-rubriker (`data/news.js` från `fetcher/walter_news.py` i Actionen: CoinDesk, Cryptonews,
+  DI filtrerat på kryptoord; bara rubrik/källa/tid/länk; rubriker med läckspärrens ord hoppas över; fel stoppar aldrig deploy)
+  och lamptabellen hopfälld längst ned (`#pro-lamps`).
 - Min egen handel (`js/manual.js` + panelen `#manual` på Pro under grafen, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
   (`walter.manual` / `walter.user.manual`), köp/sälj till Walters pris och avgift, släpande stopp −10 % som Walter sköter
   (dagspriserna i market.js `log` sedan förra besöket + dagens pris). Jämförs med Walters marknadsvinst samma tid. Rör aldrig Walters portfölj.

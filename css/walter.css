@@ -556,3 +556,9 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 .bar .band { position: absolute; top: -3px; bottom: -3px; border-radius: 3px; background: var(--teal); opacity: .16; }
 .pro-curve { width: 100%; height: auto; display: block; margin: 8px 0; }
 .pro-flow { fill: var(--teal); stroke: var(--glass-edge); stroke-width: 1.5; }
+/* Pro: krypto-rubriker */
+.pro-news { margin-top: 28px; }
+.news-list { list-style: none; margin: 8px 0 12px; padding: 0; }
+.news-list li { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.news-list a { color: var(--ink); text-decoration: none; font-size: 15px; line-height: 1.4; }
+.news-list a:hover { color: var(--teal-text); text-decoration: underline; }
