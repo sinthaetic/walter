@@ -70,6 +70,9 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 ## Walter som app (användare, steg 9)
 - Allt sparas i webbläsaren: `walter.user` (state, inkl. `savings`/`goal`), `walter.user.goal` (uttagsräknaren), `walter.ownerKey`. Inget skickas någonstans. Säkerhetskopia/inläsning finns i Inställningar (`js/user-state.js`).
 - `js/engine.js` = trade-motorn i JS (samma regler som `walter_paper.py`), `catchUp` spelar upp missade loggdagar från `market.js` → `log` och visar en ikapp-notis. Ny användare: Walter gör sitt första drag samma dag.
+- Min egen handel (`js/manual.js` + panelen `#manual` på översikten, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
+  (`walter.manual` / `walter.user.manual`), köp/sälj till Walters pris och avgift, släpande stopp −10 % som Walter sköter
+  (dagspriserna i market.js `log` sedan förra besöket + dagens pris). Jämförs med Walters marknadsvinst samma tid. Rör aldrig Walters portfölj.
 - `js/exchanges.js`: 5 MiCA-börser (Bitstamp, Bybit EU, Kraken, OKX Europe, Safello) med avgift, tillstånd och källa/datum. Alla avgifter är paper, inga riktiga pengar.
 - `js/vault.js` = dekryptering i webbläsaren (samma format som `walter_vault.py`).
 - Appens vy för användare: förklaringar i vanliga ord, "Siffrorna", Pro-läge, "Live: inte än".

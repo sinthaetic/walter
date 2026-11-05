@@ -378,6 +378,101 @@
     }
   })();
 
+  // ---------- Min egen handel (js/manual.js) ----------
+  // Egen låtsaskassa i bitcoin bredvid Walter, i den här webbläsaren (own("manual")). Walters pris och avgift.
+  // Walter sköter ett släpande stopp −10 % (dagspriserna sedan förra besöket + dagens pris) och jämförs samma tid.
+  const MAN_KEY = own("manual"), MAN = window.WalterManual;
+  const manFee = ex ? (ex.takerPct + ex.slippagePct + (ex.quote !== "SEK" ? ex.fxPct : 0)) / 100
+    : ((ruleFees.takerPct || 0) + (ruleFees.slippagePct || 0)) / 100;
+  let manMsg = "";
+  const manNum = (v) => Number(String(v).replace(/[\s ]|kr/gi, "").replace(",", "."));
+  function renderManual() {
+    const el = $("manual");
+    if (!el || !MAN) return;
+    const px = fx().btcSek, pxDay = m.btc && m.btc.asOf;
+    const fresh = px > 0 && pxDay && (Date.now() - new Date(pxDay + "T12:00:00")) / 864e5 <= 2;
+    let pot = store.get(MAN_KEY, null);
+    if (pot && MAN) {
+      const rows = ((window.WALTER_MARKET && window.WALTER_MARKET.log) || [])
+        .map((r) => ({ date: r.date, px: r.px && r.px.BTC })).filter((r) => r.px > 0);
+      const hit = MAN.checkStop(pot, rows, manFee);
+      if (!hit && fresh && pot.units && px <= pot.peakPx * (1 - MAN.STOP)) MAN.sell(pot, Infinity, px, manFee, isoToday, "stopp");
+      else if (fresh && pot.units) pot.peakPx = Math.max(pot.peakPx || 0, px);
+      const last = pot.trades[pot.trades.length - 1];
+      if (last && last.why === "stopp" && !pot.stopSeen) {
+        manMsg = `Walter sålde din bitcoin ${day(last.date)}: priset föll 10 % från toppen (${kr(last.px)}).`;
+        pot.stopSeen = true;
+      }
+      if (last && last.why !== "stopp") pot.stopSeen = false;
+      store.set(MAN_KEY, pot);
+    }
+    if (!pot) {
+      el.innerHTML = `
+        <h3>MIN EGEN HANDEL</h3>
+        <p class="plain">Testa ditt eget öga mot Walter.</p>
+        <p class="plain">En egen låtsaskassa i bitcoin: du köper och säljer, Walter säljer åt dig om priset faller 10 % från toppen.</p>
+        <div class="man-row">
+          <input class="input num" id="man-start" type="text" inputmode="numeric" autocomplete="off" value="10 000" aria-label="Startbelopp i kronor">
+          <button type="button" class="btn btn-primary" id="man-go">STARTA</button>
+        </div>
+        <p class="small msg" id="man-msg" aria-live="polite">Låtsaspengar (PAPER). Walters egna pengar rörs inte.</p>`;
+      $("man-go").onclick = () => {
+        const sek = Math.round(manNum($("man-start").value));
+        if (!(sek >= 100 && sek <= 1e8)) { $("man-msg").textContent = "Skriv ett belopp mellan 100 kr och 100 000 000 kr."; return; }
+        store.set(MAN_KEY, MAN.create(sek, isoToday, { value: pf.value, gain: marketGain }));
+        renderManual();
+      };
+      return;
+    }
+    const val = MAN.value(pot, px); // senast kända pris; färskheten styr bara om man får handla
+    const mine = (val / pot.startSek - 1) * 100;
+    const w = pot.walter || { value: pf.value, gain: marketGain };
+    const his = w.value > 0 ? (marketGain - w.gain) / w.value * 100 : 0;
+    const stop = MAN.stopPx(pot);
+    el.innerHTML = `
+      <div class="panel-head"><span>MIN EGEN HANDEL · BITCOIN</span><span class="num">SEDAN ${esc(day(pot.since).toUpperCase())}</span></div>
+      <div class="kv">
+        <div><span>KASSA</span><strong>${kr(pot.cash)}</strong></div>
+        <div><span>BITCOIN</span><strong>${kr(pot.units * (px || 0))}</strong></div>
+        <div><span>DU</span><strong>${pct(mine, 1)}</strong></div>
+        <div><span>WALTER SAMMA TID</span><strong>${pct(his, 1)}</strong></div>
+      </div>
+      <p class="small">${stop ? `Stopp: Walter säljer allt under ${kr(stop)} (10 % under toppen ${kr(pot.peakPx)}).` : "Ingen bitcoin just nu – inget stopp."} Före skatt, efter avgift (${nf(2).format(manFee * 100)} % per affär).</p>
+      <div class="man-row">
+        <input class="input num" id="man-sek" type="text" inputmode="numeric" autocomplete="off" placeholder="Summa i kr" aria-label="Summa i kronor"${fresh ? "" : " disabled"}>
+        <button type="button" class="btn btn-primary" id="man-buy"${fresh ? "" : " disabled"}>KÖP</button>
+        <button type="button" class="btn" id="man-sell"${fresh && pot.units ? "" : " disabled"}>SÄLJ</button>
+        <button type="button" class="btn" id="man-all"${fresh && pot.units ? "" : " disabled"}>SÄLJ ALLT</button>
+      </div>
+      <p class="small msg" id="man-msg" aria-live="polite">${esc(fresh ? manMsg || `Pris ${kr(px)} (${day(pxDay)}).` : "Priset är inte färskt. Tryck UPPDATERA under Status först.")}</p>
+      ${pot.trades.length ? `<ul class="rows man-trades">${pot.trades.slice(-5).reverse().map((t) => `<li><span>${day(t.date)} · ${t.side === "köp" ? "Köpte" : t.why === "stopp" ? "Walter sålde (stopp)" : "Sålde"}</span><span class="num">${kr(t.sek)}</span></li>`).join("")}</ul>` : ""}
+      <button type="button" class="link-btn small" id="man-end">Avsluta egen handel</button>`;
+    manMsg = "";
+    const act = (fn) => () => {
+      const ok = fn();
+      if (ok === false) return;
+      store.set(MAN_KEY, pot);
+      renderManual();
+    };
+    $("man-buy").onclick = act(() => {
+      const sek = manNum($("man-sek").value);
+      if (!MAN.buy(pot, sek, px, manFee, isoToday)) { $("man-msg").textContent = `Skriv en summa upp till ${kr(pot.cash)}.`; return false; }
+      manMsg = `Köpte bitcoin för ${kr(sek)}.`;
+    });
+    $("man-sell").onclick = act(() => {
+      const sek = manNum($("man-sek").value);
+      if (!(sek >= 1) || !MAN.sell(pot, sek, px, manFee, isoToday)) { $("man-msg").textContent = "Skriv hur mycket bitcoin (i kronor) du vill sälja."; return false; }
+      manMsg = `Sålde bitcoin för ${kr(Math.min(sek, pot.trades[pot.trades.length - 1].sek))}.`;
+    });
+    $("man-all").onclick = act(() => { MAN.sell(pot, Infinity, px, manFee, isoToday); manMsg = "Sålde all bitcoin."; });
+    $("man-end").onclick = () => {
+      if ($("man-end").dataset.sure !== "1") { $("man-end").dataset.sure = "1"; $("man-end").textContent = "Säker? Tryck igen för att ta bort kassan"; return; }
+      try { localStorage.removeItem(MAN_KEY); } catch { /* lagring blockerad */ }
+      renderManual();
+    };
+  }
+  renderManual();
+
   // ---------- Tio lampor ----------
   // Förklaringar i vanliga ord (under varje lampa på översikten och i Pro-fliken)
   const EXPLAIN = {
@@ -504,6 +599,7 @@
     } else failedSrc.push("valutakurser");
     renderPrices();
     renderGoal();
+    renderManual();
     if (got.length) $("status-time").textContent = stamp(now.toISOString()) + " (kurser)";
     $("status-msg").innerHTML =
       (got.length ? `Färskt ${stamp(now.toISOString())}: ${esc(got.join(" · "))}. ` : "") +

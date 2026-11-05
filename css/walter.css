@@ -540,3 +540,12 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* ---------- Min egen handel (översikten, js/manual.js) ---------- */
+.manual-panel { margin-top: 28px; }
+.manual-panel .kv { margin: 12px 0; }
+.man-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.man-row .input { flex: 1 1 140px; min-width: 0; }
+.man-trades { margin-top: 12px; }
+.link-btn { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; padding: 0; border: 0; background: none;
+  color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
