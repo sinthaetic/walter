@@ -97,7 +97,8 @@
       isObj(pf.positions) && Object.values(pf.positions).every(positionOk) &&
       (pf.firstTrade === null || pf.firstTrade === undefined || isDate(pf.firstTrade)) &&
       allOk(pf.history, historyOk) && optional(u, "savings", (s) => savingsOk(s, u.startDate)) && optional(u, "goal", goalOk) &&
-      optional(u, "pendingDeposit", (v) => fin(v) && v >= 0 && v <= 1e10);
+      optional(u, "pendingDeposit", (v) => fin(v) && v >= 0 && v <= 1e10) &&
+      optional(u, "risk", (v) => v === null || v === "vagad");
     if (!ok) throw new Error(NOT_A_COPY);
     return u;
   }

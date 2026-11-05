@@ -396,6 +396,8 @@
     const px = fx().btcSek, pxDay = m.btc && m.btc.asOf;
     const fresh = px > 0 && pxDay && (Date.now() - new Date(pxDay + "T12:00:00")) / 864e5 <= 2;
     let pot = store.get(MAN_KEY, null);
+    // En kassa i fel form (äldre version, handredigerad) räknas som ingen kassa, så att resten av sidan alltid ritas
+    if (pot && (typeof pot !== "object" || !Array.isArray(pot.trades) || !(pot.startSek > 0))) pot = null;
     if (pot && MAN) {
       const rows = ((window.WALTER_MARKET && window.WALTER_MARKET.log) || [])
         .map((r) => ({ date: r.date, px: r.px && r.px.BTC })).filter((r) => r.px > 0);
@@ -1000,7 +1002,7 @@
     // 4. Du mot Walter (egen handel)
     const pot = store.get(MAN_KEY, null), px = fx().btcSek;
     let duel = "";
-    if (pot) {
+    if (pot && Array.isArray(pot.trades) && pot.startSek > 0) {
       const val = MAN.value(pot, px), mine = val - pot.startSek;
       const w = pot.walter || { value: pf.value, gain: marketGain }, his = marketGain - w.gain;
       const sells = pot.trades.filter((t) => t.side === "sälj"), wins = sells.filter((t) => t.gainSek > 0);

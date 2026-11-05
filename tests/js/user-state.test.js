@@ -153,6 +153,8 @@ test("import_rejects_bad_shapes", () => {
     return u;
   };
   eq(WU().importText(JSON.stringify(good())).start, 10000); // utgångsläget är giltigt
+  eq(WU().importText(JSON.stringify(Object.assign(good(), { risk: "vagad" }))).risk, "vagad");
+  eq(WU().importText(JSON.stringify(Object.assign(good(), { risk: null }))).risk, null);
   const bad = [
     (u) => { u.journal = [{}]; },
     (u) => { u.journal[0].red = "<img src=x onerror=alert(1)>"; },
@@ -167,6 +169,8 @@ test("import_rejects_bad_shapes", () => {
     (u) => { u.portfolio.holdings.BTC = null; },
     (u) => { u.portfolio.positions.BTC = { units: "1", costSek: 0 }; },
     (u) => { u.level = "<i>"; },
+    (u) => { u.risk = "constructor"; },   // granskning nov 2026: gav NaN-andelar i motorn
+    (u) => { u.risk = "VAGAD"; },
     (u) => { u.startDate = "igår"; },
     (u) => { u.trades = [{ date: "2026-10-23" }]; }
   ];

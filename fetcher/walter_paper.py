@@ -55,12 +55,20 @@ def suggest_mode(red, current, rules):
 
 
 # ---------- Priser och värde ----------
-def prices_sek(m):
-    """Pris i SEK per enhet. None = väntar på data (då handlas inte den tillgången)."""
-    fx = (m.get("usdsek") or {}).get("value")
-    btc = (m.get("btc") or {}).get("value")
+def prices_sek(m, today=None, rules=None):
+    """Pris i SEK per enhet. None = väntar på data (då handlas inte den tillgången).
+    Med today: ett pris vars asOf är för gammalt blir None, så att Walter aldrig handlar på gårdagens pris när en
+    källa inte svarat (hämtarens fetchedAt sätts så fort NÅGON källa svarar). Krypto (dygnet runt): högst 1 dag.
+    Valutakursen (Riksbanken, inte helger): lampMaxAgeDays.default (4). Utan asOf (historiktestet) räknas priset."""
+    def ok(key, max_age):
+        as_of = _iso(((m.get(key) or {}).get("asOf") or "")[:10])
+        return today is None or as_of is None or (date.fromisoformat(today) - as_of).days <= max_age
+
+    fx_age = ((rules or {}).get("lampMaxAgeDays") or {}).get("default", 4)
+    fx = (m.get("usdsek") or {}).get("value") if ok("usdsek", fx_age) else None
+    btc = (m.get("btc") or {}).get("value") if ok("btc", 1) else None
     eth_btc = (m.get("ethBtc") or {}).get("value")
-    gold = (m.get("gold") or {}).get("value")  # PAXG i USD (CoinGecko pax-gold)
+    gold = (m.get("gold") or {}).get("value") if ok("gold", 1) else None  # PAXG i USD (CoinGecko pax-gold)
     return {
         "BTC": btc * fx if btc and fx else None,
         "ETH": eth_btc * btc * fx if eth_btc and btc and fx else None,
@@ -320,7 +328,7 @@ def propose_deposit(state, today, sek, assets=None):
     Lamp-strategin: bara kontanter. Ändrar ingenting. Samma kod som js/engine.js proposeDeposit."""
     r, pf = state["rules"], state["portfolio"]
     sek = float(sek)
-    px = prices_sek(state["market"])
+    px = prices_sek(state["market"], today, r)
     hold, total = valuation(pf, px)
     invest = strategy_of(r) == "autopilot"
     trades, waiting = [], []
@@ -450,7 +458,7 @@ def propose_autopilot(state, today, assets=None):
     lamps_ok = score.get("source") == "data"
     red = score["red"] if lamps_ok else None
     mode = suggest_mode(red, current, r) if lamps_ok else current
-    px = prices_sek(m)
+    px = prices_sek(m, today, r)
     # Målläget: andelarna krymper mot kontanter de sista 24 månaderna före målets datum
     glide = glide_factor(state.get("goal"), today)
     weights, missing = weights_for(r, assets, glide, state.get("risk"))
@@ -513,7 +521,7 @@ def propose_lamps(state, today):
 
     red, current = score["red"], state["mode"]
     mode = suggest_mode(red, current, r)
-    px = prices_sek(m)
+    px = prices_sek(m, today, r)
     hold, total = valuation(pf, px)
     share = {"OFFENSIV": 1, "NORMAL": r["modes"]["littleShare"], "AVVAKTAR": None, "PARKERA": 0}[mode]
     level = state["level"]

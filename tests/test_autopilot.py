@@ -64,6 +64,19 @@ class AutopilotTest(unittest.TestCase):
         self.assertAlmostEqual(p["value"], 26000 + 38000 * 0.9 + 18000 * 0.9 + 18000, places=1)
         self.assertEqual(p["history"][-1]["value"], p["value"])
 
+    def test_old_crypto_price_waits(self):
+        # Granskning nov 2026: CoinGecko svarade inte, men andra källor gjorde det -> gamla priser såg färska ut
+        p = pf(25000, {"BTC": 41000, "ETH": 17000, "GOLD": 17000})  # utanför bandet: skulle sälja BTC
+        st = state(p)
+        st["market"]["btc"]["asOf"] = "2026-10-20"
+        st["market"]["gold"]["asOf"] = "2026-10-20"
+        st["market"]["usdsek"]["asOf"] = "2026-10-23"  # fredag: Riksbanken uppdaterar inte på helgen, ok
+        prop = wp.propose(st, today=SUNDAY)
+        self.assertEqual(prop["trades"], [])
+        self.assertIsNone(wp.prices_sek(st["market"], SUNDAY, RULES)["BTC"])
+        st["market"]["btc"]["asOf"] = st["market"]["gold"]["asOf"] = "2026-10-24"  # i går: ok
+        self.assertEqual([(t["asset"], t["side"]) for t in wp.propose(st, today=SUNDAY)["trades"]], [("BTC", "sälj")])
+
     def test_sunday_outside_band_sells_back_to_weight(self):
         p = pf(25000, {"BTC": 41000, "ETH": 17000, "GOLD": 17000})
         prop = wp.propose(state(p), today=SUNDAY)
