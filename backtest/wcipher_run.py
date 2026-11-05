@@ -74,8 +74,9 @@ class Tape:
             u, e = usdsek(d), eursek(d)
             self.fx[d] = (u / e, e) if u and e else None
 
-    def target(self, i, variant, mode):
-        """Önskad position efter stapel i: 1 lång, 0 kontant, -1 kort, None = ingen ny signal."""
+    def target(self, i, variant, mode, pos=0):
+        """Önskad position efter stapel i: 1 lång, 0 kontant, -1 kort, None = ingen ny signal.
+        pos = nuvarande position (används av regelboken i backtest/regelbok_run.py, inte här)."""
         k = self.kinds.get(i)
         if not k:
             return None
@@ -108,6 +109,7 @@ def run_wc(tape, variant, mode, start, end, start_sek=100000, exchange=KRAKEN):
     units = 0.0
     entry = None       # {"i", "px", "equity", "cost_sek"}
     pending = None
+    pending_stop = None  # stopp-nivå (USD) från tape.stops, sätts på positionen när den öppnas
     paid = set()
     last_year = int(tape.days[a][:4])
     trips, bars_in, worst_adverse = [], 0, 0.0
@@ -219,6 +221,7 @@ def run_wc(tape, variant, mode, start, end, start_sek=100000, exchange=KRAKEN):
                 close(i, p_open, d, "signal")
             if pending and not dead and cash > 0:
                 open_(i, p_open, d, pending)
+                entry["stop"] = pending_stop
         pending = None
         y = int(d[:4])
         if y > last_year:
@@ -227,6 +230,13 @@ def run_wc(tape, variant, mode, start, end, start_sek=100000, exchange=KRAKEN):
                     pay_tax(i, d, yy)
             last_year = y
         p = tape.c[i] * q_
+        # Stopp-förlust (bara när tapen har stopp): stängs på stoppnivån, eller öppningen om priset gapade förbi
+        if pos and entry.get("stop"):
+            s_ = entry["stop"] * q_
+            if pos > 0 and tape.lo[i] * q_ <= s_:
+                close(i, min(p_open, s_), d, "stopp")
+            elif pos < 0 and tape.h[i] * q_ >= s_:
+                close(i, max(p_open, s_), d, "stopp")
         if pos:
             bars_in += 1
             hi, lo = tape.h[i] * q_, tape.lo[i] * q_
@@ -244,9 +254,10 @@ def run_wc(tape, variant, mode, start, end, start_sek=100000, exchange=KRAKEN):
         res.tax_out[d] = res.tax_sek
         if i == b - 1:
             break
-        t = tape.target(i, variant, mode)
+        t = tape.target(i, variant, mode, pos)
         if t is not None:
             pending = t
+            pending_stop = getattr(tape, "stops", {}).get(i)
 
     d = tape.days[b - 1]
     if pos:

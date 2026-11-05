@@ -397,3 +397,24 @@ Samma motor, avgifter och skatt som del 5. Veckoljus byggs av dagsljusen (månda
 
 Mer krypto gav mer pengar i historiken, eftersom bitcoin steg ungefär 100 gånger. Priset är större fall (70–78 %), och de 10 % sämsta
 starterna blev lite sämre. Det är ett ärligt val om risk, inte en smartare signal.
+
+## Market Cipher-regelboken från guiderna (del 5c, 5 nov 2026)
+Ägaren bad oss läsa quantzee.com/how-to-use-market-cipher och tradelogic.pro/blog/market-cipher-b-complete-guide.html
+(videon på archive.org har ingen text och gick inte att läsa). Tre saker som del 5 saknade, alla om blankningen som tömde kontot:
+trendfilter (handla bara åt Cipher A-trendens håll), stopp-förlust (under bottnen / över toppen) och ankare + trigger
+("double dip": grön prick, sedan en grundare botten). Ingen av guiderna visar ett historiktest eller en träffprocent.
+Regeln bestämdes innan körningen (`backtest/regelbok_run.py`). Förenklat bort: delvinster, volym, stöd/motstånd.
+
+| Regelboken (kr per 100 000 kr) | 2014–2019 | 2020–idag | Median 44 starter | 10 % sämsta | Största fall | Kontot tömt | Rundor/år |
+|---|---|---|---|---|---|---|---|
+| Dag, bara köp | 64 000 | 73 000 | 73 000 | 64 000 | 64 % | 0 av 44 | 1 |
+| Dag, köp + blanka | 55 000 | 123 000 | 100 000 | 72 000 | 64 % | 0 av 44 | 2 |
+| 4 h, bara köp | 51 000 | 57 000 | 46 000 | 38 000 | 79 % | 0 av 44 | 10 |
+| 4 h, köp + blanka | 95 000 | 91 000 | 82 000 | 68 000 | 52 % | 0 av 44 | 19 |
+| Jämför: autopiloten | 1 213 000 | 573 000 | 524 000 | 143 000 | 55 % | aldrig | – |
+
+- Trendfilter och stopp gjorde det de lovar: kontot tömdes aldrig, och fallen blev mindre än för blankning utan stopp.
+- Men regeln tjänade inte pengar. Bästa varianten (dag, köp + blanka) slutade runt insatsen, medan autopiloten femdubblade den.
+  Stoppen tar ofta ut en innan uppgången, och efter avgifter och skatt finns ingen fördel kvar.
+- Det som saknas i testet är det ägaren gör med ögat: välja bort dåliga signaler, stöd/motstånd och delvinster. Det går inte att
+  skriva som regel utan att lura sig själv i efterhand. Rättvisa provet är en provbot på låtsaspengar framåt i tiden.
