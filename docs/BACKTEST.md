@@ -435,3 +435,15 @@ som trend blev det 0 affärer (en djup dipp vänder alltid det snabba bandet). S
 Ingen variant tjänade pengar efter avgifter och skatt; kontot tömdes aldrig (stoppen). Riskkalkylatorn (1–2 % risk per affär,
 låg hävstång) styr hur stort man förlorar, inte om man vinner. Claude-bot-artiklarna redovisar inga riktiga resultat; den ena
 körs bara på låtsas och ligger efter köp-och-behåll i uppgångar. Båda råder 60–90 dagars provhandel innan riktiga pengar.
+
+## "Blood in the Water" (del 5e, 5 nov 2026)
+Källa: thrive.fi/blog/trading/market-cipher. Närmast ägarens egen regel: vågen under −75, köp på andra/tredje gröna pricken,
+stopp under botten, sälj vid nollinjen (`backtest/blood_run.py`, bestämd innan körningen, bara köp).
+
+| Kr per 100 000 kr | 2014–2019 | 2020–idag | Median 44 starter | Träff | Vinst / förlust | Rundor/år |
+|---|---|---|---|---|---|---|
+| Dag | 98 000 | 99 000 | 91 000 | 33 % | +6,9 % / −6,2 % | 1,6 |
+| 4 h | 53 000 | 38 000 | 44 000 | 24 % | +2,4 % / −3,5 % | 9,6 |
+
+Guidens påstådda träff för de bästa signalerna (60–68 %) har ingen källa, inget urval och inga avgifter. Här träffade en av
+tre, och pengarna låg ute bara 2 % av tiden – så när botten väl höll missade regeln uppgången efter nollinjen.
