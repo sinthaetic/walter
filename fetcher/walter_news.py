@@ -1,8 +1,8 @@
 """Krypto-rubriker till Pro-sidan: data/news.js (window.WALTER_NEWS), byggd i Actionen före deploy.
 Bara rubrik, källa, tid och länk – aldrig artikeltext. Nyheterna ändrar inget i Walter.
 Källor (RSS): CoinDesk, Cryptonews, och DI filtrerat på kryptoord (DI har inget eget kryptoflöde; Cryptofeber har stängt sitt).
-Rubriker med ord som publiceringens läckspärr letar efter (walter_deploy.PRIVATE_WORDS) hoppas över, så att en rubrik
-som "Wall Street Journal" aldrig stoppar deployen.
+Poster (rubrik, länk eller källa) med ord som publiceringens läckspärr letar efter (walter_deploy.PRIVATE_WORDS och
+BLOCK) hoppas över, så att t.ex. "Wall Street Journal" eller en länk med "daily" aldrig stoppar deployen.
 Kör: python fetcher/walter_news.py   (ett fel i en källa hoppar bara över den källan)
 """
 import json
@@ -22,8 +22,15 @@ FEEDS = [
     ("DI", "https://www.di.se/rss", re.compile(r"krypto|bitcoin|ethereum|stablecoin|blockkedja", re.I)),
 ]
 KEEP = 12
-# Samma ord som walter_deploy.PRIVATE_WORDS (inte importerat: deploy-modulen laddar hela hämtaren)
-BLOCKED = ["journal", "portfolio", "k4", "capitalchange", "daily", "notis", "proposal", "walter_owner_key"]
+# Samma ord som walter_deploy.PRIVATE_WORDS + BLOCK-namnen (inte importerat: deploy-modulen laddar hela hämtaren).
+# Jämförs utan skiftläge, alltså strängare än läckspärren. tests/test_news.py håller listorna lika.
+BLOCKED = ["journal", "portfolio", "k4", "capitalchange", "daily", "notis", "proposal", "walter_owner_key",
+           ".env", "etf_raw.json", "state.json", "state.js", "owner-cache.json", "paper-journal-"]
+
+
+def blocked(item):
+    text = json.dumps(item, ensure_ascii=False).lower()
+    return any(w in text for w in BLOCKED)
 
 
 def items(source, url, only=None, timeout=15):
@@ -42,9 +49,9 @@ def items(source, url, only=None, timeout=15):
             continue
         if only and not only.search(title):
             continue
-        if any(w in title.lower() for w in BLOCKED):
-            continue
-        out.append({"t": title[:200], "url": link, "src": source, "at": at.strftime("%Y-%m-%dT%H:%M:%SZ")})
+        item = {"t": title[:200], "url": link, "src": source, "at": at.strftime("%Y-%m-%dT%H:%M:%SZ")}
+        if not blocked(item):
+            out.append(item)
     return out
 
 

@@ -54,7 +54,12 @@ class NewsTest(unittest.TestCase):
         self.assertEqual(failed, ["Cryptonews (OSError)"])
 
     def test_blocked_words_match_deploy_guard(self):
-        self.assertEqual(sorted(wn.BLOCKED), sorted(w.lower() for w in wd.PRIVATE_WORDS))
+        guard = [w.lower() for w in wd.PRIVATE_WORDS] + [b.split("*")[0].lower() for b in wd.BLOCK]
+        self.assertEqual(sorted(wn.BLOCKED), sorted(guard))
+
+    def test_blocked_word_in_link_is_dropped(self):
+        self.assertTrue(wn.blocked({"t": "Bitcoin", "url": "https://ex.se/markets/daily-recap", "src": "X", "at": ""}))
+        self.assertFalse(wn.blocked({"t": "Bitcoin", "url": "https://ex.se/markets/recap", "src": "X", "at": ""}))
 
     def test_news_js_passes_leak_check(self):
         news, _ = wn.build(lambda s, u, o: [{"t": "Bitcoin stiger", "url": "https://x", "src": s, "at": "2026-11-05T00:00:00Z"}])
