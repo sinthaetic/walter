@@ -368,3 +368,32 @@ Tolva år är en enda, mycket stark period för krypto, så siffran är ingen ga
 för den som inte tål en stor nedgång strax före datumet – inte ett sätt att få mer pengar. Appen säger det rakt ut
 (målkortet och Inställningar): "I historiken gav det en lugnare resa men oftast mindre pengar – det är ett val för den
 som inte tål ett stort fall strax före datumet."
+
+## Ägarens divergens-regel och en vågad Walter (del 5b, 5 nov 2026)
+Frågan efter raset i okt–nov 2026: kan regeln "köp när vågbottnarna går uppåt (divergens), sälj/blanka när topparna går nedåt"
+tjäna mer än autopiloten? Och vad ger en större kryptoandel? Kör om: `.venv\Scripts\python.exe -m backtest.div_run`.
+Samma motor, avgifter och skatt som del 5. Veckoljus byggs av dagsljusen (måndag–söndag).
+
+| Divergens-regeln (kr per 100 000 kr) | 2014–2019 | 2020–idag | Median 44 starter | Största fall | Kontot tömt |
+|---|---|---|---|---|---|
+| Vecka, bara köp | 115 000 | 104 000 | 106 000 | 11 % | 0 av 44 |
+| Vecka, köp + blanka | 23 000 | 23 000 | 22 000 | 100 % | 42 av 44 |
+| Dag, bara köp | 103 000 | 111 000 | 113 000 | 56 % | 0 av 44 |
+| Dag, köp + blanka | 27 000 | 20 000 | 21 000 | 100 % | 41 av 44 |
+| 4 h, bara köp | 41 000 | 68 000 | 69 000 | 83 % | 0 av 44 |
+| 4 h, köp + blanka | 20 000 | 20 000 | 21 000 | 100 % | 43 av 44 |
+
+- Motorns divergens (andra vågbotten under −65, högre än den förra, medan priset gör en lägre botten) slår nästan aldrig till på köpsidan:
+  0 gånger på veckoljus och 2 på dagsljus sedan 2011, mot 5 respektive 51 säljdivergenser. Bara köp blir därför mest kontanter.
+- Att blanka på säljdivergenserna tömde kontot nästan alltid: i en stigande marknad kommer de för tidigt.
+- Ögat ser divergenser mer generöst än regeln (lägre krav på djup, andra börser och valutor). Det testet är inte gjort – det kräver
+  att regeln skrivs ner exakt i förväg.
+
+| Fasta andelar, samma söndagskoll (kr per 100 000 kr) | 2014–2019 | 2020–idag | Median 44 starter | 10 % sämsta | Största fall |
+|---|---|---|---|---|---|
+| Walter i dag: BTC 35 / ETH 20 / guld 20 / kontant 25 | 1 213 000 | 573 000 | 524 000 | 143 000 | 55 % |
+| Vågad: 50 / 25 / 0 / 25 | 2 195 000 | 763 000 | 677 000 | 136 000 | 70 % |
+| Mycket vågad: 60 / 30 / 0 / 10 | 2 998 000 | 925 000 | 786 000 | 129 000 | 78 % |
+
+Mer krypto gav mer pengar i historiken, eftersom bitcoin steg ungefär 100 gånger. Priset är större fall (70–78 %), och de 10 % sämsta
+starterna blev lite sämre. Det är ett ärligt val om risk, inte en smartare signal.
