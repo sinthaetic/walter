@@ -125,6 +125,21 @@
       <!-- Målet med datum (valfritt, js/app.js). Dolt när inget mål finns. -->
       <section class="panel goal-card" id="goal-card" aria-label="Mål" hidden></section>
 
+      <div class="section-title" id="siffror"><h2>SIFFRORNA</h2><span class="small">Allt bakom läget, för den som vill se.</span></div>
+      <div class="cards">
+        <section class="panel wide proposal" id="proposal" aria-label="Walters förslag"></section>
+        <section class="panel" id="status" aria-label="Status och uppdatering"></section>
+        <section class="panel" id="allocation" aria-label="Fördelning"></section>
+        <section class="panel" id="levels" aria-label="Nivåer"></section>
+        <section class="panel" id="unlock" aria-label="Vägen till Level 2"></section>
+        <section class="panel wide" id="journey" aria-label="Resan" hidden></section>
+      </div>
+    </section>
+
+    <!-- Pro: för den som vill titta, jämföra och handla själv. Översikten är för den som vill att det bara ska funka. -->
+    <section id="view-pro" data-page="pro" aria-label="Pro" hidden>
+      <p class="kicker">PRO · GRAF, EGEN HANDEL OCH SIFFROR</p>
+      <div class="title-row"><h1>PRO</h1></div>
       <!-- W-Cipher (js/cipher-chart.js, samma graf som cipher.html i CIPHER-läget) + Walters lampor och affärer. Ritas av js/app.js. -->
       <section class="panel wc-panel" id="wc" aria-label="W-Cipher">
         <div class="panel-head"><span>BITCOIN · W-CIPHER <em>CIPHER A + B · WALTER</em></span><span class="num" id="wc-live">HÄMTAR …</span></div>
@@ -144,18 +159,11 @@
       <!-- Min egen handel (js/manual.js + js/app.js): egen låtsaskassa i bitcoin, släpande stopp −10 %, jämförs med Walter -->
       <section class="panel manual-panel" id="manual" aria-label="Min egen handel"></section>
 
-      <div class="section-title" id="siffror"><h2>SIFFRORNA</h2><span class="small">Allt bakom läget, för den som vill se.</span></div>
-      <div class="cards">
-        <section class="panel wide proposal" id="proposal" aria-label="Walters förslag"></section>
-        <section class="panel" id="status" aria-label="Status och uppdatering"></section>
-        <section class="panel" id="allocation" aria-label="Fördelning"></section>
-        <section class="panel" id="levels" aria-label="Nivåer"></section>
-        <section class="panel" id="unlock" aria-label="Vägen till Level 2"></section>
-        <section class="panel wide" id="journey" aria-label="Resan" hidden></section>
-      </div>
+      <details class="pro-lamps-box">
+        <summary>TIO LAMPOR · VÄRDENA BAKOM</summary>
+        <div id="pro-lamps"></div>
+      </details>
     </section>
-
-    <section id="view-pro" data-page="pro" aria-label="Pro" hidden></section>
     <section id="view-logg" data-page="logg" aria-label="Logg" hidden></section>
     <section id="view-k4" data-page="k4" aria-label="K4" hidden></section>
     <section id="view-installningar" data-page="installningar" aria-label="Inställningar" hidden></section>

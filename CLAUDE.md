@@ -70,7 +70,9 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 ## Walter som app (användare, steg 9)
 - Allt sparas i webbläsaren: `walter.user` (state, inkl. `savings`/`goal`), `walter.user.goal` (uttagsräknaren), `walter.ownerKey`. Inget skickas någonstans. Säkerhetskopia/inläsning finns i Inställningar (`js/user-state.js`).
 - `js/engine.js` = trade-motorn i JS (samma regler som `walter_paper.py`), `catchUp` spelar upp missade loggdagar från `market.js` → `log` och visar en ikapp-notis. Ny användare: Walter gör sitt första drag samma dag.
-- Min egen handel (`js/manual.js` + panelen `#manual` på översikten, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
+- Översikten är för den som vill att det bara ska funka (hjälten, portföljen, Walter gjorde, lampringen). Pro är för den som vill
+  titta och handla själv: grafen, egen handel, (steg 2) statistik, och lamptabellen hopfälld längst ned (`#pro-lamps`).
+- Min egen handel (`js/manual.js` + panelen `#manual` på Pro under grafen, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
   (`walter.manual` / `walter.user.manual`), köp/sälj till Walters pris och avgift, släpande stopp −10 % som Walter sköter
   (dagspriserna i market.js `log` sedan förra besöket + dagens pris). Jämförs med Walters marknadsvinst samma tid. Rör aldrig Walters portfölj.
 - `js/exchanges.js`: 5 MiCA-börser (Bitstamp, Bybit EU, Kraken, OKX Europe, Safello) med avgift, tillstånd och källa/datum. Alla avgifter är paper, inga riktiga pengar.
@@ -87,7 +89,7 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Grafen är en modul: `js/cipher-chart.js` (`WalterCipherChart`: börser, `fetchBars`, `mount(el, opts)` -> setBars/setView/setExtras,
   `legendHTML`, `mountCopy`; API i filhuvudet) + färgerna i `css/cipher-chart.css`. `js/cipher-app.js` är bara cipher-sidans kontroller och text.
   Ändra ritningen i modulen, aldrig i två kopior.
-- Översikten (index.html, under hjälten, alla tittare) visar samma graf i CIPHER-läget: BTC, DAG som standard (4 TIM/DAG/VECKA),
+- Pro-sidan (index.html#pro, alla tittare; ritas först när Pro öppnas, `mountChart`) visar samma graf i CIPHER-läget: BTC, DAG som standard (4 TIM/DAG/VECKA),
   börsen = användarens om grafen har den (Kraken, Bybit EU -> Bybit, OKX Europe -> OKX), ägarens Kraken, annars Binance. Plus Walters egna:
   rutan WALTERS LAMPOR (5 − röda, grönt över noll / rött under, bara DAG/VECKA) och Walters affärer ur journalen
   (teal "W KÖPTE"/"W SÅLDE", liten prick = söndagskoll utan affär). Lightweight Charts laddas utan blockering

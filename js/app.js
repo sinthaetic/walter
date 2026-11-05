@@ -293,7 +293,7 @@
       ${saveLine ? `<p class="pf-save"><span class="dot teal" aria-hidden="true"></span>${esc(saveLine)}</p>` : "<span></span>"}
       <button type="button" class="btn dep-open" data-dep-open>SÄTT IN PENGAR</button>
     </div>
-    <div class="pf-foot"><a href="#wc">BITCOIN · W-CIPHER ↓</a><a href="#siffror">SIFFRORNA →</a></div>`;
+    <div class="pf-foot"><a href="#pro">PRO: GRAF OCH EGEN HANDEL →</a><a href="#siffror">SIFFRORNA ↓</a></div>`;
 
   // ---------- Målet (valfritt): hur långt kvar, och hur mycket Walter redan flyttat till kontanter ----------
   (() => {
@@ -316,12 +316,15 @@
       <p class="explain">Inget löfte om att nå målet. I historiken gav det en lugnare resa men oftast mindre pengar – det är ett val för den som inte tål ett stort fall strax före datumet. <a href="#installningar">Ändra målet →</a></p>`;
   })();
 
-  // ---------- W-Cipher under hjälten ----------
+  // ---------- W-Cipher på Pro-sidan ----------
   // Samma graf som cipher.html i CIPHER-läget (js/cipher-chart.js), plus Walters lampor (data/pulse.js + market.js-loggen)
   // och Walters affärer ur journalen. Börsen: användarens om grafen har den, ägarens Kraken, annars W-Cipherns standard.
-  // Lightweight Charts laddas först här (inte som blockerande skripttagg), så att resten av översikten ritas direkt.
-  // Ett fel här får aldrig stoppa resten av översikten.
-  (() => {
+  // Ritas först när Pro öppnas (route -> mountChart), så att översikten aldrig väntar på grafen.
+  // Ett fel här får aldrig stoppa resten av sidan.
+  let chartMounted = false;
+  const mountChart = () => {
+    if (chartMounted) return;
+    chartMounted = true;
     const CC = window.WalterCipherChart, el = $("wc-chart");
     if (!el) return;
     const fail = () => { if ($("wc-live")) $("wc-live").textContent = "GRAFEN KUNDE INTE LADDAS"; };
@@ -369,14 +372,14 @@
         // Ljust/mörkt byts av knappen i toppen: läs om färgerna. Städas av graph.destroy().
         const mo = new MutationObserver(() => { graph.applyTheme(); graph.redraw(); });
         mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-        const timer = setInterval(() => { if (!document.hidden && !$("view-oversikt").hidden) load(false); }, 60000);
+        const timer = setInterval(() => { if (!document.hidden && !$("view-pro").hidden) load(false); }, 60000);
         graph.onDestroy(() => { mo.disconnect(); clearInterval(timer); });
         load(true);
       }).catch(fail);
     } catch (e) {
       fail();
     }
-  })();
+  };
 
   // ---------- Min egen handel (js/manual.js) ----------
   // Egen låtsaskassa i bitcoin bredvid Walter, i den här webbläsaren (own("manual")). Walters pris och avgift.
@@ -803,10 +806,9 @@
   const renderPro = () => {
     const l = S.lamps[proSel], s = lampState(l);
     const word = { red: "RISK", green: "LUGN", wait: "VÄNTAR" };
-    $("view-pro").innerHTML = `
-      <p class="kicker">PRO · DATAN BAKOM LAMPORNA · SENAST HÄMTAD ${S.fetchedAt ? dotStamp(S.fetchedAt) : "OKÄNT"}</p>
+    $("pro-lamps").innerHTML = `
+      <p class="small">Senast hämtad ${S.fetchedAt ? dotStamp(S.fetchedAt) : "okänt"}.</p>
       <div class="title-row">
-        <h1>PRO</h1>
         <div class="legend row">
           <span><i class="r"></i>${nRed} röda</span><span><i class="g"></i>${nGreen} gröna</span><span><i class="w"></i>${nWait} väntar</span>
           <span class="note" style="margin:0">${AUTO ? `MARKNADEN: ${esc(MOOD.toUpperCase())} · STYR INTE KÖPEN` : `VILA VID ${S.rules.parkeraAtRed}/${total}${left > 0 ? ` · ${left} KVAR` : ""}`}</span>
@@ -842,10 +844,10 @@
         </div>
       </div>`;
     renderPrices();
-    $("view-pro").querySelectorAll(".pro-row").forEach((tr) => tr.addEventListener("click", () => {
+    $("pro-lamps").querySelectorAll(".pro-row").forEach((tr) => tr.addEventListener("click", () => {
       proSel = +tr.dataset.i;
       renderPro();
-      const b = $("view-pro").querySelector(`button[data-i="${proSel}"]`);
+      const b = $("pro-lamps").querySelector(`button[data-i="${proSel}"]`);
       if (b) b.focus();
     }));
   };
@@ -1664,6 +1666,7 @@
       if (a.dataset.view === page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
     document.title = page === "oversikt" ? `WALTER · ${AUTO ? "AUTOPILOT" : MODE.word}` : `WALTER · ${page === "installningar" ? "INSTÄLLNINGAR" : page.toUpperCase()}`;
+    if (page === "pro") mountChart();
     if (PAGES.includes(h)) window.scrollTo(0, 0);
     if (window.WalterTop) window.WalterTop.fit();
   };
