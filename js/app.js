@@ -147,9 +147,9 @@
   const unlocked = AUTO ? { BTC: true, ETH: true, GOLD: true } : { BTC: S.level >= 1, ETH: S.level >= 2, GOLD: S.level >= 3 };
   const levelCap = Math.min(S.rules.maxInvested, ["BTC", "ETH", "GOLD"].reduce((a, k) => a + (unlocked[k] ? S.rules.caps[k] : 0), 0));
   // Autopilotens andelar: det motorn faktiskt använder (proposal.weights; en tillgång börsen saknar = 0),
-  // annars rules.caps med börsens saknade tillgångar som 0.
+  // annars rules.caps (eller Vågad, S.risk) med börsens saknade tillgångar som 0.
   const apWeights = (S.proposal && S.proposal.weights) || ["BTC", "ETH", "GOLD"].reduce((o, k) => {
-    o[k] = ex && (!ex.assets || ex.assets[k] !== true) ? 0 : S.rules.caps[k]; return o; }, {});
+    o[k] = ex && (!ex.assets || ex.assets[k] !== true) ? 0 : ((S.risk && window.WalterEngine && window.WalterEngine.RISK_CAPS[S.risk]) || S.rules.caps)[k]; return o; }, {});
   const AP_NAMES = { BTC: "bitcoin", ETH: "ethereum", GOLD: "guld" };
   const apNote = (k, txt) => (apWeights[k] > 0 ? txt : "finns inte på din börs");
   const apDay = String((S.rules.decision && S.rules.decision.weekday) || "söndag").toLowerCase();
@@ -968,6 +968,17 @@
       </div>
     </div>
     <div data-sgroup="mal">
+    <section class="panel risk-panel" aria-label="Walters kurs">
+      <h3>WALTERS KURS</h3>
+      <div class="seg full" role="radiogroup" aria-label="Walters kurs" id="risk-seg">
+        <button type="button" role="radio" data-risk="">SOM VANLIGT</button>
+        <button type="button" role="radio" data-risk="vagad">VÅGAD</button>
+      </div>
+      <p class="plain" id="risk-text"></p>
+      <p class="small">Ett byte gäller från nästa söndagskoll, då flyttar Walter pengarna. Siffrorna: historiktestet 2014–idag, 100 000 kr efter avgifter och skatt (mitten av 44 startdagar). Inget löfte om framtiden.</p>
+      <div class="form-actions start"><button type="button" class="btn btn-primary" id="risk-save" disabled>BYT KURS</button></div>
+      <p class="small msg" id="risk-msg" aria-live="polite"></p>
+    </section>
     <p class="intro">Ett mål med ett datum, och ett sparande varje månad. Båda är valfria. Allt är låtsaspengar (PAPER).</p>
     ${AUTO ? "" : '<p class="warn">Målet och månadssparandet fungerar bara med autopiloten. Walter kör nu lamp-strategin (rules.strategy = "lamps"), så de ändrar inget.</p>'}
     <div class="plan sv-plan"${AUTO ? "" : " hidden"}>
@@ -1143,6 +1154,37 @@
     $("set-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-set]"); if (b) show(b.dataset.set); });
     const saved = store.get(TAB_KEY, "mal", "sessionStorage");
     show(["mal", "pengar", "om"].includes(saved) ? saved : "mal");
+  })();
+
+  // ---------- Walters kurs (Vågad) ----------
+  // Användaren: walter.user.risk (WalterUser.setRisk). Ägaren: "risk" i state.json (sidan visar raden att klistra in).
+  // Bytet gäller från nästa söndagskoll: då flyttar autopiloten pengarna till de nya andelarna.
+  (() => {
+    const RISK_TEXT = {
+      "": "35 % bitcoin, 20 % ethereum, 20 % guld, 25 % kontant. Ungefär 524 000 kr. Största fall 55 %.",
+      vagad: "50 % bitcoin, 25 % ethereum, inget guld, 25 % kontant. Ungefär 677 000 kr. Största fall 70 % – i ett ras tappar Walter mer."
+    };
+    const now = S.risk === "vagad" ? "vagad" : "";
+    let pick = now;
+    const sync = () => {
+      document.querySelectorAll("#risk-seg button").forEach((b) => {
+        b.setAttribute("aria-checked", String(b.dataset.risk === pick));
+        b.setAttribute("aria-pressed", String(b.dataset.risk === pick));
+      });
+      $("risk-text").textContent = RISK_TEXT[pick];
+      $("risk-save").disabled = pick === now;
+    };
+    $("risk-seg").addEventListener("click", (e) => { const b = e.target.closest("button[data-risk]"); if (b) { pick = b.dataset.risk; sync(); } });
+    $("risk-save").addEventListener("click", () => {
+      const val = pick || null;
+      if (isUser) { saveUser((u) => U.setRisk(u, val), $("risk-msg")); return; }
+      $("owner-snippet-text").textContent = `"risk": ${JSON.stringify(val)},`;
+      $("owner-snippet").hidden = false;
+      $("risk-msg").textContent = "Lägg raden i state.json (top-level) och kör walter deploy. Gäller från nästa söndagskoll.";
+    });
+    if (!AUTO) $("risk-save").disabled = true;
+    sync();
+    if (now === "vagad") $("risk-msg").textContent = "Walter kör vågad kurs.";
   })();
 
   // ---------- Mål och månadssparande ----------

@@ -156,9 +156,14 @@ def day_text(iso):
     return f"{DAY_WORDS[d.weekday()]} {d.day} {MONTHS[d.month - 1]}"
 
 
-def weights_for(rules, assets=None, glide=1.0):
-    """Målandelar (rules.caps) gånger målläget (glide, 0..1). Det börsen saknar får andel 0 och ligger som kontanter."""
-    caps = rules.get("caps") or {}
+# Vågad Walter (state.json / walter.user: "risk": "vagad"): större kryptoandel, samma kontantgolv. BACKTEST.md del 5b.
+RISK_CAPS = {"vagad": {"BTC": 0.5, "ETH": 0.25, "GOLD": 0.0}}
+
+
+def weights_for(rules, assets=None, glide=1.0, risk=None):
+    """Målandelar (rules.caps, eller RISK_CAPS[risk]) gånger målläget (glide, 0..1).
+    Det börsen saknar får andel 0 och ligger som kontanter."""
+    caps = RISK_CAPS.get(risk) or rules.get("caps") or {}
     w = {a: float(caps.get(a, 0)) * glide for a in ASSETS}
     missing = [a for a in ASSETS if assets is not None and assets.get(a) is not True]
     for a in missing:
@@ -320,7 +325,7 @@ def propose_deposit(state, today, sek, assets=None):
     invest = strategy_of(r) == "autopilot"
     trades, waiting = [], []
     if invest:
-        weights, _ = weights_for(r, assets, glide_factor(state.get("goal"), today))
+        weights, _ = weights_for(r, assets, glide_factor(state.get("goal"), today), state.get("risk"))
         fee = (r["withdrawalFees"]["takerPct"] + r["withdrawalFees"]["slippagePct"]) / 100
         hold2 = dict(hold, CASH=hold["CASH"] + sek)
         trades, waiting = savings_trades(px, hold2, total + sek, weights, r, fee, sek)
@@ -448,7 +453,7 @@ def propose_autopilot(state, today, assets=None):
     px = prices_sek(m)
     # Målläget: andelarna krymper mot kontanter de sista 24 månaderna före målets datum
     glide = glide_factor(state.get("goal"), today)
-    weights, missing = weights_for(r, assets, glide)
+    weights, missing = weights_for(r, assets, glide, state.get("risk"))
     wanted = [a for a in ASSETS if (r.get("caps") or {}).get(a, 0) > 0 and a not in missing]
     if wanted and all(px[a] is None for a in wanted):  # inga priser alls: vänta (samma som js/engine.js)
         return {"asOf": today, "ready": False, "strategy": "autopilot", "red": red, "mode": current,

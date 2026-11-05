@@ -183,8 +183,14 @@ def savings_goal_cases(lamp_rules):
         ("gl_after_goal_date", sun, _pf(near_cash, near), [], None, {"name": "Bil", "amountSek": 90000, "date": "2026-01-01"}, [], True),
         ("gl_with_savings", fri, _pf(onw_cash, onw), checked, sv(23), {"name": "Studio", "amountSek": 300000, "date": "2027-04-23"}, [], True),
     ]
+    # Vågad Walter (risk = "vagad"): 50/25/0 i stället för 35/20/20
+    cases = [c + (None,) for c in cases] + [
+        ("rk_vagad_sunday", sun, _pf(near_cash, near), [], None, None, [], True, "vagad"),
+        ("rk_vagad_first_trade", fri, _pf(100000), [], None, None, [], True, "vagad"),
+        ("rk_vagad_with_savings", fri, _pf(onw_cash, onw), checked, sv(23), None, [], True, "vagad"),
+    ]
     out = []
-    for name, day, pf, journal, savings, goal, extra, gold in cases:
+    for name, day, pf, journal, savings, goal, extra, gold, risk in cases:
         pf = copy.deepcopy(pf)
         pf["history"] += extra
         m = _market(15, False, False)
@@ -199,6 +205,8 @@ def savings_goal_cases(lamp_rules):
             state["savings"] = raw["savings"] = user["savings"] = savings
         if goal is not None:
             state["goal"] = raw["goal"] = user["goal"] = goal
+        if risk is not None:
+            state["risk"] = raw["risk"] = user["risk"] = risk
         prop = walter_paper.propose(state, today=day)
         entry = walter_paper.apply(raw, prop, day) if prop["ready"] and prop["needsApproval"] else None
         row = {"date": day, "ready": True, "red": 3, "px": walter_paper.prices_sek(m),

@@ -278,7 +278,8 @@ test("autopilot_catchup_missed_sunday_once", () => {
 // ---------- Månadssparande och målläge (paritet mot Python: engine-cases.json -> savingsGoal) ----------
 const SG = ["sv_deposit_day", "sv_missed_day_next_day", "sv_two_months_missed", "sv_cash_below_floor", "sv_day_null_is_off", "sv_day_missing_is_25", "sv_amount_zero",
   "sv_month_already_done", "sv_before_since", "sv_sunday_with_rebalance", "sv_first_trade", "sv_gold_price_missing",
-  "gl_far_full_weights", "gl_12_months_half", "gl_goal_date_all_cash", "gl_after_goal_date", "gl_with_savings"];
+  "gl_far_full_weights", "gl_12_months_half", "gl_goal_date_all_cash", "gl_after_goal_date", "gl_with_savings",
+  "rk_vagad_sunday", "rk_vagad_first_trade", "rk_vagad_with_savings"];
 for (const name of SG) {
   test("parity_" + name, async () => {
     const fx = await fixtures();

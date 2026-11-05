@@ -80,8 +80,10 @@
     const d = new Date(ms(iso));
     return `${DAY_WORDS[weekday(iso)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
   }
-  function weightsFor(rules, exchange, glide) {
-    const caps = rules.caps || {}, w = {}, missing = [];
+  // Vågad Walter (user.risk = "vagad"): större kryptoandel, samma kontantgolv. Som RISK_CAPS i Python.
+  const RISK_CAPS = { vagad: { BTC: 0.5, ETH: 0.25, GOLD: 0 } };
+  function weightsFor(rules, exchange, glide, risk) {
+    const caps = RISK_CAPS[risk] || rules.caps || {}, w = {}, missing = [];
     const g = glide == null ? 1 : glide;
     for (const a of ASSETS) {
       w[a] = Number(caps[a] || 0) * g;
@@ -258,7 +260,7 @@
     for (const a of ASSETS) px[a] = (row.px && row.px[a]) || null;
     // Målläget: andelarna krymper mot kontanter de sista 24 månaderna före målets datum
     const glide = glideFactor(user.goal, row.date);
-    const { w, missing } = weightsFor(r, exchange, glide);
+    const { w, missing } = weightsFor(r, exchange, glide, user.risk);
     const wanted = ASSETS.filter((a) => Number((r.caps || {})[a] || 0) > 0 && !missing.includes(a));
     if (wanted.length && wanted.every((a) => px[a] === null)) {
       return { ready: false, strategy: "autopilot", red, mode: current, currentMode: current, trades: [], valueSek: null,
@@ -481,7 +483,7 @@
     const auto = strategyOf(r) === "autopilot", stale = auto && !!o.stale, invest = auto && !stale;
     let trades = [], waiting = [];
     if (invest) {
-      const { w } = weightsFor(r, exchange, glideFactor(user.goal, row.date));
+      const { w } = weightsFor(r, exchange, glideFactor(user.goal, row.date), user.risk);
       const fee = (exchange.takerPct + exchange.slippagePct + (exchange.quote !== "SEK" ? exchange.fxPct : 0)) / 100;
       const hold2 = Object.assign({}, hold, { CASH: hold.CASH + (o.pending ? 0 : sek) });
       const st = savingsTrades(px, hold2, total + (o.pending ? 0 : sek), w, r, fee, sek);
@@ -617,7 +619,7 @@
     return s;
   }
 
-  root.WalterEngine = { suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, MOODS, NAMES,
+  root.WalterEngine = { RISK_CAPS, suggestMode, propose, apply, levelFor, catchUp, summary, round, num, WORDS, MOODS, NAMES,
     strategyOf, nextCheck, dayText, glideFactor, savingsPlan, savingsDue, nextSavings, SAVINGS_NOTE,
     proposeDeposit, applyDeposit, DEPOSIT_NOTE, DEPOSIT_MIN, DEPOSIT_MAX };
 })(typeof window !== "undefined" ? window : this);

@@ -40,6 +40,9 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 - Målläge (`goal: {name, amountSek, date}` eller null): de sista 24 månaderna skalas andelarna med
   f = clamp(dagar kvar / 730,5, 0, 1); på datumet säljs allt på söndagskollen. Ersätter gamla `walter.plan`.
   Samma kod i `walter_paper` och `js/engine.js` (paritet: `tests/make_fixtures.py` → savingsGoal). Historik: docs/BACKTEST.md.
+- Vågad Walter (`risk: "vagad"`, top-level i state.json / `walter.user.risk`, knapp WALTERS KURS under Inställningar → Mål):
+  andelarna blir `RISK_CAPS.vagad` = BTC 50 %, ETH 25 %, guld 0 %, samma kontantgolv. Bytet sker på söndagskollen.
+  Samma i `walter_paper.weights_for` och `engine.weightsFor` (paritet: fixturen savingsGoal, fall `rk_*`). Historik: BACKTEST del 5b.
 - Lamporna och läget räknas och visas fortfarande (marknadsläget, journalens `mode`; kalla det aldrig "väder"), men i autopiloten ÄNDRAR DE INGA AFFÄRER
   och Levels låser ingenting. Allt nedan om lägen, ETH-villkor, guldsignal och Levels gäller bara `"strategy": "lamps"`.
 - Läge från röda lampor (`rules.modes`): 0–2 = Köper (OFFENSIV, fulla tak), 3–4 = Köper lite (NORMAL, halva taken), 5–6 = Avvaktar (rör inget), 7+ = Vilar (PARKERA, säljer till kontant).

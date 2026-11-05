@@ -123,6 +123,13 @@
     return true;
   }
 
+  // Walters kurs: null = som vanligt (35/20/20), "vagad" = 50/25/0 (js/engine.js RISK_CAPS)
+  function setRisk(user, risk) {
+    if (risk !== null && risk !== "vagad") return false;
+    user.risk = risk;
+    return true;
+  }
+
   // ---------- Färsk marknadsdata ----------
   // Samma gräns som lamporna (rules.lampMaxAgeDays.default, annars 4 dagar), räknat mot webbläsarens datum.
   // Okänt hämtdatum räknas som gammalt – gammal data får aldrig se färsk ut.
@@ -269,10 +276,11 @@
       // Användarens månadssparande och mål (samma fält som ägarens state.json)
       savings: user.savings ? copy(user.savings) : null,
       goal: user.goal ? copy(user.goal) : null,
+      risk: user.risk === "vagad" ? "vagad" : null,
       proposal
     };
   }
 
   root.WalterUser = { load, save, storageOk, create, isFresh, firstMove, exportFile, importText, toState, today, unlockOwner, forgetOwner,
-    setSavings, setGoal, deposit, investPending };
+    setSavings, setGoal, setRisk, deposit, investPending };
 })(typeof window !== "undefined" ? window : this);
