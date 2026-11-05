@@ -552,3 +552,7 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 /* Pro: lamptabellen längst ned, hopfälld */
 .pro-lamps-box { margin-top: 32px; }
 .pro-lamps-box > summary { margin-bottom: 12px; }
+/* Pro: statistik */
+.bar .band { position: absolute; top: -3px; bottom: -3px; border-radius: 3px; background: var(--teal); opacity: .16; }
+.pro-curve { width: 100%; height: auto; display: block; margin: 8px 0; }
+.pro-flow { fill: var(--teal); stroke: var(--glass-edge); stroke-width: 1.5; }

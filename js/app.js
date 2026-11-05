@@ -388,6 +388,7 @@
   const manFee = ex ? (ex.takerPct + ex.slippagePct + (ex.quote !== "SEK" ? ex.fxPct : 0)) / 100
     : ((ruleFees.takerPct || 0) + (ruleFees.slippagePct || 0)) / 100;
   let manMsg = "";
+  let statsReady = false; // renderProStats (längre ned) behöver värden som räknas efter egen handel
   const manNum = (v) => Number(String(v).replace(/[\s ]|kr/gi, "").replace(",", "."));
   function renderManual() {
     const el = $("manual");
@@ -468,10 +469,12 @@
       manMsg = `Sålde bitcoin för ${kr(Math.min(sek, pot.trades[pot.trades.length - 1].sek))}.`;
     });
     $("man-all").onclick = act(() => { MAN.sell(pot, Infinity, px, manFee, isoToday); manMsg = "Sålde all bitcoin."; });
+    if (statsReady) renderProStats();
     $("man-end").onclick = () => {
       if ($("man-end").dataset.sure !== "1") { $("man-end").dataset.sure = "1"; $("man-end").textContent = "Säker? Tryck igen för att ta bort kassan"; return; }
       try { localStorage.removeItem(MAN_KEY); } catch { /* lagring blockerad */ }
       renderManual();
+      if (statsReady) renderProStats();
     };
   }
   renderManual();
@@ -952,6 +955,104 @@
     }));
   };
   renderLog();
+
+  // ================================================================
+  // PRO – statistik: nästa justering, värdet över tid, avgifter och skatt, du mot Walter
+  // ================================================================
+  // Värdet över tid: sista värdet per dag ur historiken (inklusive insättningar, som markeras).
+  const valueChart = (pts) => {
+    const W = 600, H = 150, L = 6, R = 6, T = 14, B = 20;
+    const v = pts.map((p) => p.value), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || Math.max(1, hi * 0.02);
+    const x = (i) => L + (i * (W - L - R)) / Math.max(1, pts.length - 1);
+    const y = (val) => T + (1 - (val - lo) / span) * (H - T - B);
+    const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+    return `<svg class="pro-curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Walters värde från ${esc(day(pts[0].date))} (${kr(pts[0].value)}) till ${esc(day(pts[pts.length - 1].date))} (${kr(pts[pts.length - 1].value)})">
+      <polyline points="${x(0).toFixed(1)},${H - B} ${line} ${x(pts.length - 1).toFixed(1)},${H - B}" class="pf-area"/>
+      <polyline points="${line}" class="pf-line"/>
+      ${pts.map((p, i) => (p.flow ? `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" class="pro-flow"><title>Insättning ${kr(p.flow)}</title></circle>` : "")).join("")}
+      <text x="${L}" y="${H - 5}" class="journey-date">${esc(day(pts[0].date))}</text>
+      <text x="${W - R}" y="${H - 5}" text-anchor="end" class="journey-date">${esc(day(pts[pts.length - 1].date))}</text>
+      <text x="${W - R}" y="${T - 3}" text-anchor="end" class="journey-val">${esc(amount(hi))} kr</text>
+    </svg>`;
+  };
+  function renderProStats() {
+    const el = $("pro-stats");
+    if (!el) return;
+    // 1. Hur nära nästa justering: andel nu mot målet och Walters marginal (bandPp)
+    const assets = ["BTC", "ETH", "GOLD"].filter((k) => (apWeights[k] || 0) > 0 || share(k) > 0);
+    const bars = assets.map((k) => {
+      const now = share(k) * 100, t = (apWeights[k] || 0) * 100, lo = Math.max(0, t - apBand), hi = t + apBand;
+      const top = Math.max(60, hi + 10, now + 5), pos = (v) => `${Math.min(100, (v / top) * 100).toFixed(1)}%`;
+      const out = now < lo || now > hi;
+      return `<div class="alloc-row">
+        <div class="lbl"><b>${AP_NAMES[k][0].toUpperCase() + AP_NAMES[k].slice(1)}</b><span>${out ? "justeras på " + esc(apDay) : "inom marginalen"}</span></div>
+        <div class="bar"><span class="band" style="left:${pos(lo)};width:calc(${pos(hi)} - ${pos(lo)})"></span><span class="fill" style="width:${pos(now)}"></span><span class="cap" style="left:${pos(t)}" title="Mål ${nf(0).format(t)} %"></span></div>
+        <div class="pct">${nf(1).format(now)} % / ${nf(0).format(t)} %</div>
+      </div>`;
+    }).join("");
+    // 2. Värdet över tid
+    const byDay = new Map();
+    allHist.forEach((h) => { const p = byDay.get(h.date); byDay.set(h.date, { date: h.date, value: h.value, flow: ((p && p.flow) || 0) + (h.flow || 0) }); });
+    const pts = [...byDay.values()];
+    // 3. Avgifter och skatt (journalens affärer; skatt = 30 % på sålda vinster, 70 % av förlusterna dras av)
+    const jt = journalTrades(S.journal), feesAll = jt.reduce((a, t) => a + t.feeSek, 0);
+    const taxEst = sold > 0 ? sold * 0.3 : sold * 0.3 * 0.7;
+    // 4. Du mot Walter (egen handel)
+    const pot = store.get(MAN_KEY, null), px = fx().btcSek;
+    let duel = "";
+    if (pot) {
+      const val = MAN.value(pot, px), mine = val - pot.startSek;
+      const w = pot.walter || { value: pf.value, gain: marketGain }, his = marketGain - w.gain;
+      const sells = pot.trades.filter((t) => t.side === "sälj"), wins = sells.filter((t) => t.gainSek > 0);
+      const losses = sells.filter((t) => t.gainSek <= 0);
+      const avg = (a) => (a.length ? a.reduce((s, t) => s + t.gainSek, 0) / a.length : null);
+      duel = `
+      <section class="panel" aria-label="Du mot Walter">
+        <h3>DU MOT WALTER · SEDAN ${esc(day(pot.since).toUpperCase())}</h3>
+        <div class="kv">
+          <div><span>DU</span><strong>${mine < 0 ? "−" : "+"}${kr(Math.abs(mine))} · ${pct(mine / pot.startSek * 100, 1)}</strong></div>
+          <div><span>WALTER</span><strong>${pct(w.value > 0 ? his / w.value * 100 : 0, 1)}</strong></div>
+          <div><span>AFFÄRER</span><strong>${pot.trades.length}</strong></div>
+          <div><span>TRÄFF (SÅLDA)</span><strong>${sells.length ? nf(0).format(wins.length / sells.length * 100) + " %" : "–"}</strong></div>
+          <div><span>SNITT VINST / FÖRLUST</span><strong>${avg(wins) == null ? "–" : "+" + kr(avg(wins))} / ${avg(losses) == null ? "–" : "−" + kr(Math.abs(avg(losses)))}</strong></div>
+          <div><span>DINA AVGIFTER</span><strong>${kr2(pot.trades.reduce((a, t) => a + t.feeSek, 0))}</strong></div>
+        </div>
+        <p class="small">Före skatt för båda. Walter räknas i procent av sitt värde när din kassa startade.</p>
+      </section>`;
+    }
+    el.innerHTML = `
+      <div class="section-title"><h2>SIFFROR</h2><span class="small">Walters portfölj, och du mot Walter.</span></div>
+      <div class="cards">
+        <section class="panel wide" aria-label="Nästa justering">
+          <h3>NÄSTA JUSTERING · ${apNextText ? esc(apNextText.toUpperCase()) : "–"}</h3>
+          <div class="alloc">${bars || '<p class="small">Inga innehav än.</p>'}</div>
+          <p class="small" style="margin-top:12px">Fältet visar Walters marginal (${apBand} procentenheter åt varje håll). Ligger stapeln utanför fältet på ${esc(apDay)}en flyttar han tillbaka till målet (strecket).</p>
+        </section>
+        <section class="panel wide" aria-label="Värdet över tid">
+          <h3>VÄRDET ÖVER TID</h3>
+          ${pts.length > 1 ? valueChart(pts) : '<p class="small">Kurvan ritas när det finns mer än en dag.</p>'}
+          <p class="small">Inklusive insättningar (prickarna). Fall från toppen nu: ${nf(1).format(dd)} %.</p>
+        </section>
+        <section class="panel" aria-label="Avgifter och skatt">
+          <h3>AVGIFTER OCH SKATT</h3>
+          <div class="kv">
+            <div><span>AFFÄRER</span><strong>${jt.length}</strong></div>
+            <div><span>AVGIFTER</span><strong>${kr2(feesAll)}</strong></div>
+            <div><span>SÅLT, VINST/FÖRLUST</span><strong>${sold < 0 ? "−" : "+"}${kr2(Math.abs(sold))}</strong></div>
+            <div><span>SKATT PÅ DET (UNGEFÄR)</span><strong>${sold ? (taxEst < 0 ? "−" : "") + kr(Math.abs(taxEst)) : "0 kr"}</strong></div>
+          </div>
+          <p class="small">Bara sålda affärer beskattas (30 % på vinst, 70 % av en förlust dras av). Det som inte är sålt beskattas inte än.</p>
+        </section>
+        <section class="panel" aria-label="Avkastning per risk">
+          <h3>AVKASTNING PER RISK</h3>
+          <div class="kv"><div><span>SHARPE</span><strong>${esc(sharpeTxt)}</strong></div><div><span>MARKNADSVINST</span><strong>${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))} · ${avk}</strong></div></div>
+          <p class="small">Sharpe: hur mycket Walter tjänar för varje bit svängning, över 1 är bra. Visas efter 30 dagars handel.</p>
+        </section>
+        ${duel}
+      </div>`;
+  }
+  statsReady = true;
+  renderProStats();
 
   // ================================================================
   // K4 – underlag (PAPER). Hela kronor som fetcher/walter_k4.py: försäljning efter avgift, omkostnad.
