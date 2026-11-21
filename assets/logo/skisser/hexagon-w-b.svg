@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WALTER">
+  <path d="M32 4 L56.2 18 V46 L32 60 L7.8 46 V18 Z" fill="#14222A" stroke="#14222A" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M19 25 L25.5 43 L32 31 L38.5 43 L45 25" fill="none" stroke="#E3E9EB" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="17.5" r="2.7" fill="#17808D"/>
+</svg>
