@@ -441,11 +441,12 @@
         <button type="button" class="btn btn-primary" id="man-buy"${fresh ? "" : " disabled"}>KÖP</button>
         <button type="button" class="btn" id="man-sell"${fresh && pot.units ? "" : " disabled"}>SÄLJ</button>
         <button type="button" class="btn" id="man-all"${fresh && pot.units ? "" : " disabled"}>SÄLJ ALLT</button>
-        <button type="button" class="btn" id="man-short"${fresh && !pot.units ? "" : " disabled"} title="${pot.units ? "Sälj din bitcoin först" : "Tjänar om priset faller"}">BLANKA</button>`}
+        <button type="button" class="btn" id="man-short"${fresh ? "" : " disabled"} title="Tjänar om priset faller">BLANKA</button>`}
       </div>
       <p class="small msg" id="man-msg" aria-live="polite">${esc(fresh ? manMsg || `Pris ${kr(px)} (${day(pxDay)}).` : "Priset är inte färskt. Tryck UPPDATERA under Status först.")}</p>
       ${pot.trades.length ? `<ul class="rows man-trades">${pot.trades.slice(-5).reverse().map((t) => `<li><span>${day(t.date)} · ${t.side === "köp" ? "Köpte" : t.side === "blanka" ? "Blankade" : t.side === "stäng" ? (t.why === "stopp" ? "Walter stängde blankning (stopp)" : "Stängde blankning") : t.why === "stopp" ? "Walter sålde (stopp)" : "Sålde"}</span><span class="num">${kr(t.sek)}</span></li>`).join("")}</ul>` : ""}
-      <button type="button" class="link-btn small" id="man-end">Avsluta egen handel</button>`;
+      <button type="button" class="link-btn small" id="man-end">Avsluta egen handel</button>
+      <p class="small">Version ${esc((document.querySelector('meta[name="walter-build"]') || {}).content || "okänd")}</p>`;
     manMsg = "";
     const act = (fn) => () => {
       const ok = fn();
@@ -472,6 +473,9 @@
       });
       $("man-all").onclick = act(() => { MAN.sell(pot, Infinity, px, manFee, isoToday); manMsg = "Sålde all bitcoin."; });
       $("man-short").onclick = act(() => {
+        // En rest under 1 kr efter en försäljning ska inte stoppa blankningen
+        if (pot.units && pot.units * px < 1) MAN.sell(pot, Infinity, px, manFee, isoToday);
+        if (pot.units) { $("man-msg").textContent = `Sälj din bitcoin (${kr(pot.units * px)}) först: tryck SÄLJ ALLT, sedan BLANKA.`; return false; }
         const sek = manNum($("man-sek").value);
         if (!MAN.short(pot, sek, px, manFee, isoToday)) { $("man-msg").textContent = `Skriv en summa upp till ${kr(pot.cash)}.`; return false; }
         manMsg = `Blankade bitcoin för ${kr(sek)}. Du tjänar om priset faller.`;

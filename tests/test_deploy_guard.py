@@ -84,6 +84,32 @@ class OwnerEncTest(unittest.TestCase):
         out = v.decrypt(wd.build_owner_enc({}, {}, "k"), "k")
         self.assertEqual(out, {"state": {}, "daily": {}, "notis": None})
 
+    def test_stamp_build_versions_code_and_ignores_line_endings(self):
+        def site(t, nl):
+            (t / "js").mkdir()
+            (t / "css").mkdir()
+            (t / "data").mkdir()
+            (t / "js" / "a.js").write_bytes(("x" + nl + "y").encode())
+            (t / "css" / "a.css").write_bytes(b"a{}")
+            (t / "data" / "market.js").write_bytes(b"1")
+            (t / "index.html").write_bytes(('<meta name="walter-build" content="dev"><link href="css/a.css">'
+                                            '<script src="js/a.js"></script><script src="data/market.js"></script>'
+                                            '<a href="cipher.html"></a>').encode())
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            a, b = Path(a), Path(b)
+            site(a, "\n")
+            site(b, "\r\n")
+            build = wd.stamp_build(a)
+            self.assertEqual(wd.stamp_build(b), build)    # samma kod på Windows och i Actionen
+            html = (a / "index.html").read_text(encoding="utf-8")
+            self.assertIn(f'content="{build}"', html)
+            self.assertIn(f'src="js/a.js?v={build}"', html)
+            self.assertIn(f'href="css/a.css?v={build}"', html)
+            self.assertIn('src="data/market.js"', html)   # data byts var 15:e minut och ska inte ge ny version
+            (a / "data" / "market.js").write_bytes(b"2")
+            (b / "data" / "market.js").write_bytes(b"3")
+            self.assertEqual(wd.stamp_build(a), wd.stamp_build(b))
+
     def test_allow_has_no_private_files(self):
         self.assertEqual(wd.ALLOW, ["index.html", "cipher.html", "css", "js", "assets",
                                     "tradingview/w-cipher.pine", "tradingview/w-cipher-a.pine",

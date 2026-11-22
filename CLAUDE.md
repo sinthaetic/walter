@@ -65,6 +65,8 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
 ## Publicering och ägare
 - Publikt: `index.html`, `cipher.html`, `css/`, `js/`, `assets/`, `tradingview/*.pine`, `data/market.js`, `data/cache.json`, `data/pulse.js`, `data/news.js`, `data/owner.enc` (krypterad `{state, daily, notis}`). ALLOW-listan och `leak_check` i `fetcher/walter_deploy.py` stoppar allt annat. Se `README_DEPLOY.md`.
 - Utan Secret `WALTER_OWNER_KEY` hoppar Actionen över hämtning och publicering (sidan ligger kvar som den var).
+- Version: `walter_deploy.stamp_build` sätter `?v=<kodhash>` på css/js och `<meta name="walter-build">` i den publicerade kopian
+  (källfilerna har `dev`). `js/top.js` läser versionen från servern vid start och laddar om en gång om den är ny. Panelen Min egen handel visar versionen.
 - Lokal deploy slår först ihop publicerade `owner.enc` (dagsvärden) och vägrar korta historiken. `WALTER_GLOM_GAMLA_DAGAR=1` är nödutgången vid kodbyte: lägg den ALDRIG i `.env`.
 - Boot (`js/boot.js`): `data/state.js` finns → ägare lokalt. Annars `walter.ownerKey` i localStorage (skrivs in under Inställningar) → dekryptera `owner.enc` → ägarens Walter. Annars landning (`js/landing.js`) → användarens Walter eller intro (`js/intro.js`).
 

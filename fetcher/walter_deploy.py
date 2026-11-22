@@ -14,8 +14,10 @@ Före bygget slås publicerade cache.json (gh-pages) ihop med den lokala, så at
 Actionen lagt till aldrig försvinner. Med WALTER_PAGES_REPO men utan WALTER_OWNER_KEY publiceras inget.
 """
 
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -181,6 +183,26 @@ def leak_check(out_dir):
     return bad
 
 
+def stamp_build(out_dir):
+    """Versionsstämpel på den publicerade kopian: ?v=<hash> på css/js och <meta name="walter-build">, så att en
+    webbläsare aldrig blandar gamla och nya filer. Hashen bygger bara på koden (inte data/), med samma radslut på
+    Windows och i Actionen, så att den bara ändras när sidan faktiskt ändrats. Returnerar hashen."""
+    out_dir = Path(out_dir)
+    pages = [out_dir / n for n in ("index.html", "cipher.html") if (out_dir / n).exists()]
+    code = sorted(p for d in ("css", "js") for p in (out_dir / d).rglob("*") if p.is_file())
+    h = hashlib.sha256()
+    for p in sorted(pages) + code:
+        h.update(p.relative_to(out_dir).as_posix().encode())
+        h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+    build = h.hexdigest()[:10]
+    for p in pages:
+        text = p.read_text(encoding="utf-8")
+        text = re.sub(r'((?:src|href)=")((?:css|js)/[^"?]+)"', rf'\1\2?v={build}"', text)
+        text = text.replace('<meta name="walter-build" content="dev">', f'<meta name="walter-build" content="{build}">')
+        p.write_text(text, encoding="utf-8", newline="")
+    return build
+
+
 def copy_site():
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -196,6 +218,7 @@ def copy_site():
         else:
             shutil.copy2(src, dst)
     (OUT / ".nojekyll").write_text("", encoding="utf-8")  # GitHub Pages: servera filerna som de är
+    stamp_build(OUT)
     leaked = leak_check(OUT)
     if leaked:
         shutil.rmtree(OUT)

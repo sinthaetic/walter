@@ -35,5 +35,21 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit).catch(() => {});
   window.addEventListener("pageshow", fit);
 
+  // Ny version publicerad? Webbläsaren kan hålla kvar en gammal sida, så läs versionen direkt från servern och
+  // ladda om en gång med versionen i adressen. Lokalt (build "dev") och utan nät händer inget.
+  (async () => {
+    const mine = (document.querySelector('meta[name="walter-build"]') || {}).content;
+    if (!mine || mine === "dev" || !/^https?:$/.test(location.protocol)) return;
+    try {
+      const html = await (await fetch(location.pathname, { cache: "no-store" })).text();
+      const now = (html.match(/name="walter-build" content="([^"]+)"/) || [])[1];
+      if (!now || now === "dev" || now === mine || sessionStorage.getItem("walterBuild") === now) return;
+      sessionStorage.setItem("walterBuild", now); // en gång per version, så att sidan aldrig fastnar i omladdning
+      const url = new URL(location.href);
+      url.searchParams.set("b", now);
+      location.replace(url);
+    } catch (e) { /* inget nät eller blockerad lagring: sidan fungerar som den är */ }
+  })();
+
   window.WalterTop = { fit };
 })();
