@@ -78,7 +78,10 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
   Sharpe, du mot Walter), krypto-rubriker (`data/news.js` från `fetcher/walter_news.py` i Actionen: CoinDesk, Cryptonews,
   DI filtrerat på kryptoord; bara rubrik/källa/tid/länk; rubriker med läckspärrens ord hoppas över; fel stoppar aldrig deploy)
   och lamptabellen hopfälld längst ned (`#pro-lamps`).
-- Min egen handel (`js/manual.js` + panelen `#manual` på Pro under grafen, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
+- Arenan = Pro-sidan (`js/arena.js` ritar, `css/arena.css`, räkningen i `js/manual.js`): ställningen DU mot WALTER (du alltid lila `--du`, Walter teal),
+  grafen + Ditt drag, kapplöpningen (dra över kurvan = tidsmaskin för ställningen), månadsrundor och märken. Rörelsen stängs av med prefers-reduced-motion. Poäng räknas bara på resultat efter avgifter, aldrig på antal affärer.
+  Walters kurva spelas upp ur journalens affärer och insättningar mot market.js-loggen. Dina affärer ritas i grafen (`extras.mine`). Statistik, nyheter, lampor och kassans kopia är hopfällda längst ned.
+- Min egen handel (`js/manual.js` + panelen `#manual` bredvid grafen, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
   (`walter.manual` / `walter.user.manual`), köp/sälj/blanka till Walters pris och avgift, släpande stopp 10 % åt båda håll som Walter sköter
   (dagspriserna i market.js `log` sedan förra besöket + dagens pris). Blankning: på låtsas, 1x, en i taget, aldrig samtidigt som köp,
   0,03 %/dag i finansiering, kan inte förlora mer än insatsen. Jämförs med Walters marknadsvinst samma tid. Rör aldrig Walters portfölj.

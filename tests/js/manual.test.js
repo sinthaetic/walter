@@ -81,6 +81,52 @@ test("manual_short_never_loses_more_than_stake", () => {
   eq(p.trades[1].gainSek, -1000);
 });
 
+test("arena_pot_curve_replays_trades_and_short", () => {
+  const p = M().create(1000, "2026-11-01");
+  M().buy(p, 1000, 100, 0, "2026-11-01");
+  M().sell(p, Infinity, 120, 0, "2026-11-02");
+  M().short(p, 1200, 120, 0, "2026-11-03");
+  M().cover(p, 90, 0, "2026-11-05");
+  const c = M().potCurve(p, [{ date: "2026-10-31", px: 90 }, { date: "2026-11-01", px: 100 }, { date: "2026-11-02", px: 120 },
+    { date: "2026-11-04", px: 100 }, { date: "2026-11-05", px: 90 }, { date: "2026-11-06", px: 200 }]);
+  eq(c.map((x) => x.date), ["2026-11-01", "2026-11-02", "2026-11-04", "2026-11-05", "2026-11-06"]);
+  eq(c[0].pct, 0); eq(c[1].pct, 20);
+  eq(Math.round(c[3].pct), Math.round((p.cash / 1000 - 1) * 100));
+  eq(c[4].pct, c[3].pct);          // stängd: priset rör inte kassan
+});
+
+test("arena_walter_curve_ignores_deposits", () => {
+  const px = (b) => ({ BTC: b });
+  const rows = [{ date: "2026-11-01", px: px(100) }, { date: "2026-11-02", px: px(110) }, { date: "2026-11-03", px: px(110) }];
+  const trades = [{ date: "2026-11-01", side: "köp", asset: "BTC", units: 10, sek: 1000, feeSek: 0 }];
+  const flows = [{ date: "2026-11-01", flow: 1000 }, { date: "2026-11-03", flow: 500 }];
+  const c = M().walterCurve(trades, flows, rows, "2026-11-01");
+  eq(c.map((x) => x.pct), [0, 10, 10]);   // insättningen 3 nov är ingen vinst
+});
+
+test("arena_rounds_and_badges_count_results_not_trades", () => {
+  const du = [{ date: "2026-10-31", pct: 0 }, { date: "2026-11-30", pct: -2 }, { date: "2026-12-05", pct: -1 }];
+  const wa = [{ date: "2026-10-31", pct: 0 }, { date: "2026-11-30", pct: -10 }, { date: "2026-12-05", pct: -11 }];
+  const r = M().rounds(du, wa, [], "2026-12-05");
+  eq(r.map((x) => [x.month, x.winner, x.live]), [["2026-10", null, false], ["2026-11", "du", false], ["2026-12", "du", true]]);
+  const b = M().badges(r);
+  eq(b.find((x) => x.id === "ras").won, true);
+  eq(b.find((x) => x.id === "still").won, true);
+  eq(b.find((x) => x.id === "tre").won, false);
+  const live = M().badges([{ month: "2026-12", du: 1, walter: -8, winner: "du", live: true, trades: 2 }]);
+  eq([live[0].won, live[0].live], [false, true]); // en pågående runda låser inte upp
+});
+
+test("arena_copy_roundtrip_and_rejects_bad_files", () => {
+  const p = M().create(1000, "2026-11-01", { value: 900, gain: 0 });
+  M().short(p, 500, 100, 0.01, "2026-11-01");
+  eq(M().parsePot(M().exportText(p)), p);
+  eq(M().parsePot("inte json"), null);
+  eq(M().parsePot(JSON.stringify({ walterManual: 1, pot: { ...p, cash: "1" } })), null);
+  eq(M().parsePot(JSON.stringify({ walterManual: 1, pot: { ...p, since: "<img>" } })), null);
+  eq(M().parsePot(JSON.stringify({ walterManual: 1, pot: { ...p, trades: [{ date: "2026-11-01", side: "x", sek: 1, units: 1, px: 1, feeSek: 0 }] } })), null);
+});
+
 test("manual_stop_not_hit_and_stop_price", () => {
   const p = M().create(1000, "2026-11-01");
   M().buy(p, 1000, 100, 0, "2026-11-01");

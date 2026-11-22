@@ -324,7 +324,7 @@
       const exName = { binance: "Binance", kraken: "Kraken", bybit: "Bybit", okx: "OKX", coinbase: "Coinbase" }[exId];
       const pulse = CC.mergePulse(window.WALTER_PULSE, (window.WALTER_MARKET && window.WALTER_MARKET.log) || []);
       const trades = CC.tradeMarks(S.journal);
-      const extras = { pulse: pulse.length ? pulse : null, trades: trades.length ? trades : null };
+      const extras = { pulse: pulse.length ? pulse : null, trades: trades.length ? trades : null, mine: arena.marks() };
       const TF_KEY = "walterOverviewTf";
       let tf = store.get(TF_KEY, "1D");
       if (!["4h", "1D", "1W"].includes(tf)) tf = "1D";
@@ -336,6 +336,7 @@
         if (el._wc) el._wc.destroy();
         const graph = el._wc = CC.mount(el, { view: "cipher", wavePane: 0.32, pulsePane: 64, wheel: false });
         graph.setExtras(extras);
+        arena.onMarks(() => { extras.mine = arena.marks(); graph.setExtras(extras); });
         let loading = 0;
         const load = async (reset) => {
           const my = ++loading;
@@ -368,128 +369,11 @@
     }
   };
 
-  // ---------- Min egen handel (js/manual.js) ----------
-  // Egen låtsaskassa i bitcoin bredvid Walter, i den här webbläsaren (own("manual")). Walters pris och avgift.
-  // Walter sköter ett släpande stopp 10 % åt båda håll (dagspriserna sedan förra besöket + dagens pris) och jämförs samma tid.
-  const MAN_KEY = own("manual"), MAN = window.WalterManual;
+  // ---------- Arenan: du mot Walter (js/arena.js, räkningen i js/manual.js) ----------
   const manFee = ex ? (ex.takerPct + ex.slippagePct + (ex.quote !== "SEK" ? ex.fxPct : 0)) / 100
     : ((ruleFees.takerPct || 0) + (ruleFees.slippagePct || 0)) / 100;
-  let manMsg = "";
-  let statsReady = false; // renderProStats (längre ned) behöver värden som räknas efter egen handel
-  const manNum = (v) => Number(String(v).replace(/[\s ]|kr/gi, "").replace(",", "."));
-  function renderManual() {
-    const el = $("manual");
-    if (!el || !MAN) return;
-    const px = fx().btcSek, pxDay = m.btc && m.btc.asOf;
-    const fresh = px > 0 && pxDay && (Date.now() - new Date(pxDay + "T12:00:00")) / 864e5 <= 2;
-    let pot = store.get(MAN_KEY, null);
-    // En kassa i fel form (äldre version, handredigerad) räknas som ingen kassa, så att resten av sidan alltid ritas
-    if (pot && (typeof pot !== "object" || !Array.isArray(pot.trades) || !(pot.startSek > 0) ||
-      (pot.short && !(pot.short.units > 0 && pot.short.px > 0 && pot.short.lowPx > 0)))) pot = null;
-    if (pot && MAN) {
-      const rows = ((window.WALTER_MARKET && window.WALTER_MARKET.log) || [])
-        .map((r) => ({ date: r.date, px: r.px && r.px.BTC })).filter((r) => r.px > 0);
-      const hit = MAN.checkStop(pot, rows, manFee);
-      if (!hit && fresh) MAN.checkLive(pot, px, manFee, isoToday);
-      const last = pot.trades[pot.trades.length - 1];
-      if (last && last.why === "stopp" && !pot.stopSeen) {
-        manMsg = last.side === "stäng"
-          ? `Walter stängde din blankning ${day(last.date)}: priset steg 10 % från botten (${kr(last.px)}).`
-          : `Walter sålde din bitcoin ${day(last.date)}: priset föll 10 % från toppen (${kr(last.px)}).`;
-        pot.stopSeen = true;
-      }
-      if (last && last.why !== "stopp") pot.stopSeen = false;
-      store.set(MAN_KEY, pot);
-    }
-    if (!pot) {
-      el.innerHTML = `
-        <h3>MIN EGEN HANDEL</h3>
-        <p class="plain">Testa ditt eget öga mot Walter.</p>
-        <p class="plain">En egen låtsaskassa i bitcoin: du köper, säljer eller blankar.</p>
-        <p class="plain">Walter stänger åt dig om priset går 10 % emot dig från bästa läget.</p>
-        <div class="man-row">
-          <input class="input num" id="man-start" type="text" inputmode="numeric" autocomplete="off" value="10 000" aria-label="Startbelopp i kronor">
-          <button type="button" class="btn btn-primary" id="man-go">STARTA</button>
-        </div>
-        <p class="small msg" id="man-msg" aria-live="polite">Låtsaspengar (PAPER). Walters egna pengar rörs inte.</p>`;
-      $("man-go").onclick = () => {
-        const sek = Math.round(manNum($("man-start").value));
-        if (!(sek >= 100 && sek <= 1e8)) { $("man-msg").textContent = "Skriv ett belopp mellan 100 kr och 100 000 000 kr."; return; }
-        store.set(MAN_KEY, MAN.create(sek, isoToday, { value: pf.value, gain: marketGain }));
-        renderManual();
-      };
-      return;
-    }
-    const val = MAN.value(pot, px, isoToday); // senast kända pris; färskheten styr bara om man får handla
-    const mine = (val / pot.startSek - 1) * 100;
-    const w = pot.walter || { value: pf.value, gain: marketGain };
-    const his = w.value > 0 ? (marketGain - w.gain) / w.value * 100 : 0;
-    const stop = MAN.stopPx(pot);
-    el.innerHTML = `
-      <div class="panel-head"><span>MIN EGEN HANDEL · BITCOIN</span><span class="num">SEDAN ${esc(day(pot.since).toUpperCase())}</span></div>
-      <div class="kv">
-        <div><span>KASSA</span><strong>${kr(pot.cash)}</strong></div>
-        <div><span>${pot.short ? "BLANKAT" : "BITCOIN"}</span><strong>${kr(pot.short ? MAN.shortValue(pot, px, isoToday) : pot.units * (px || 0))}</strong></div>
-        <div><span>DU</span><strong>${pct(mine, 1)}</strong></div>
-        <div><span>WALTER SAMMA TID</span><strong>${pct(his, 1)}</strong></div>
-      </div>
-      <p class="small">${pot.short ? `Blankat från ${kr(pot.short.px)}. Stopp: Walter stänger över ${kr(stop)} (10 % över botten ${kr(pot.short.lowPx)}). Blankning kostar ${nf(2).format(MAN.FUNDING_DAY * 100)} % per dag.`
-        : stop ? `Stopp: Walter säljer allt under ${kr(stop)} (10 % under toppen ${kr(pot.peakPx)}).` : "Ingen position just nu – inget stopp."} Före skatt, efter avgift (${nf(2).format(manFee * 100)} % per affär).</p>
-      <div class="man-row">
-        ${pot.short ? `<button type="button" class="btn btn-primary" id="man-cover"${fresh ? "" : " disabled"}>STÄNG BLANKNING</button>` : `
-        <input class="input num" id="man-sek" type="text" inputmode="numeric" autocomplete="off" placeholder="Summa i kr" aria-label="Summa i kronor"${fresh ? "" : " disabled"}>
-        <button type="button" class="btn btn-primary" id="man-buy"${fresh ? "" : " disabled"}>KÖP</button>
-        <button type="button" class="btn" id="man-sell"${fresh && pot.units ? "" : " disabled"}>SÄLJ</button>
-        <button type="button" class="btn" id="man-all"${fresh && pot.units ? "" : " disabled"}>SÄLJ ALLT</button>
-        <button type="button" class="btn" id="man-short"${fresh ? "" : " disabled"} title="Tjänar om priset faller">BLANKA</button>`}
-      </div>
-      <p class="small msg" id="man-msg" aria-live="polite">${esc(fresh ? manMsg || `Pris ${kr(px)} (${day(pxDay)}).` : "Priset är inte färskt. Tryck UPPDATERA under Status först.")}</p>
-      ${pot.trades.length ? `<ul class="rows man-trades">${pot.trades.slice(-5).reverse().map((t) => `<li><span>${day(t.date)} · ${t.side === "köp" ? "Köpte" : t.side === "blanka" ? "Blankade" : t.side === "stäng" ? (t.why === "stopp" ? "Walter stängde blankning (stopp)" : "Stängde blankning") : t.why === "stopp" ? "Walter sålde (stopp)" : "Sålde"}</span><span class="num">${kr(t.sek)}</span></li>`).join("")}</ul>` : ""}
-      <button type="button" class="link-btn small" id="man-end">Avsluta egen handel</button>
-      <p class="small">Version ${esc((document.querySelector('meta[name="walter-build"]') || {}).content || "okänd")}</p>`;
-    manMsg = "";
-    const act = (fn) => () => {
-      const ok = fn();
-      if (ok === false) return;
-      store.set(MAN_KEY, pot);
-      renderManual();
-    };
-    if (pot.short) {
-      $("man-cover").onclick = act(() => {
-        MAN.cover(pot, px, manFee, isoToday);
-        const g = pot.trades[pot.trades.length - 1].gainSek;
-        manMsg = `Stängde blankningen: ${g < 0 ? "−" : "+"}${kr(Math.abs(g))} efter avgifter.`;
-      });
-    } else {
-      $("man-buy").onclick = act(() => {
-        const sek = manNum($("man-sek").value);
-        if (!MAN.buy(pot, sek, px, manFee, isoToday)) { $("man-msg").textContent = `Skriv en summa upp till ${kr(pot.cash)}.`; return false; }
-        manMsg = `Köpte bitcoin för ${kr(sek)}.`;
-      });
-      $("man-sell").onclick = act(() => {
-        const sek = manNum($("man-sek").value);
-        if (!(sek >= 1) || !MAN.sell(pot, sek, px, manFee, isoToday)) { $("man-msg").textContent = "Skriv hur mycket bitcoin (i kronor) du vill sälja."; return false; }
-        manMsg = `Sålde bitcoin för ${kr(Math.min(sek, pot.trades[pot.trades.length - 1].sek))}.`;
-      });
-      $("man-all").onclick = act(() => { MAN.sell(pot, Infinity, px, manFee, isoToday); manMsg = "Sålde all bitcoin."; });
-      $("man-short").onclick = act(() => {
-        // En rest under 1 kr efter en försäljning ska inte stoppa blankningen
-        if (pot.units && pot.units * px < 1) MAN.sell(pot, Infinity, px, manFee, isoToday);
-        if (pot.units) { $("man-msg").textContent = `Sälj din bitcoin (${kr(pot.units * px)}) först: tryck SÄLJ ALLT, sedan BLANKA.`; return false; }
-        const sek = manNum($("man-sek").value);
-        if (!MAN.short(pot, sek, px, manFee, isoToday)) { $("man-msg").textContent = `Skriv en summa upp till ${kr(pot.cash)}.`; return false; }
-        manMsg = `Blankade bitcoin för ${kr(sek)}. Du tjänar om priset faller.`;
-      });
-    }
-    if (statsReady) renderProStats();
-    $("man-end").onclick = () => {
-      if ($("man-end").dataset.sure !== "1") { $("man-end").dataset.sure = "1"; $("man-end").textContent = "Säker? Tryck igen för att ta bort kassan"; return; }
-      try { localStorage.removeItem(MAN_KEY); } catch { /* lagring blockerad */ }
-      renderManual();
-      if (statsReady) renderProStats();
-    };
-  }
-  renderManual();
+  const arena = window.WalterArena.mount({ S, pf, fx, kr, kr2, pct, nf, esc, day, store, own, fee: manFee, today: isoToday,
+    apDay, journalTrades, market: m, marketGain });
 
   // ---------- Tio lampor ----------
   // Förklaringar i vanliga ord (under varje lampa på översikten och i Pro-fliken)
@@ -617,7 +501,7 @@
     } else failedSrc.push("valutakurser");
     renderPrices();
     renderGoal();
-    renderManual();
+    arena.render();
     if (got.length) $("status-time").textContent = stamp(now.toISOString()) + " (kurser)";
     $("status-msg").innerHTML =
       (got.length ? `Färskt ${stamp(now.toISOString())}: ${esc(got.join(" · "))}. ` : "") +
@@ -929,29 +813,6 @@
     // 3. Avgifter och skatt (journalens affärer; skatt = 30 % på sålda vinster, 70 % av förlusterna dras av)
     const jt = journalTrades(S.journal), feesAll = jt.reduce((a, t) => a + t.feeSek, 0);
     const taxEst = sold > 0 ? sold * 0.3 : sold * 0.3 * 0.7;
-    // 4. Du mot Walter (egen handel)
-    const pot = store.get(MAN_KEY, null), px = fx().btcSek;
-    let duel = "";
-    if (pot && Array.isArray(pot.trades) && pot.startSek > 0) {
-      const val = MAN.value(pot, px, isoToday), mine = val - pot.startSek;
-      const w = pot.walter || { value: pf.value, gain: marketGain }, his = marketGain - w.gain;
-      const sells = pot.trades.filter((t) => t.side === "sälj" || t.side === "stäng"), wins = sells.filter((t) => t.gainSek > 0);
-      const losses = sells.filter((t) => t.gainSek <= 0);
-      const avg = (a) => (a.length ? a.reduce((s, t) => s + t.gainSek, 0) / a.length : null);
-      duel = `
-      <section class="panel" aria-label="Du mot Walter">
-        <h3>DU MOT WALTER · SEDAN ${esc(day(pot.since).toUpperCase())}</h3>
-        <div class="kv">
-          <div><span>DU</span><strong>${mine < 0 ? "−" : "+"}${kr(Math.abs(mine))} · ${pct(mine / pot.startSek * 100, 1)}</strong></div>
-          <div><span>WALTER</span><strong>${pct(w.value > 0 ? his / w.value * 100 : 0, 1)}</strong></div>
-          <div><span>AFFÄRER</span><strong>${pot.trades.length}</strong></div>
-          <div><span>TRÄFF (AVSLUTADE)</span><strong>${sells.length ? nf(0).format(wins.length / sells.length * 100) + " %" : "–"}</strong></div>
-          <div><span>SNITT VINST / FÖRLUST</span><strong>${avg(wins) == null ? "–" : "+" + kr(avg(wins))} / ${avg(losses) == null ? "–" : "−" + kr(Math.abs(avg(losses)))}</strong></div>
-          <div><span>DINA AVGIFTER</span><strong>${kr2(pot.trades.reduce((a, t) => a + t.feeSek, 0))}</strong></div>
-        </div>
-        <p class="small">Före skatt för båda. Walter räknas i procent av sitt värde när din kassa startade.</p>
-      </section>`;
-    }
     el.innerHTML = `
       <div class="section-title"><h2>SIFFROR</h2><span class="small">Walters portfölj, och du mot Walter.</span></div>
       <div class="cards">
@@ -980,10 +841,8 @@
           <div class="kv"><div><span>SHARPE</span><strong>${esc(sharpeTxt)}</strong></div><div><span>MARKNADSVINST</span><strong>${marketGain < 0 ? "−" : "+"}${kr(Math.abs(marketGain))} · ${avk}</strong></div></div>
           <p class="small">Sharpe: hur mycket Walter tjänar för varje bit svängning, över 1 är bra. Visas efter 30 dagars handel.</p>
         </section>
-        ${duel}
       </div>`;
   }
-  statsReady = true;
   renderProStats();
 
   // ---------- Krypto-rubriker (data/news.js) ----------
@@ -1718,7 +1577,7 @@
       if (a.dataset.view === page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
     document.title = page === "oversikt" ? `WALTER · ${AUTO ? "AUTOPILOT" : MODE.word}` : `WALTER · ${page === "installningar" ? "INSTÄLLNINGAR" : page.toUpperCase()}`;
-    if (page === "pro") mountChart();
+    if (page === "pro") { mountChart(); arena.show(); }
     if (PAGES.includes(h)) window.scrollTo(0, 0);
     if (window.WalterTop) window.WalterTop.fit();
   };

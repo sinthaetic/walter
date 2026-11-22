@@ -22,6 +22,8 @@ FEEDS = [
     ("DI", "https://www.di.se/rss", re.compile(r"krypto|bitcoin|ethereum|stablecoin|blockkedja", re.I)),
 ]
 KEEP = 12
+# Säljtexter och prisspådomar är inga nyheter (Cryptonews blandar in dem bland riktiga artiklar)
+ADS = re.compile(r"predict|prediction|presale|pre-sale|best crypto|next crypto|to buy now|to explode|\b\d+x\b|meme ?coin|casino|airdrop", re.I)
 # Samma ord som walter_deploy.PRIVATE_WORDS + BLOCK-namnen (inte importerat: deploy-modulen laddar hela hämtaren).
 # Jämförs utan skiftläge, alltså strängare än läckspärren. tests/test_news.py håller listorna lika.
 BLOCKED = ["journal", "portfolio", "k4", "capitalchange", "daily", "notis", "proposal", "walter_owner_key",
@@ -48,6 +50,8 @@ def items(source, url, only=None, timeout=15):
         if not title or not link.startswith("https://"):
             continue
         if only and not only.search(title):
+            continue
+        if ADS.search(title) or ADS.search(link):
             continue
         item = {"t": title[:200], "url": link, "src": source, "at": at.strftime("%Y-%m-%dT%H:%M:%SZ")}
         if not blocked(item):

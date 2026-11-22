@@ -44,6 +44,21 @@ class NewsTest(unittest.TestCase):
         self.assertEqual([i["t"] for i in di], ["Bitcoin faller 5 %"])                   # bara kryptoord
         self.assertEqual(all_[0]["at"], "2026-11-05T10:00:00Z")
 
+    def test_ads_and_price_predictions_are_dropped(self):
+        rss = (b'<?xml version="1.0"?><rss><channel>'
+               b'<item><title>Claude AI Predicts Near-Triple-Digit Move</title><link>https://ex.se/a</link><pubDate>Thu, 05 Nov 2026 10:00:00 GMT</pubDate></item>'
+               b'<item><title>Best Crypto to Buy Now</title><link>https://ex.se/b</link><pubDate>Thu, 05 Nov 2026 10:00:00 GMT</pubDate></item>'
+               b'<item><title>XRP soars</title><link>https://ex.se/price-prediction/xrp</link><pubDate>Thu, 05 Nov 2026 10:00:00 GMT</pubDate></item>'
+               b'<item><title>Bitcoin tumbles as stocks fall</title><link>https://ex.se/c</link><pubDate>Thu, 05 Nov 2026 10:00:00 GMT</pubDate></item>'
+               b'</channel></rss>')
+        orig = wn.urllib.request.urlopen
+        wn.urllib.request.urlopen = lambda req, timeout=0: FakeResp(rss)
+        try:
+            got = wn.items("X", "https://x")
+        finally:
+            wn.urllib.request.urlopen = orig
+        self.assertEqual([i["t"] for i in got], ["Bitcoin tumbles as stocks fall"])
+
     def test_broken_source_is_skipped_and_newest_first(self):
         def fetch(source, url, only):
             if source == "Cryptonews":

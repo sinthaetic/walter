@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/top.css">
   <link rel="stylesheet" href="css/landing.css">
   <link rel="stylesheet" href="css/cipher-chart.css">
+  <link rel="stylesheet" href="css/arena.css">
   <!-- Samma nyckel som W-Cipher, så mörkt läge följer med mellan sidorna -->
   <script>try { if (localStorage.getItem("walterDark") === "1") document.documentElement.dataset.theme = "dark"; } catch (e) {}</script>
 </head>
@@ -136,38 +137,37 @@
     </section>
 
     <!-- Pro: för den som vill titta, jämföra och handla själv. Översikten är för den som vill att det bara ska funka. -->
-    <section id="view-pro" data-page="pro" aria-label="Pro" hidden>
-      <p class="kicker">PRO · GRAF, EGEN HANDEL OCH SIFFROR</p>
-      <div class="title-row"><h1>PRO</h1></div>
-      <!-- W-Cipher (js/cipher-chart.js, samma graf som cipher.html i CIPHER-läget) + Walters lampor och affärer. Ritas av js/app.js. -->
-      <section class="panel wc-panel" id="wc" aria-label="W-Cipher">
-        <div class="panel-head"><span>BITCOIN · W-CIPHER <em>CIPHER A + B · WALTER</em></span><span class="num" id="wc-live">HÄMTAR …</span></div>
-        <div class="wc-bar">
-          <div class="seg" id="wc-tf" role="group" aria-label="Tidsram">
-            <button type="button" data-tf="4h" aria-pressed="false">4 TIM</button>
-            <button type="button" data-tf="1D" aria-pressed="true">DAG</button>
-            <button type="button" data-tf="1W" aria-pressed="false">VECKA</button>
+    <section id="view-pro" data-page="pro" aria-label="Arenan: du mot Walter" hidden>
+      <h1 class="sr">Arenan: du mot Walter</h1>
+      <section class="ar-duel" id="ar-duel" aria-label="Ställningen"></section>
+      <div class="ar-stage">
+        <!-- W-Cipher (js/cipher-chart.js, samma graf som cipher.html i CIPHER-läget) + Walters lampor och båda era affärer. Ritas av js/app.js. -->
+        <section class="panel wc-panel" id="wc" aria-label="W-Cipher">
+          <div class="panel-head"><span>BITCOIN · W-CIPHER <em>CIPHER A + B</em></span><span class="num" id="wc-live">HÄMTAR …</span></div>
+          <div class="wc-bar">
+            <div class="seg" id="wc-tf" role="group" aria-label="Tidsram">
+              <button type="button" data-tf="4h" aria-pressed="false">4 TIM</button>
+              <button type="button" data-tf="1D" aria-pressed="true">DAG</button>
+              <button type="button" data-tf="1W" aria-pressed="false">VECKA</button>
+            </div>
+            <a class="wc-open" href="cipher.html">ÖPPNA W-CIPHER →</a>
           </div>
-          <a class="wc-open" href="cipher.html">ÖPPNA W-CIPHER →</a>
-        </div>
-        <div class="wc-chart" id="wc-chart" role="img" aria-label="Bitcoin med W-Cipher: pris och trendband överst, vågen och pengaflödet i mitten, Walters lampor längst ned. W-markörerna är Walters affärer."></div>
-        <details class="wc-legend-box"><summary>VAD BETYDER FÄRGERNA?</summary><ul class="wc-legend" id="wc-legend"></ul></details>
-        <div id="wc-copy"></div>
-      </section>
-
-      <!-- Min egen handel (js/manual.js + js/app.js): egen låtsaskassa i bitcoin, släpande stopp −10 %, jämförs med Walter -->
-      <section class="panel manual-panel" id="manual" aria-label="Min egen handel"></section>
-
-      <!-- Statistik (js/app.js renderProStats): nästa justering, värdet över tid, avgifter/skatt, du mot Walter -->
-      <div id="pro-stats"></div>
-
-      <!-- Krypto-rubriker (data/news.js, fetcher/walter_news.py i Actionen). Dolt när filen saknas. -->
-      <section class="panel pro-news" id="pro-news" aria-label="Krypto-rubriker" hidden></section>
-
-      <details class="pro-lamps-box">
-        <summary>TIO LAMPOR · VÄRDENA BAKOM</summary>
-        <div id="pro-lamps"></div>
-      </details>
+          <div class="wc-chart" id="wc-chart" role="img" aria-label="Bitcoin med W-Cipher: pris och trendband överst, vågen och pengaflödet i mitten, Walters lampor längst ned. W-markörerna är Walters affärer och DU-markörerna dina."></div>
+          <details class="wc-legend-box"><summary>VAD BETYDER FÄRGERNA?</summary><ul class="wc-legend" id="wc-legend"></ul><div id="wc-copy"></div></details>
+        </section>
+        <!-- Ditt drag (js/arena.js + js/manual.js): egen låtsaskassa i bitcoin, släpande stopp 10 % -->
+        <aside class="panel ar-ticket" id="manual" aria-label="Ditt drag"></aside>
+      </div>
+      <div class="ar-low">
+        <section class="panel" id="ar-race" aria-label="Kapplöpningen"></section>
+        <section class="panel" id="ar-season" aria-label="Säsongen"></section>
+      </div>
+      <div class="ar-more">
+        <details><summary>WALTERS SIFFROR</summary><div id="pro-stats"></div></details>
+        <details><summary>NYHETER</summary><section class="pro-news" id="pro-news" aria-label="Krypto-rubriker" hidden></section></details>
+        <details class="pro-lamps-box"><summary>TIO LAMPOR</summary><div id="pro-lamps"></div></details>
+        <details><summary>DIN KASSA</summary><div id="ar-kassa"></div></details>
+      </div>
     </section>
     <section id="view-logg" data-page="logg" aria-label="Logg" hidden></section>
     <section id="view-k4" data-page="k4" aria-label="K4" hidden></section>
@@ -204,6 +204,7 @@
   <script src="js/exchanges.js"></script>
   <script src="js/user-state.js"></script>
   <script src="js/manual.js"></script>
+  <script src="js/arena.js"></script>
   <script src="js/top.js"></script>
   <script src="js/app.js"></script>
   <script src="js/landing.js"></script>

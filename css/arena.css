@@ -1,0 +1,162 @@
+/* Arenan (Pro-sidan): du mot Walter. Du är alltid lila, Walter alltid teal. Följer ljust/mörkt via Walters färger. */
+:root { --du: #4F3FD8; --du-soft: rgba(79, 63, 216, .16); --on-du: #FFFFFF; --wa: #0D5F69; --wa-line: #17808D; --ar-well: rgba(20, 34, 42, .07); }
+:root[data-theme="dark"] { --du: #B3ACFF; --du-soft: rgba(179, 172, 255, .18); --on-du: #14102F; --wa: #6FD3DE; --wa-line: #6FD3DE; --ar-well: rgba(0, 0, 0, .26); }
+
+#view-pro { position: relative; }
+#view-pro::before { content: ""; position: absolute; z-index: -1; inset: -60px 0 auto; height: 620px; pointer-events: none;
+  background: radial-gradient(46% 70% at 12% 8%, var(--du-soft), transparent 72%), radial-gradient(50% 76% at 90% 6%, var(--fog), transparent 72%); }
+
+.ar-lab { font-size: 11px; font-weight: 400; letter-spacing: .3em; color: var(--muted); }
+.ar-ink { color: var(--ink); }
+.ar-du { color: var(--du); }
+.ar-wa { color: var(--wa); }
+.ar-small { font-size: 13px; color: var(--soft); }
+.ar-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Ställningen */
+.ar-duel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 24px; margin-top: 34px; padding-bottom: 24px; }
+.ar-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ar-side.r { align-items: flex-end; text-align: right; }
+.ar-side .ar-lab { letter-spacing: .5em; }
+.ar-big { font-size: clamp(56px, 8.4vw, 124px); font-weight: 300; line-height: .92; letter-spacing: -.02em; white-space: nowrap; }
+.ar-big small { margin-left: .12em; font-size: .4em; font-weight: 300; letter-spacing: 0; }
+.ar-sub { font-size: 14px; color: var(--soft); }
+.ar-lead { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 180px; padding-bottom: 4px; text-align: center; }
+.ar-leadn { font-size: 34px; font-weight: 300; line-height: 1.1; }
+.ar-unit { font-size: 13px; color: var(--muted); }
+.ar-rail { position: absolute; inset: auto 0 0; height: 2px; background: linear-gradient(90deg, var(--du), var(--line) 50%, var(--wa-line)); }
+.ar-rail i { position: absolute; top: -6px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--du);
+  box-shadow: 0 0 0 5px var(--du-soft), 0 0 20px var(--du); transition: left .6s cubic-bezier(.2, .7, .2, 1); }
+.ar-rail i.wa { background: var(--wa-line); box-shadow: 0 0 0 5px var(--fog), 0 0 20px var(--wa-line); }
+
+/* Grafen och ditt drag */
+.ar-stage { display: grid; grid-template-columns: minmax(0, 1fr) 348px; gap: 18px; margin-top: 28px; align-items: stretch; }
+.ar-stage .wc-panel { margin-top: 0; min-width: 0; }
+.ar-ticket { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin: 0; }
+.ar-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 14px; background: var(--ar-well); }
+.ar-seg button, .ar-pre button { min-height: 44px; border: 0; border-radius: 11px; background: transparent; color: var(--soft); font-size: 12px; font-weight: 400; letter-spacing: .16em; cursor: pointer; transition: background-color .18s, color .18s; }
+.ar-seg button:hover, .ar-pre button:hover { background: var(--glass); color: var(--ink); }
+.ar-seg button[aria-pressed="true"] { background: var(--du); color: var(--on-du); }
+.ar-hint { min-height: 44px; font-size: 15px; line-height: 1.45; color: var(--soft); }
+.ar-field { display: flex; flex-direction: column; gap: 8px; }
+.ar-amt { width: 100%; height: 64px; padding: 0 16px; border: 1px solid var(--glass-edge); border-radius: 14px; outline: 0; background: var(--ar-well); color: var(--ink); font-size: 30px; font-weight: 300; }
+.ar-amt:focus { border-color: var(--du); box-shadow: 0 0 0 3px var(--du-soft); }
+.ar-pre { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ar-pre button { border: 1px solid var(--line); font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0; }
+.ar-sum, .ar-stats { margin: 0; }
+.ar-sum { display: grid; gap: 9px; padding: 13px 0; border-block: 1px solid var(--line); font-size: 14px; }
+.ar-sum div { display: flex; justify-content: space-between; gap: 12px; }
+.ar-sum dt, .ar-stats dt { color: var(--muted); }
+.ar-sum dd, .ar-stats dd { margin: 0; }
+.ar-go { width: 100%; min-height: 56px; border: 0; border-radius: 15px; background: var(--du); color: var(--on-du); font-size: 13px; font-weight: 500; letter-spacing: .18em; cursor: pointer; transition: transform .15s, filter .18s; }
+.ar-go:hover { filter: brightness(1.08); }
+.ar-go:active { transform: scale(.985); }
+.ar-msg { min-height: 38px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.ar-pos { font-size: 40px; font-weight: 300; line-height: 1.05; color: var(--du); }
+.ar-says { display: flex; gap: 11px; margin-top: auto; }
+.ar-says i { flex: none; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 12px var(--teal); }
+.ar-says p { font-size: 15px; line-height: 1.45; color: var(--ink); }
+.ar-says .ar-lab { display: block; margin-top: 6px; letter-spacing: .24em; }
+
+/* Kapplöpningen */
+.ar-low { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 18px; margin-top: 18px; }
+.ar-low > .panel { min-width: 0; margin: 0; }
+.ar-key { display: flex; gap: 16px; font-size: 13px; color: var(--soft); }
+.ar-key span { display: inline-flex; align-items: center; gap: 6px; }
+.ar-key i { width: 18px; height: 0; border-top: 2px solid var(--du); }
+.ar-key i.wa { border-top: 2px dashed var(--wa-line); }
+.ar-plot { position: relative; margin-top: 12px; touch-action: pan-y; }
+.ar-plot svg { display: block; max-width: 100%; overflow: visible; }
+.ar-zero { stroke: var(--line); }
+.ar-gap { fill: var(--du-soft); }
+.ar-ldu, .ar-lwa { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.ar-ldu { stroke: var(--du); stroke-width: 2.6; }
+.ar-lwa { stroke: var(--wa-line); stroke-width: 2.2; stroke-dasharray: 7 5; }
+.ar-ddu { fill: var(--du); stroke: var(--bg-solid); stroke-width: 2; }
+.ar-dwa { fill: var(--wa-line); stroke: var(--bg-solid); stroke-width: 2; }
+.ar-tick { font-family: "JetBrains Mono", monospace; font-size: 11px; fill: var(--muted); }
+.ar-end { font-family: "JetBrains Mono", monospace; font-size: 13px; fill: var(--ink); }
+.ar-cross { stroke: var(--muted); stroke-dasharray: 2 3; }
+.ar-tip { position: absolute; top: -6px; left: 0; padding: 6px 10px; border: 1px solid var(--glass-edge); border-radius: 9px; background: var(--bg-solid); color: var(--ink); font-family: "JetBrains Mono", monospace; font-size: 12px; white-space: nowrap; pointer-events: none; }
+.ar-empty { margin-top: 16px; font-size: 15px; line-height: 1.5; color: var(--soft); }
+.ar-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); font-size: 13px; }
+.ar-stats dd { margin-top: 3px; font-size: 16px; color: var(--ink); }
+
+/* Säsongen */
+#ar-season { display: flex; flex-direction: column; gap: 14px; }
+.ar-score { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; color: var(--muted); }
+.ar-score strong { font-size: 42px; font-weight: 300; line-height: 1; }
+.ar-score p { flex: 1 1 150px; font-size: 14px; line-height: 1.4; color: var(--soft); }
+.ar-segs { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+.ar-segs i { height: 5px; border-radius: 3px; background: var(--line); }
+.ar-segs i.du { background: var(--du); }
+.ar-segs i.walter { background: var(--wa-line); }
+.ar-segs i.tie { background: var(--muted); }
+.ar-segs i.live { background: var(--du-soft); box-shadow: inset 0 0 0 1px var(--du); }
+.ar-badges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: auto 0 0; padding: 0; list-style: none; }
+.ar-badges li { display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-height: 82px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.ar-badges b { font-size: 14px; font-weight: 400; line-height: 1.25; color: var(--soft); }
+.ar-badges span { font-size: 12px; color: var(--muted); }
+.ar-badges .won { border-color: var(--du); background: var(--du-soft); }
+.ar-badges .won b { color: var(--ink); }
+.ar-badges .won span, .ar-badges .live span { color: var(--du); }
+.ar-badges .live { border-color: var(--du); border-style: dashed; }
+
+/* Mer */
+.ar-more { display: flex; flex-direction: column; margin-top: 22px; border-top: 1px solid var(--line); }
+.ar-more > details { border-bottom: 1px solid var(--line); }
+.ar-more > details > summary { display: flex; align-items: center; justify-content: space-between; min-height: 56px; margin: 0; list-style: none; cursor: pointer; font-size: 12px; letter-spacing: .28em; color: var(--soft); }
+.ar-more > details > summary::-webkit-details-marker { display: none; }
+.ar-more > details > summary::after { content: "+"; font-size: 18px; font-weight: 300; }
+.ar-more > details[open] > summary::after { content: "−"; }
+.ar-more > details > div, .ar-more .pro-news { margin: 0 0 22px; }
+.ar-more .section-title { display: none; }
+.ar-more .pro-lamps-box { margin-top: 0; }
+.ar-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+
+@media (max-width: 1100px) {
+  .ar-stage, .ar-low { grid-template-columns: minmax(0, 1fr); }
+  .ar-hint { min-height: 0; }
+}
+@media (max-width: 640px) {
+  .ar-duel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 12px; margin-top: 18px; }
+  #view-pro .wc-chart { height: 420px; } /* kortare graf, så att Ditt drag kommer snabbare */
+  .ar-lead { grid-column: 1 / -1; grid-row: 2; flex-direction: row; justify-content: center; align-items: baseline; gap: 8px; min-width: 0; }
+  .ar-leadn { font-size: 22px; }
+  .ar-big { font-size: clamp(38px, 12.2vw, 56px); }
+  .ar-side .ar-lab { letter-spacing: .3em; }
+  .ar-amt { height: 56px; font-size: 24px; }
+  .ar-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ar-badges li { padding: 10px; }
+  .ar-badges b { font-size: 13px; }
+}
+@media (hover: none), (pointer: coarse) { .ar-amt { font-size: max(16px, 24px); } }
+@media (prefers-reduced-motion: reduce) { .ar-rail i, .ar-go, .ar-seg button, .ar-pre button { transition: none; } }
+
+/* Rörelse som betyder något: band som väver, levande slutpunkter, puls när du handlar. Allt stängs av med reducerad rörelse. */
+.ar-echo { fill: none; stroke-width: 1; stroke-linejoin: round; pointer-events: none; }
+.ar-echo.du { stroke: var(--du); }
+.ar-echo.wa { stroke: var(--wa-line); }
+.ar-ldu { filter: drop-shadow(0 0 5px var(--du)); }
+.ar-lwa { filter: drop-shadow(0 0 4px var(--wa-line)); animation: ar-flow 1.6s linear infinite; }
+.ar-ring { fill: none; stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: ar-ping 2.6s ease-out infinite; }
+.ar-ring.du { stroke: var(--du); }
+.ar-ring.wa { stroke: var(--wa-line); animation-delay: 1.3s; }
+.ar-plot { cursor: ew-resize; }
+.ar-plot svg.ar-wipe { animation: ar-wipe 1.2s cubic-bezier(.2, .7, .2, 1) both; }
+.ar-scrub { margin-top: 4px; font-size: 13px; color: var(--muted); }
+.ar-rail::after { content: ""; position: absolute; top: -1px; width: 90px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--ink), transparent); opacity: .42; animation: ar-run 6s ease-in-out infinite; }
+.ar-duel.ar-hit .ar-big { animation: ar-hit .7s cubic-bezier(.2, .7, .2, 1); }
+.ar-duel.ar-hit .ar-rail i { animation: ar-pop .7s cubic-bezier(.2, .7, .2, 1); }
+.wc-panel, .ar-ticket, #ar-race, #ar-season { transition: border-color .25s, box-shadow .25s; }
+.ar-ticket:focus-within { border-color: var(--du); box-shadow: 0 0 34px var(--du-soft); }
+@keyframes ar-flow { to { stroke-dashoffset: -24; } }
+@keyframes ar-ping { 0% { transform: scale(1); opacity: .85; } 70%, 100% { transform: scale(3.4); opacity: 0; } }
+@keyframes ar-wipe { from { clip-path: inset(-20px 100% -20px -20px); } to { clip-path: inset(-20px -90px -20px -20px); } }
+@keyframes ar-run { 0% { left: 0; opacity: 0; } 15%, 85% { opacity: .42; } 100% { left: calc(100% - 90px); opacity: 0; } }
+@keyframes ar-hit { 0% { transform: scale(1); filter: brightness(1); } 28% { transform: scale(1.025); filter: brightness(1.35); } 100% { transform: scale(1); filter: brightness(1); } }
+@keyframes ar-pop { 0% { transform: scale(1); } 35% { transform: scale(1.7); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .ar-lwa, .ar-ring, .ar-rail::after, .ar-plot svg.ar-wipe, .ar-duel.ar-hit .ar-big, .ar-duel.ar-hit .ar-rail i { animation: none; }
+  .ar-ring, .ar-rail::after { display: none; }
+}

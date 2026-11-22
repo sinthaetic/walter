@@ -12,7 +12,8 @@
 //                                      false = hjulet rullar sidan). Lodrät fingerdragning rullar alltid sidan.}
 //     handle.setBars(bars, tf, reset)  ritar; reset = visa de senaste ~120 staplarna. -> {result, decimals} | null
 //     handle.setView(view)             "walter" eller "cipher" (ritar inte; anropa redraw)
-//     handle.setExtras({pulse, trades}) Walters lampor [[datum, röda]] (bara DAG/VECKA) och affärer från tradeMarks()
+//     handle.setExtras({pulse, trades, mine}) Walters lampor [[datum, röda]] (bara DAG/VECKA), affärer från tradeMarks()
+//                                      och dina egna (mine = [{date, side: "köp"|"sälj"|"blanka"|"stäng"}])
 //     handle.applyTheme()              efter byte ljust/mörkt (ritar inte om; anropa setView/redraw)
 //     handle.redraw(), handle.clear(), handle.chart
 //     handle.onDestroy(fn), handle.destroy()   städning (observers, timers) + tar bort grafen
@@ -397,13 +398,23 @@
       });
       // Walters egna affärer: samma pilar som köp/sälj, men i Walters teal och med W
       if (extras.trades && extras.trades.length) {
-        const visible = bars.slice(from);
+        const visible = bars.slice(from), tight = el.clientWidth < 520; // smal graf: korta etiketter som inte krockar
         extras.trades.forEach(t => {
           const time = alignTime(t.date, visible, tf);
           if (time == null) return;
-          if (t.side === "buy") priceMarks.push({ time, position: "belowBar", shape: "arrowUp", color: teal, text: "W KÖPTE" });
-          else if (t.side === "sell") priceMarks.push({ time, position: "aboveBar", shape: "arrowDown", color: teal, text: "W SÅLDE" });
+          if (t.side === "buy") priceMarks.push({ time, position: "belowBar", shape: "arrowUp", color: teal, text: tight ? "W" : "W KÖPTE" });
+          else if (t.side === "sell") priceMarks.push({ time, position: "aboveBar", shape: "arrowDown", color: teal, text: tight ? "W" : "W SÅLDE" });
           else priceMarks.push({ time, position: "belowBar", shape: "circle", color: teal, size: 0.5 });
+        });
+      }
+      // Dina egna affärer (Arenan): i din färg, så att du ser vad ciphern visade när du agerade
+      if (extras.mine && extras.mine.length) {
+        const visible = bars.slice(from), du = css("--du") || "#8C84FF";
+        const MINE = { "köp": ["belowBar", "arrowUp", "DU KÖPTE"], "sälj": ["aboveBar", "arrowDown", "DU SÅLDE"],
+          "blanka": ["aboveBar", "arrowDown", "DU BLANKADE"], "stäng": ["belowBar", "arrowUp", "DU STÄNGDE"] };
+        extras.mine.forEach(t => {
+          const time = alignTime(t.date, visible, tf), m = MINE[t.side];
+          if (time != null && m) priceMarks.push({ time, position: m[0], shape: m[1], color: du, text: el.clientWidth < 520 ? "DU" : m[2] });
         });
       }
       priceMarks.sort((a, b) => a.time - b.time);
@@ -469,6 +480,7 @@
          ["sw", "--c-k", "Stoch RSI"], ["dt", "--green", "Köp"], ["dt", "--red", "Sälj"], ["dt", "--gold", "Guld"]]
       : [["sw", "--c-band", "Trendband"], ["sw", "--c-wave", "Vågen"], ["sw", "--c-mfi", "Pengaflöde"], ["dt", "--green", "Köpsignal"], ["dt", "--red", "Säljsignal"], ["dt", "--gold", "Guldsignal"]];
     if (extras && extras.trades) items.push(["dt", "--teal", "W = Walters affär"]);
+    if (extras && "mine" in extras) items.push(["dt", "--du", "DU = din affär"]);
     if (extras && extras.pulse) items.push(["sw", "--c-mfi-up", "Lamporna lugna"], ["sw", "--c-mfi-down", "Lamporna oroliga"]);
     return items.map(([k, v, t]) => `<li><span class="${k}" style="background:var(${v})"></span>${t}</li>`).join("")
       + `<li><span class="sw" style="border-top:1px dashed var(--muted);height:0"></span>Starka zoner ±60</li>`;
