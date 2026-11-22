@@ -263,6 +263,13 @@ test("autopilot_catchup_trades_on_prices_when_lamps_not_ready", () => {
   eq(u2.lastDay, "2026-09-30");
 });
 
+test("autopilot_catchup_mode_change_alone_writes_no_journal", () => {
+  const user = newUser(100000, 100000, { lastDay: "2026-10-22", startDate: "2026-10-23" });
+  const r = E().catchUp(user, [row("2026-10-23", 3), row("2026-10-24", 1)], AP_RULES, LEVELS, EX);
+  eq(r.user.journal.map((j) => j.date), ["2026-10-23"]);
+  eq(r.user.portfolio.history[r.user.portfolio.history.length - 1].note, "dag");
+});
+
 test("autopilot_catchup_missed_sunday_once", () => {
   // Fredag 23 okt första köp. Söndag 25 okt saknas i loggen. BTC fördubblas måndag 26 okt.
   const user = newUser(100000, 100000, { lastDay: "2026-10-22", startDate: "2026-10-23" });

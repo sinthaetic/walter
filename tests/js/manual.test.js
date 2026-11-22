@@ -37,6 +37,50 @@ test("manual_trailing_stop_follows_peak", () => {
   eq(p.checked, "2026-11-05");
 });
 
+test("manual_short_earns_when_price_falls", () => {
+  const p = M().create(1000, "2026-11-01");
+  eq(M().short(p, 1000, 100, 0.01, "2026-11-01"), true);
+  eq(p.cash, 0);
+  eq(M().buy(p, 1, 100, 0, "2026-11-01"), false);    // aldrig köp och blankning samtidigt
+  eq(M().short(p, 1, 100, 0, "2026-11-01"), false);  // en blankning i taget
+  const days = 10, margin = 990, units = margin / 100, fund = units * 100 * M().FUNDING_DAY * days;
+  eq(Math.round(M().value(p, 80, "2026-11-11") * 100), Math.round((margin + 20 * units - fund) * 100));
+  eq(M().cover(p, 80, 0.01, "2026-11-11"), true);
+  eq(p.short, null);
+  eq(p.cash, Math.round((margin + 20 * units - fund - units * 80 * 0.01) * 100) / 100);
+  eq(p.trades[1].side, "stäng");
+  eq(p.trades[1].gainSek, Math.round((p.cash - 1000) * 100) / 100);
+});
+
+test("manual_short_blocked_while_holding", () => {
+  const p = M().create(1000, "2026-11-01");
+  M().buy(p, 500, 100, 0, "2026-11-01");
+  eq(M().short(p, 100, 100, 0, "2026-11-01"), false);
+});
+
+test("manual_short_trailing_stop_from_low", () => {
+  const p = M().create(1000, "2026-11-01");
+  M().short(p, 1000, 100, 0, "2026-11-01");
+  const hit = M().checkStop(p, [{ date: "2026-11-02", px: 80 }, { date: "2026-11-03", px: 87 }, { date: "2026-11-04", px: 89 }], 0);
+  eq(hit.date, "2026-11-04");       // 89 >= 80 × 1,1 = 88
+  eq(p.short, null);
+  eq(p.trades[1].why, "stopp");
+  const q = M().create(1000, "2026-11-01");
+  M().short(q, 1000, 100, 0, "2026-11-01");
+  eq(M().checkLive(q, 95, 0, "2026-11-01"), false);
+  eq(Math.round(M().stopPx(q) * 10), 1045);
+  eq(M().checkLive(q, 105, 0, "2026-11-01"), true);
+});
+
+test("manual_short_never_loses_more_than_stake", () => {
+  const p = M().create(1000, "2026-11-01");
+  M().short(p, 1000, 100, 0, "2026-11-01");
+  eq(M().value(p, 500, "2026-11-02"), 0);   // gap rakt förbi stoppet: insatsen är borta, inget mer
+  M().cover(p, 500, 0.01, "2026-11-02", "stopp");
+  eq(p.cash, 0);
+  eq(p.trades[1].gainSek, -1000);
+});
+
 test("manual_stop_not_hit_and_stop_price", () => {
   const p = M().create(1000, "2026-11-01");
   M().buy(p, 1000, 100, 0, "2026-11-01");

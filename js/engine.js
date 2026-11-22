@@ -589,7 +589,8 @@
       }
 
       const prop = propose(user, row, rules, exchange);
-      if (prop.trades.length || prop.mode !== user.mode || (auto && prop.needsApproval)) {
+      // Autopiloten: marknadsläget ensamt ger ingen journalpost (needsApproval, som i Python)
+      if (auto ? prop.needsApproval : prop.trades.length || prop.mode !== user.mode) {
         events.push(apply(user, prop, row.date));
       } else {
         // Ingen affär: dagens värde sparas ändå (en riktig loggdag), så att historiken stämmer.

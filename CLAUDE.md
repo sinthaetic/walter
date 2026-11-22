@@ -77,8 +77,10 @@ Trend och nivå, inte enstaka dagar. Gränserna står i `rules.lampThresholds`.
   DI filtrerat på kryptoord; bara rubrik/källa/tid/länk; rubriker med läckspärrens ord hoppas över; fel stoppar aldrig deploy)
   och lamptabellen hopfälld längst ned (`#pro-lamps`).
 - Min egen handel (`js/manual.js` + panelen `#manual` på Pro under grafen, tester `tests/js/manual.test.js`): egen låtsaskassa i bitcoin
-  (`walter.manual` / `walter.user.manual`), köp/sälj till Walters pris och avgift, släpande stopp −10 % som Walter sköter
-  (dagspriserna i market.js `log` sedan förra besöket + dagens pris). Jämförs med Walters marknadsvinst samma tid. Rör aldrig Walters portfölj.
+  (`walter.manual` / `walter.user.manual`), köp/sälj/blanka till Walters pris och avgift, släpande stopp 10 % åt båda håll som Walter sköter
+  (dagspriserna i market.js `log` sedan förra besöket + dagens pris). Blankning: på låtsas, 1x, en i taget, aldrig samtidigt som köp,
+  0,03 %/dag i finansiering, kan inte förlora mer än insatsen. Jämförs med Walters marknadsvinst samma tid. Rör aldrig Walters portfölj.
+  Autopiloten blankar aldrig (BACKTEST del 5–5e).
 - `js/exchanges.js`: 5 MiCA-börser (Bitstamp, Bybit EU, Kraken, OKX Europe, Safello) med avgift, tillstånd och källa/datum. Alla avgifter är paper, inga riktiga pengar.
 - `js/vault.js` = dekryptering i webbläsaren (samma format som `walter_vault.py`).
 - Appens vy för användare: förklaringar i vanliga ord, "Siffrorna", Pro-läge, "Live: inte än".
