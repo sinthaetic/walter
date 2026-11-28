@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512" role="img" aria-label="WALTER">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#1C2E35"/><stop offset="1" stop-color="#0A1216"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14.5" fill="url(#g)"/>
+  <g transform="translate(13.5 13.5) scale(0.578)">
+    <path d="M26 8.46 L8.6 18.5 V45.5 L32 59 L55.4 45.5 V18.5 L38 8.46" fill="none" stroke="#E8F0F2" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M8.6 18.5 L20 52.1 L32 31 L44 52.1 L55.4 18.5" fill="none" stroke="#E8F0F2" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="32" cy="5.5" r="3.6" fill="#6FD3DE"/>
+  </g>
+</svg>

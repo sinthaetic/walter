@@ -1,0 +1,69 @@
+//@version=5
+// W-Cipher A – Walters trendband och signaler i prisgrafen.
+// Egen kod från öppna formler (EMA, LazyBears WaveTrend), inspirerad av VuManChu Cipher A.
+// Ingen kod kopierad. Samma parametrar som js/wcipher.js. Signalerna är vad indikatorn visar, inte råd.
+indicator("W-Cipher A (Walter)", shorttitle="W-Cipher A", overlay=true)
+
+l1 = input.int(5,  "EMA 1", group="Trendband")
+l2 = input.int(11, "EMA 2", group="Trendband")
+l3 = input.int(15, "EMA 3", group="Trendband")
+l4 = input.int(18, "EMA 4", group="Trendband")
+l5 = input.int(21, "EMA 5", group="Trendband")
+l6 = input.int(24, "EMA 6", group="Trendband")
+l7 = input.int(28, "EMA 7", group="Trendband")
+l8 = input.int(34, "EMA 8", group="Trendband")
+chan   = input.int(9,  "Vågen: kanal", group="Vågen")
+avgLen = input.int(12, "Vågen: snitt", group="Vågen")
+maLen  = input.int(3,  "Vågen: MA",    group="Vågen")
+zone   = input.int(60, "Stark zon ±",  group="Vågen")
+deep   = input.int(75, "Djup zon för guld (−)", group="Vågen")
+rsiLow = input.int(30, "RSI låg (guld)", group="Vågen")
+
+GREEN = #3DD39A
+RED   = #FF4D66
+GOLD  = #F2C14E
+
+e1 = ta.ema(close, l1)
+e2 = ta.ema(close, l2)
+e3 = ta.ema(close, l3)
+e4 = ta.ema(close, l4)
+e5 = ta.ema(close, l5)
+e6 = ta.ema(close, l6)
+e7 = ta.ema(close, l7)
+e8 = ta.ema(close, l8)
+bandCol = e2 >= e8 ? color.new(GREEN, 45) : color.new(RED, 45)
+plot(e1, "EMA 1", color=bandCol)
+plot(e2, "EMA 2", color=bandCol)
+plot(e3, "EMA 3", color=bandCol)
+plot(e4, "EMA 4", color=bandCol)
+plot(e5, "EMA 5", color=bandCol)
+plot(e6, "EMA 6", color=bandCol)
+plot(e7, "EMA 7", color=bandCol)
+plot(e8, "EMA 8", color=bandCol, linewidth=2)
+
+// Vågen, samma som W-Cipher B
+ap  = hlc3
+esa = ta.ema(ap, chan)
+d   = ta.ema(math.abs(ap - esa), chan)
+ci  = d == 0 ? 0.0 : (ap - esa) / (0.015 * d)
+wt1 = ta.ema(ci, avgLen)
+wt2 = ta.sma(wt1, maLen)
+r   = ta.rsi(close, 14)
+
+up   = wt1[1] < wt2[1] and wt1 >= wt2
+dn   = wt1[1] > wt2[1] and wt1 <= wt2
+guld = up and wt2 <= -deep and r < rsiLow
+kop  = up and not guld and wt2 <= -zone
+salj = dn and wt2 >= zone
+trendUpp = e2[1] < e8[1] and e2 >= e8
+trendNed = e8[1] < e2[1] and e8 >= e2
+blod = dn and wt2 > 0 and e1[1] > e2[1] and e1 <= e2
+
+plotshape(trendUpp, title="Trendband vänder upp", style=shape.circle,       location=location.belowbar, color=GREEN, size=size.tiny)
+plotshape(trendNed, title="Trendband vänder ned", style=shape.circle,       location=location.abovebar, color=RED,   size=size.tiny)
+plotshape(kop,      title="Köp",                  style=shape.triangleup,   location=location.belowbar, color=GREEN, size=size.small, text="KÖP",  textcolor=GREEN)
+plotshape(guld,     title="Guld",                 style=shape.triangleup,   location=location.belowbar, color=GOLD,  size=size.small, text="GULD", textcolor=GOLD)
+plotshape(salj,     title="Sälj",                 style=shape.triangledown, location=location.abovebar, color=RED,   size=size.small, text="SÄLJ", textcolor=RED)
+plotshape(blod,     title="Blod",                 style=shape.diamond,      location=location.abovebar, color=#B0203A, size=size.small, text="BLOD", textcolor=#B0203A)
+
+alertcondition(blod, "W-Cipher blod", "W-Cipher: blodsignal på {{ticker}} ({{interval}})")
